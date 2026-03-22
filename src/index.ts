@@ -3,17 +3,24 @@
 /**
  * @battlegrid/mcp-server — stdio proxy to BattleGrid's remote MCP server
  *
- * Reads BATTLEGRID_API_KEY from environment, connects to the remote BattleGrid
- * MCP server via Streamable HTTP, and re-exposes all tools, prompts, and
- * resources over stdio transport for local MCP clients.
+ * Reads BATTLEGRID_API_KEYS (comma-separated) or BATTLEGRID_API_KEY from
+ * environment, discovers account identities via GET /mcp/identity, connects
+ * to the remote BattleGrid MCP server via Streamable HTTP, and re-exposes
+ * all tools, prompts, and resources over stdio transport for local MCP clients.
+ *
+ * Multi-account support: when multiple keys are configured, an `account`
+ * enum parameter is injected into every tool so the AI agent can choose
+ * which account to act as. Tool calls are routed with the matching Bearer token.
  *
  * Architecture: Matches Stripe's @stripe/mcp pattern — thin authenticated proxy.
  *
  * Usage:
  *   BATTLEGRID_API_KEY=bg_live_... npx @battlegrid/mcp-server
+ *   BATTLEGRID_API_KEYS=bg_live_aaa,bg_live_bbb npx @battlegrid/mcp-server
  *
  * Environment Variables:
- *   BATTLEGRID_API_KEY  (required) — Your BattleGrid API key (starts with bg_live_)
+ *   BATTLEGRID_API_KEYS (optional) — Comma-separated list of API keys
+ *   BATTLEGRID_API_KEY  (optional) — Single API key (fallback if BATTLEGRID_API_KEYS not set)
  *   BATTLEGRID_API_URL  (optional) — Override server URL (default: https://mcp.battlegrid.trade)
  */
 
@@ -30,37 +37,108 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-export const VERSION = '1.0.1';
+export const VERSION = '1.1.0';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
 
-// --- Environment validation (exported for testing) ---
+// --- Types ---
 
 export interface EnvConfig {
-  apiKey: string;
+  apiKeys: string[];
   apiUrl: string;
 }
 
+export interface AccountIdentity {
+  apiKey: string;
+  userId: string;
+  username: string;
+  keyLabel: string | null;
+}
+
+// --- Environment validation (exported for testing) ---
+
 export function validateEnv(env: Record<string, string | undefined>): EnvConfig {
-  const apiKey = env.BATTLEGRID_API_KEY;
   const apiUrl = env.BATTLEGRID_API_URL || DEFAULT_URL;
 
-  if (!apiKey) {
+  // BATTLEGRID_API_KEYS (comma-separated) takes precedence
+  const keysRaw = env.BATTLEGRID_API_KEYS;
+  let apiKeys: string[];
+
+  if (keysRaw) {
+    apiKeys = keysRaw.split(',').map(k => k.trim()).filter(Boolean);
+  } else {
+    const singleKey = env.BATTLEGRID_API_KEY;
+    apiKeys = singleKey ? [singleKey] : [];
+  }
+
+  if (apiKeys.length === 0) {
     throw new Error(
-      'BATTLEGRID_API_KEY environment variable is required.\n' +
+      'BATTLEGRID_API_KEY or BATTLEGRID_API_KEYS environment variable is required.\n' +
       'Get your API key at: https://battlegrid.trade → Profile → MCP tab'
     );
   }
 
-  if (!apiKey.startsWith('bg_live_')) {
+  for (const key of apiKeys) {
+    if (!key.startsWith('bg_live_')) {
+      throw new Error(
+        `API key must start with "bg_live_" (got "${key.slice(0, 12)}...")\n` +
+        'Create a new key at: https://battlegrid.trade → Profile → MCP tab'
+      );
+    }
+  }
+
+  return { apiKeys, apiUrl };
+}
+
+// --- Identity discovery (exported for testing) ---
+
+export async function discoverIdentities(
+  apiKeys: string[],
+  apiUrl: string,
+): Promise<AccountIdentity[]> {
+  // Derive identity base URL from MCP URL (strip /mcp suffix if present)
+  const baseUrl = apiUrl.replace(/\/mcp\/?$/, '');
+
+  const results = await Promise.allSettled(
+    apiKeys.map(async (apiKey) => {
+      const response = await fetch(`${baseUrl}/mcp/identity`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status}: ${text}`);
+      }
+      const data = await response.json() as { userId: string; username: string | null; keyLabel: string | null };
+      return {
+        apiKey,
+        userId: data.userId,
+        username: data.username ?? data.userId.slice(0, 8),
+        keyLabel: data.keyLabel,
+      } satisfies AccountIdentity;
+    }),
+  );
+
+  const identities: AccountIdentity[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === 'fulfilled') {
+      identities.push(result.value);
+    } else {
+      process.stderr.write(
+        `Warning: identity discovery failed for key #${i + 1}: ${result.reason}\n`
+      );
+    }
+  }
+
+  if (identities.length === 0) {
     throw new Error(
-      'API key must start with "bg_live_"\n' +
-      'Create a new key at: https://battlegrid.trade → Profile → MCP tab'
+      'No valid API keys — all identity lookups failed.\n' +
+      'Check your keys at: https://battlegrid.trade → Profile → MCP tab'
     );
   }
 
-  return { apiKey, apiUrl };
+  return identities;
 }
 
 // --- Connection with retry ---
@@ -80,7 +158,6 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
       await client.connect(transport);
       return;
     } catch (error) {
-      // Auth errors should not be retried — the key is wrong
       if (isAuthError(error)) {
         throw new Error(
           'Invalid or revoked API key.\n' +
@@ -101,12 +178,39 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
         `Connection attempt ${attempt + 1} failed, retrying in ${delay / 1000}s...\n`
       );
       await sleep(delay);
-
-      // Recreate transport for retry (previous one may be in a broken state)
-      // Note: we can't reconnect the same transport, so we create a fresh Client+Transport
-      // on each retry in the main function instead
     }
   }
+}
+
+// --- Multi-account tool augmentation ---
+
+interface ToolDefinition {
+  name: string;
+  description?: string;
+  inputSchema: {
+    type: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+    [key: string]: unknown;
+  };
+}
+
+function injectAccountParam(tools: ToolDefinition[], accountNames: string[]): ToolDefinition[] {
+  return tools.map(tool => ({
+    ...tool,
+    inputSchema: {
+      ...tool.inputSchema,
+      properties: {
+        account: {
+          type: 'string',
+          enum: accountNames,
+          description: `Which BattleGrid account to use for this action. Available: ${accountNames.join(', ')}`,
+        },
+        ...tool.inputSchema.properties,
+      },
+      required: ['account', ...(tool.inputSchema.required ?? [])],
+    },
+  }));
 }
 
 // --- Main ---
@@ -120,19 +224,42 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Connect to remote BattleGrid MCP server with retry
-  const remoteTransport = new StreamableHTTPClientTransport(
-    new URL(config.apiUrl),
-    { requestInit: { headers: { Authorization: `Bearer ${config.apiKey}` } } }
+  // Discover identities for all keys
+  let identities: AccountIdentity[];
+  try {
+    identities = await discoverIdentities(config.apiKeys, config.apiUrl);
+  } catch (error) {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  }
+
+  const isMultiAccount = identities.length > 1;
+  const accountNames = identities.map(id => id.username);
+
+  // Build lookup: username → apiKey
+  const keyByAccount = new Map<string, string>();
+  for (const id of identities) {
+    keyByAccount.set(id.username, id.apiKey);
+  }
+
+  process.stderr.write(
+    `BattleGrid MCP: ${identities.length} account(s) discovered — ${accountNames.join(', ')}\n`
   );
 
-  const remoteClient = new Client(
+  // Connect to remote using the first key (for capability discovery)
+  const primaryKey = identities[0].apiKey;
+  const primaryTransport = new StreamableHTTPClientTransport(
+    new URL(config.apiUrl),
+    { requestInit: { headers: { Authorization: `Bearer ${primaryKey}` } } }
+  );
+
+  const primaryClient = new Client(
     { name: 'battlegrid-proxy', version: VERSION },
     { capabilities: {} }
   );
 
   try {
-    await connectWithRetry(remoteClient, remoteTransport, config.apiUrl);
+    await connectWithRetry(primaryClient, primaryTransport, config.apiUrl);
   } catch (error) {
     process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exit(1);
@@ -140,9 +267,9 @@ async function main(): Promise<void> {
 
   // Discover remote capabilities
   const [toolsResult, promptsResult, resourcesResult] = await Promise.all([
-    remoteClient.listTools(),
-    remoteClient.listPrompts(),
-    remoteClient.listResources(),
+    primaryClient.listTools(),
+    primaryClient.listPrompts(),
+    primaryClient.listResources(),
   ]);
 
   process.stderr.write(
@@ -150,6 +277,11 @@ async function main(): Promise<void> {
     `${promptsResult.prompts.length} prompts, ` +
     `${resourcesResult.resources.length} resources\n`
   );
+
+  // Augment tools with account parameter if multi-account
+  const exposedTools = isMultiAccount
+    ? injectAccountParam(toolsResult.tools as ToolDefinition[], accountNames)
+    : toolsResult.tools;
 
   // Create local stdio server
   const localServer = new Server(
@@ -166,14 +298,54 @@ async function main(): Promise<void> {
   // --- Proxy: tools ---
 
   localServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: toolsResult.tools,
+    tools: exposedTools,
   }));
+
+  // Keep a pool of remote clients keyed by API key for routing
+  const clientPool = new Map<string, Client>();
+  clientPool.set(primaryKey, primaryClient);
+
+  async function getClientForKey(apiKey: string): Promise<Client> {
+    const existing = clientPool.get(apiKey);
+    if (existing) return existing;
+
+    const transport = new StreamableHTTPClientTransport(
+      new URL(config.apiUrl),
+      { requestInit: { headers: { Authorization: `Bearer ${apiKey}` } } }
+    );
+    const client = new Client(
+      { name: 'battlegrid-proxy', version: VERSION },
+      { capabilities: {} }
+    );
+    await connectWithRetry(client, transport, config.apiUrl);
+    clientPool.set(apiKey, client);
+    return client;
+  }
 
   localServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
-      return await remoteClient.callTool({
+      let targetKey = primaryKey;
+      const args = { ...request.params.arguments } as Record<string, unknown>;
+
+      if (isMultiAccount) {
+        const selectedAccount = args.account as string | undefined;
+        if (!selectedAccount || !keyByAccount.has(selectedAccount)) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: `Error: "account" parameter is required. Choose one of: ${accountNames.join(', ')}`,
+            }],
+            isError: true,
+          };
+        }
+        targetKey = keyByAccount.get(selectedAccount)!;
+        delete args.account; // Strip before forwarding to remote
+      }
+
+      const client = await getClientForKey(targetKey);
+      return await client.callTool({
         name: request.params.name,
-        arguments: request.params.arguments,
+        arguments: args,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -191,7 +363,7 @@ async function main(): Promise<void> {
   }));
 
   localServer.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    return await remoteClient.getPrompt({
+    return await primaryClient.getPrompt({
       name: request.params.name,
       arguments: request.params.arguments,
     });
@@ -204,7 +376,7 @@ async function main(): Promise<void> {
   }));
 
   localServer.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-    return await remoteClient.readResource({
+    return await primaryClient.readResource({
       uri: request.params.uri,
     });
   });

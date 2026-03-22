@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { validateEnv, DEFAULT_URL } from '../index.js';
 
 describe('validateEnv', () => {
-  it('returns config with valid API key and default URL', () => {
+  // --- Single key (backwards compat) ---
+
+  it('returns config with valid single API key and default URL', () => {
     const result = validateEnv({ BATTLEGRID_API_KEY: 'bg_live_abc123' });
     expect(result).toEqual({
-      apiKey: 'bg_live_abc123',
+      apiKeys: ['bg_live_abc123'],
       apiUrl: DEFAULT_URL,
     });
   });
@@ -18,19 +20,19 @@ describe('validateEnv', () => {
     expect(result.apiUrl).toBe('http://localhost:4002/mcp');
   });
 
-  it('throws when BATTLEGRID_API_KEY is missing', () => {
-    expect(() => validateEnv({})).toThrow('BATTLEGRID_API_KEY environment variable is required');
+  it('throws when no API key env vars are set', () => {
+    expect(() => validateEnv({})).toThrow('BATTLEGRID_API_KEY or BATTLEGRID_API_KEYS environment variable is required');
   });
 
   it('throws when BATTLEGRID_API_KEY is undefined', () => {
     expect(() => validateEnv({ BATTLEGRID_API_KEY: undefined })).toThrow(
-      'BATTLEGRID_API_KEY environment variable is required'
+      'BATTLEGRID_API_KEY or BATTLEGRID_API_KEYS environment variable is required'
     );
   });
 
   it('throws when BATTLEGRID_API_KEY is empty string', () => {
     expect(() => validateEnv({ BATTLEGRID_API_KEY: '' })).toThrow(
-      'BATTLEGRID_API_KEY environment variable is required'
+      'BATTLEGRID_API_KEY or BATTLEGRID_API_KEYS environment variable is required'
     );
   });
 
@@ -48,7 +50,7 @@ describe('validateEnv', () => {
 
   it('accepts minimum valid key (bg_live_ prefix only)', () => {
     const result = validateEnv({ BATTLEGRID_API_KEY: 'bg_live_x' });
-    expect(result.apiKey).toBe('bg_live_x');
+    expect(result.apiKeys).toEqual(['bg_live_x']);
   });
 
   it('defaults to production URL when BATTLEGRID_API_URL is empty', () => {
@@ -57,5 +59,55 @@ describe('validateEnv', () => {
       BATTLEGRID_API_URL: '',
     });
     expect(result.apiUrl).toBe(DEFAULT_URL);
+  });
+
+  // --- Multi-key (BATTLEGRID_API_KEYS) ---
+
+  it('parses comma-separated BATTLEGRID_API_KEYS', () => {
+    const result = validateEnv({
+      BATTLEGRID_API_KEYS: 'bg_live_aaa,bg_live_bbb,bg_live_ccc',
+    });
+    expect(result.apiKeys).toEqual(['bg_live_aaa', 'bg_live_bbb', 'bg_live_ccc']);
+  });
+
+  it('trims whitespace around comma-separated keys', () => {
+    const result = validateEnv({
+      BATTLEGRID_API_KEYS: ' bg_live_aaa , bg_live_bbb ',
+    });
+    expect(result.apiKeys).toEqual(['bg_live_aaa', 'bg_live_bbb']);
+  });
+
+  it('BATTLEGRID_API_KEYS takes precedence over BATTLEGRID_API_KEY', () => {
+    const result = validateEnv({
+      BATTLEGRID_API_KEYS: 'bg_live_multi1,bg_live_multi2',
+      BATTLEGRID_API_KEY: 'bg_live_single',
+    });
+    expect(result.apiKeys).toEqual(['bg_live_multi1', 'bg_live_multi2']);
+  });
+
+  it('throws when BATTLEGRID_API_KEYS is empty', () => {
+    expect(() => validateEnv({ BATTLEGRID_API_KEYS: '' })).toThrow(
+      'BATTLEGRID_API_KEY or BATTLEGRID_API_KEYS environment variable is required'
+    );
+  });
+
+  it('throws when any key in BATTLEGRID_API_KEYS has invalid prefix', () => {
+    expect(() =>
+      validateEnv({ BATTLEGRID_API_KEYS: 'bg_live_good,sk_bad_key' })
+    ).toThrow('API key must start with "bg_live_"');
+  });
+
+  it('filters out empty entries from trailing commas', () => {
+    const result = validateEnv({
+      BATTLEGRID_API_KEYS: 'bg_live_aaa,,bg_live_bbb,',
+    });
+    expect(result.apiKeys).toEqual(['bg_live_aaa', 'bg_live_bbb']);
+  });
+
+  it('works with single key in BATTLEGRID_API_KEYS', () => {
+    const result = validateEnv({
+      BATTLEGRID_API_KEYS: 'bg_live_only',
+    });
+    expect(result.apiKeys).toEqual(['bg_live_only']);
   });
 });
