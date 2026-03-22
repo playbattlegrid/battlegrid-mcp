@@ -24,6 +24,7 @@
  *   BATTLEGRID_API_URL  (optional) — Override server URL (default: https://mcp.battlegrid.trade)
  */
 
+import { createHash } from 'crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -37,7 +38,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.3';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
@@ -125,8 +126,10 @@ export async function discoverIdentities(
     if (result.status === 'fulfilled') {
       identities.push(result.value);
     } else {
+      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      const keyPrefix = apiKeys[i].substring(0, 12);
       process.stderr.write(
-        `Warning: identity discovery failed for key #${i + 1}: ${result.reason}\n`
+        `Warning: identity discovery failed for key #${i + 1} (${keyPrefix}): ${reason}\n`
       );
     }
   }
@@ -144,6 +147,11 @@ export async function discoverIdentities(
 // --- Connection with retry ---
 
 function isAuthError(error: unknown): boolean {
+  // Check error.code for StreamableHTTPError (MCP SDK stores HTTP status as .code)
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code: unknown }).code;
+    if (code === 401 || code === 403) return true;
+  }
   const message = error instanceof Error ? error.message : String(error);
   return message.includes('401') || message.includes('Unauthorized') || message.includes('403');
 }
@@ -158,9 +166,19 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
       await client.connect(transport);
       return;
     } catch (error) {
+      // Log full error detail for diagnostics
+      const errorCode = error && typeof error === 'object' && 'code' in error
+        ? (error as { code: unknown }).code
+        : undefined;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
       if (isAuthError(error)) {
         throw new Error(
-          'Invalid or revoked API key.\n' +
+          `Authentication failed (HTTP ${errorCode ?? 'unknown'}): ${errorMessage}\n` +
+          'This means the server rejected your API key. Possible causes:\n' +
+          '  1. Key was revoked (a new key invalidates all previous keys)\n' +
+          '  2. Key was corrupted during copy-paste\n' +
+          '  3. Environment variable contains extra whitespace or newline\n' +
           'Create a new key at: https://battlegrid.trade → Profile → MCP tab'
         );
       }
@@ -168,6 +186,7 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
       if (attempt === MAX_RETRIES) {
         throw new Error(
           `Cannot connect to BattleGrid server at ${apiUrl} after ${MAX_RETRIES + 1} attempts.\n` +
+          `Last error: ${errorMessage}\n` +
           `Check your internet connection or verify the server is running.\n` +
           `Health check: ${apiUrl.replace('/mcp', '')}/health`
         );
@@ -175,7 +194,7 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
 
       const delay = RETRY_DELAYS_MS[attempt] ?? 8000;
       process.stderr.write(
-        `Connection attempt ${attempt + 1} failed, retrying in ${delay / 1000}s...\n`
+        `Connection attempt ${attempt + 1} failed (${errorMessage}), retrying in ${delay / 1000}s...\n`
       );
       await sleep(delay);
     }
@@ -222,6 +241,15 @@ async function main(): Promise<void> {
   } catch (error) {
     process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exit(1);
+  }
+
+  // Log key diagnostics for cross-referencing with server logs
+  for (let i = 0; i < config.apiKeys.length; i++) {
+    const key = config.apiKeys[i];
+    const hashPrefix = createHash('sha256').update(key).digest('hex').substring(0, 16);
+    process.stderr.write(
+      `BattleGrid MCP: Key #${i + 1} prefix=${key.substring(0, 12)} hashPrefix=${hashPrefix} len=${key.length}\n`
+    );
   }
 
   // Discover identities for all keys
