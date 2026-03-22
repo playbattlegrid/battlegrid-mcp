@@ -97,12 +97,12 @@ export async function discoverIdentities(
   apiKeys: string[],
   apiUrl: string,
 ): Promise<AccountIdentity[]> {
-  // Derive identity base URL from MCP URL (strip /mcp suffix if present)
-  const baseUrl = apiUrl.replace(/\/mcp\/?$/, '');
+  // Strip trailing slash for clean URL construction
+  const baseUrl = apiUrl.replace(/\/+$/, '');
 
   const results = await Promise.allSettled(
     apiKeys.map(async (apiKey) => {
-      const response = await fetch(`${baseUrl}/mcp/identity`, {
+      const response = await fetch(`${baseUrl}/identity`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!response.ok) {
