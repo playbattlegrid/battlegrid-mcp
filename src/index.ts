@@ -38,7 +38,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-export const VERSION = '1.1.3';
+export const VERSION = '1.1.4';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
