@@ -31,7 +31,7 @@ BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
 ### Option B: Remote / streamable-http
 
 ```
-URL: https://mcp.battlegrid.trade
+URL: https://mcp.battlegrid.trade/mcp
 Header: Authorization: Bearer bg_live_xxx
 ```
 

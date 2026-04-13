@@ -21,7 +21,7 @@
  * Environment Variables:
  *   BATTLEGRID_API_KEYS (optional) — Comma-separated list of API keys
  *   BATTLEGRID_API_KEY  (optional) — Single API key (fallback if BATTLEGRID_API_KEYS not set)
- *   BATTLEGRID_API_URL  (optional) — Override server URL (default: https://mcp.battlegrid.trade)
+ *   BATTLEGRID_API_URL  (optional) — Override server URL (default: https://mcp.battlegrid.trade/mcp)
  */
 
 import { createHash } from 'crypto';
@@ -38,8 +38,8 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-export const VERSION = '1.1.4';
-export const DEFAULT_URL = 'https://mcp.battlegrid.trade';
+export const VERSION = '2.0.0';
+export const DEFAULT_URL = 'https://mcp.battlegrid.trade/mcp';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
 

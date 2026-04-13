@@ -24,7 +24,7 @@ When multiple keys are provided, the server discovers each account's identity an
 ### Remote server (streamable-http transport)
 
 ```
-https://mcp.battlegrid.trade
+https://mcp.battlegrid.trade/mcp
 ```
 
 No npm install required — connect directly from any MCP client that supports streamable-http.
@@ -206,7 +206,7 @@ npx skills add playbattlegrid/battlegrid-mcp
 |----------|----------|-------------|
 | `BATTLEGRID_API_KEYS` | One of these | Comma-separated API keys for multiple accounts |
 | `BATTLEGRID_API_KEY` | One of these | Single API key (fallback if `BATTLEGRID_API_KEYS` not set) |
-| `BATTLEGRID_API_URL` | No | Override server URL (default: `https://mcp.battlegrid.trade`) |
+| `BATTLEGRID_API_URL` | No | Override server URL (default: `https://mcp.battlegrid.trade/mcp`) |
 
 ## License
 
