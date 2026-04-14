@@ -319,26 +319,7 @@
       margin-top: 4px;
     }
 
-    /* ── Capabilities Bar ── */
-    .capabilities {
-      display: flex;
-      justify-content: center;
-      gap: 48px;
-      margin-top: 48px;
-      flex-wrap: wrap;
-    }
-    .cap-item { text-align: center; }
-    .cap-number {
-      font-family: var(--font-display);
-      font-size: 48px;
-      color: var(--primary);
-      text-shadow: 0 0 20px rgba(255, 20, 147, 0.5);
-    }
-    .cap-label {
-      font-size: 14px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
+
 
     /* ── Footer ── */
     footer {
@@ -374,8 +355,7 @@
     @media (max-width: 768px) {
       section { padding: 56px 0; }
       .hero { padding: 64px 0 56px; }
-      .capabilities { gap: 32px; }
-      .cap-number { font-size: 36px; }
+
       .nav-links .hide-mobile { display: none; }
     }
   </style>
@@ -480,29 +460,7 @@
     </div>
   </section>
 
-  <!-- ── Capabilities ── -->
-  <section>
-    <div class="container">
-      <div class="capabilities">
-        <div class="cap-item">
-          <div class="cap-number">34</div>
-          <div class="cap-label">Tools</div>
-        </div>
-        <div class="cap-item">
-          <div class="cap-number">5</div>
-          <div class="cap-label">Prompts</div>
-        </div>
-        <div class="cap-item">
-          <div class="cap-number">3</div>
-          <div class="cap-label">Resources</div>
-        </div>
-        <div class="cap-item">
-          <div class="cap-number">3</div>
-          <div class="cap-label">Workflows</div>
-        </div>
-      </div>
-    </div>
-  </section>
+
 
   <!-- ── What Agents Build ── -->
   <section>
