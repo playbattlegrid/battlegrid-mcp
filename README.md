@@ -115,6 +115,27 @@ export BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key
 }
 ```
 
+### ChatGPT Desktop
+
+ChatGPT Desktop connects via **OAuth 2.1** — no npm package or API key needed. ChatGPT handles the OAuth flow automatically.
+
+1. Open ChatGPT Desktop → **Settings** → **MCP Servers** → **Add Server**
+2. Enter the MCP endpoint URL: `https://mcp.battlegrid.trade/mcp`
+3. Select **OAuth** as the authentication method
+4. ChatGPT will automatically:
+   - Discover OAuth endpoints via `/.well-known/oauth-authorization-server`
+   - Register itself as an OAuth client (Dynamic Client Registration)
+   - Open BattleGrid's consent page in your browser
+5. Log in to BattleGrid and click **Authorize**
+6. ChatGPT exchanges the auth code for a Bearer token and connects
+
+| | Claude Desktop / Cursor | ChatGPT Desktop |
+|---|---|---|
+| **Transport** | stdio proxy (`@battlegrid/mcp-server`) | Direct HTTPS |
+| **Auth** | API key (`bg_live_*`) | OAuth 2.1 (Bearer token) |
+| **Setup** | npm package + env vars | URL + OAuth consent |
+| **Multi-account** | `BATTLEGRID_API_KEYS` env var | One OAuth grant per account |
+
 ## Account Management
 
 ### Single Account
@@ -171,16 +192,20 @@ npx skills add playbattlegrid/battlegrid-mcp
 
 ## Capabilities
 
-### Tools (28)
+### Tools (34)
 
 | Category | Tools |
 |----------|-------|
-| **Market Grid** (7) | `list_market_grid_sessions`, `get_market_grid_session`, `check_market_grid_submission`, `submit_market_grid`, `get_market_grid_results`, `get_market_grid_player_grid`, `update_market_grid` |
-| **Coin Grid** (6) | `list_coin_grid_sessions`, `get_coin_grid_session`, `check_coin_grid_submission`, `submit_coin_grid`, `get_coin_grid_results`, `get_coin_grid_player_grid` |
-| **Account** (6) | `get_account_balance`, `get_user_profile`, `get_user_stats`, `list_user_favorites`, `add_user_favorite_preset`, `remove_user_favorite_preset` |
-| **Leaderboard** (3) | `get_leaderboard`, `get_market_grid_leaderboard`, `get_hall_of_fame` |
-| **Market Data** (4) | `get_coin_overview`, `get_recent_candles`, `get_top_ranked_coins`, `list_game_presets` |
-| **Intelligence Agent** (2) | `list_intelligence_agents`, `get_intelligence_agent` |
+| **Market Grid** (9) | `list_market_grid_sessions`, `get_market_grid_session`, `check_market_grid_submission`, `submit_market_grid`, `update_market_grid`, `random_submit_market_grid`, `get_market_grid_results`, `get_market_grid_player_grid`, `get_mcp_reasoning_journal` |
+| **Market Data** (2) | `get_market_context`, `list_game_presets` |
+| **Account** (1) | `get_account_state` |
+| **Leaderboard** (1) | `get_leaderboard` |
+| **Intelligence Agents** (6) | `list_intelligence_agents`, `get_intelligence_agent`, `create_intelligence_agent`, `update_intelligence_agent`, `delete_intelligence_agent`, `list_approved_models` |
+| **Agent Automation** (3) | `get_agent_automation_status`, `assign_agent_to_preset`, `unassign_agent_from_preset` |
+| **Agent Grid** (2) | `generate_agent_grid`, `submit_agent_grid` |
+| **Agent Journal** (1) | `get_agent_journal` |
+| **Signals** (5) | `list_signal_logs`, `get_signal_log`, `get_signal_performance`, `list_trade_outcomes`, `record_trade_outcome` |
+| **Entry Decisions** (4) | `list_entry_decisions`, `get_entry_decision`, `accept_entry_decision`, `cancel_entry_decision` |
 
 ### Prompts (5)
 
