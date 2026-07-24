@@ -12,6 +12,14 @@
  * enum parameter is injected into every tool so the AI agent can choose
  * which account to act as. Tool calls are routed with the matching Bearer token.
  *
+ * Strategy authoring (v3): the strategy-authoring tools publish one strict
+ * server-owned outer object, `{ request: canonicalPayload }`. In multi-account
+ * mode the proxy adds `account` only as a sibling of `request`, producing
+ * exactly `{ account, request }`; on a call it strips only `account` and
+ * forwards the unchanged `{ request }`. It never descends into or reconstructs
+ * the nested request — the server owns every required field, bound, union
+ * discriminator, and `additionalProperties:false` constraint.
+ *
  * Architecture: Matches Stripe's @stripe/mcp pattern — thin authenticated proxy.
  *
  * Usage:
@@ -38,7 +46,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-export const VERSION = '2.0.0';
+export const VERSION = '3.0.0';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade/mcp';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
@@ -203,7 +211,7 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
 
 // --- Multi-account tool augmentation ---
 
-interface ToolDefinition {
+export interface ToolDefinition {
   name: string;
   description?: string;
   inputSchema: {
@@ -214,7 +222,15 @@ interface ToolDefinition {
   };
 }
 
-function injectAccountParam(tools: ToolDefinition[], accountNames: string[]): ToolDefinition[] {
+/**
+ * Add a required `account` enum to every discovered tool, as a sibling of the
+ * existing top-level properties. For the strict authoring tools whose schema is
+ * `{ request: canonicalPayload }`, this produces exactly `{ account, request }`
+ * with `required: ["account", "request"]`; the server-owned root
+ * `additionalProperties:false` and the entire nested `request` (unions,
+ * required fields, bounds) are preserved by reference, never rewritten.
+ */
+export function injectAccountParam(tools: ToolDefinition[], accountNames: string[]): ToolDefinition[] {
   return tools.map(tool => ({
     ...tool,
     inputSchema: {
@@ -232,34 +248,35 @@ function injectAccountParam(tools: ToolDefinition[], accountNames: string[]): To
   }));
 }
 
-// --- Main ---
+// --- Proxy server factory (exported for protocol testing) ---
 
-async function main(): Promise<void> {
-  let config: EnvConfig;
-  try {
-    config = validateEnv(process.env);
-  } catch (error) {
-    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(1);
-  }
+export interface CreateProxyServerOptions {
+  /** Discovered account identities (index 0 is the primary key used for capability discovery). */
+  identities: AccountIdentity[];
+  /** Connect (or reuse) a remote MCP client for a given API key. Called once per key, lazily. */
+  connect: (apiKey: string) => Promise<Client>;
+  /** Advertised server version; defaults to VERSION. */
+  version?: string;
+}
 
-  // Log key diagnostics for cross-referencing with server logs
-  for (let i = 0; i < config.apiKeys.length; i++) {
-    const key = config.apiKeys[i];
-    const hashPrefix = createHash('sha256').update(key).digest('hex').substring(0, 16);
-    process.stderr.write(
-      `BattleGrid MCP: Key #${i + 1} prefix=${key.substring(0, 12)} hashPrefix=${hashPrefix} len=${key.length}\n`
-    );
-  }
+export interface ProxyServer {
+  server: Server;
+  toolCount: number;
+  promptCount: number;
+  resourceCount: number;
+  isMultiAccount: boolean;
+  accountNames: string[];
+}
 
-  // Discover identities for all keys
-  let identities: AccountIdentity[];
-  try {
-    identities = await discoverIdentities(config.apiKeys, config.apiUrl);
-  } catch (error) {
-    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(1);
-  }
+/**
+ * Build the local stdio-facing MCP server that proxies to the remote BattleGrid
+ * server. Discovers remote capabilities through the primary client, augments
+ * tools with the `account` enum when multiple accounts resolved, and wires
+ * strip-only-account routing to a lazily-populated per-key client pool.
+ */
+export async function createProxyServer(options: CreateProxyServerOptions): Promise<ProxyServer> {
+  const { identities, connect } = options;
+  const version = options.version ?? VERSION;
 
   const isMultiAccount = identities.length > 1;
   const accountNames = identities.map(id => id.username);
@@ -270,28 +287,9 @@ async function main(): Promise<void> {
     keyByAccount.set(id.username, id.apiKey);
   }
 
-  process.stderr.write(
-    `BattleGrid MCP: ${identities.length} account(s) discovered — ${accountNames.join(', ')}\n`
-  );
-
-  // Connect to remote using the first key (for capability discovery)
+  // Primary client (first key) is used for capability discovery and non-tool proxying.
   const primaryKey = identities[0].apiKey;
-  const primaryTransport = new StreamableHTTPClientTransport(
-    new URL(config.apiUrl),
-    { requestInit: { headers: { Authorization: `Bearer ${primaryKey}` } } }
-  );
-
-  const primaryClient = new Client(
-    { name: 'battlegrid-proxy', version: VERSION },
-    { capabilities: {} }
-  );
-
-  try {
-    await connectWithRetry(primaryClient, primaryTransport, config.apiUrl);
-  } catch (error) {
-    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(1);
-  }
+  const primaryClient = await connect(primaryKey);
 
   // Discover remote capabilities
   const [toolsResult, promptsResult, resourcesResult] = await Promise.all([
@@ -300,12 +298,6 @@ async function main(): Promise<void> {
     primaryClient.listResources(),
   ]);
 
-  process.stderr.write(
-    `BattleGrid MCP: ${toolsResult.tools.length} tools, ` +
-    `${promptsResult.prompts.length} prompts, ` +
-    `${resourcesResult.resources.length} resources\n`
-  );
-
   // Augment tools with account parameter if multi-account
   const exposedTools = isMultiAccount
     ? injectAccountParam(toolsResult.tools as ToolDefinition[], accountNames)
@@ -313,7 +305,7 @@ async function main(): Promise<void> {
 
   // Create local stdio server
   const localServer = new Server(
-    { name: 'battlegrid', version: VERSION },
+    { name: 'battlegrid', version },
     {
       capabilities: {
         tools: {},
@@ -323,12 +315,6 @@ async function main(): Promise<void> {
     }
   );
 
-  // --- Proxy: tools ---
-
-  localServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: exposedTools,
-  }));
-
   // Keep a pool of remote clients keyed by API key for routing
   const clientPool = new Map<string, Client>();
   clientPool.set(primaryKey, primaryClient);
@@ -337,18 +323,16 @@ async function main(): Promise<void> {
     const existing = clientPool.get(apiKey);
     if (existing) return existing;
 
-    const transport = new StreamableHTTPClientTransport(
-      new URL(config.apiUrl),
-      { requestInit: { headers: { Authorization: `Bearer ${apiKey}` } } }
-    );
-    const client = new Client(
-      { name: 'battlegrid-proxy', version: VERSION },
-      { capabilities: {} }
-    );
-    await connectWithRetry(client, transport, config.apiUrl);
+    const client = await connect(apiKey);
     clientPool.set(apiKey, client);
     return client;
   }
+
+  // --- Proxy: tools ---
+
+  localServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: exposedTools,
+  }));
 
   localServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
@@ -367,7 +351,7 @@ async function main(): Promise<void> {
           };
         }
         targetKey = keyByAccount.get(selectedAccount)!;
-        delete args.account; // Strip before forwarding to remote
+        delete args.account; // Strip ONLY account before forwarding; request is forwarded unchanged
       }
 
       const client = await getClientForKey(targetKey);
@@ -409,10 +393,79 @@ async function main(): Promise<void> {
     });
   });
 
+  return {
+    server: localServer,
+    toolCount: toolsResult.tools.length,
+    promptCount: promptsResult.prompts.length,
+    resourceCount: resourcesResult.resources.length,
+    isMultiAccount,
+    accountNames,
+  };
+}
+
+// --- Main ---
+
+async function main(): Promise<void> {
+  let config: EnvConfig;
+  try {
+    config = validateEnv(process.env);
+  } catch (error) {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  }
+
+  // Log key diagnostics for cross-referencing with server logs
+  for (let i = 0; i < config.apiKeys.length; i++) {
+    const key = config.apiKeys[i];
+    const hashPrefix = createHash('sha256').update(key).digest('hex').substring(0, 16);
+    process.stderr.write(
+      `BattleGrid MCP: Key #${i + 1} prefix=${key.substring(0, 12)} hashPrefix=${hashPrefix} len=${key.length}\n`
+    );
+  }
+
+  // Discover identities for all keys
+  let identities: AccountIdentity[];
+  try {
+    identities = await discoverIdentities(config.apiKeys, config.apiUrl);
+  } catch (error) {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  }
+
+  process.stderr.write(
+    `BattleGrid MCP: ${identities.length} account(s) discovered — ${identities.map(id => id.username).join(', ')}\n`
+  );
+
+  // Lazily connect a remote MCP client per API key, with retry + auth diagnostics.
+  const connect = async (apiKey: string): Promise<Client> => {
+    const transport = new StreamableHTTPClientTransport(
+      new URL(config.apiUrl),
+      { requestInit: { headers: { Authorization: `Bearer ${apiKey}` } } }
+    );
+    const client = new Client(
+      { name: 'battlegrid-proxy', version: VERSION },
+      { capabilities: {} }
+    );
+    await connectWithRetry(client, transport, config.apiUrl);
+    return client;
+  };
+
+  let proxy: ProxyServer;
+  try {
+    proxy = await createProxyServer({ identities, connect });
+  } catch (error) {
+    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(1);
+  }
+
+  process.stderr.write(
+    `BattleGrid MCP: ${proxy.toolCount} tools, ${proxy.promptCount} prompts, ${proxy.resourceCount} resources\n`
+  );
+
   // --- Start stdio transport ---
 
   const stdioTransport = new StdioServerTransport();
-  await localServer.connect(stdioTransport);
+  await proxy.server.connect(stdioTransport);
 
   process.stderr.write('BattleGrid MCP server running on stdio\n');
 }

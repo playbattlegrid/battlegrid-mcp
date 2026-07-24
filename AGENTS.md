@@ -1,6 +1,6 @@
 # AGENTS.md — BattleGrid MCP Server
 
-Machine-readable agent discovery file for `@battlegrid/mcp-server`.
+Machine-readable agent discovery file for `@battlegrid/mcp-server` (thin stdio proxy to BattleGrid's remote MCP server).
 
 ## Platform
 
@@ -9,23 +9,28 @@ Machine-readable agent discovery file for `@battlegrid/mcp-server`.
 | Name | BattleGrid |
 | Website | https://battlegrid.trade |
 | Protocol | Model Context Protocol (MCP) |
-| Transport | stdio (npm), streamable-http (remote) |
+| Transport | stdio (npm package), streamable-http (remote) |
+| Package major | v3 — pairs with the server's strategy-authoring major |
 
 ## Authentication
 
 | Field | Value |
 |-------|-------|
-| Method | API Key |
+| Method | API Key (stdio) / OAuth 2.1 (remote, ChatGPT Desktop) |
 | Format | `bg_live_*` |
 | Header | `Authorization: Bearer <API_KEY>` |
 | Obtain | https://battlegrid.trade → Profile → MCP tab |
+| Scopes | `mcp:read` (discovery + non-financial config writes), `mcp:wager` (financial actions) |
 
 ## Connection
 
 ### Option A: npm / stdio
 
 ```bash
+# Single account
 BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
+# Multiple accounts
+BATTLEGRID_API_KEYS=bg_live_aaa,bg_live_bbb npx @battlegrid/mcp-server
 ```
 
 ### Option B: Remote / streamable-http
@@ -35,63 +40,19 @@ URL: https://mcp.battlegrid.trade/mcp
 Header: Authorization: Bearer bg_live_xxx
 ```
 
-## Capabilities
+## Capabilities — discovered live
 
-### Tools (28)
+Tools, prompts, and resources are **discovered live** from the connected server via `tools/list`, `prompts/list`, and `resources/list`. This package does not hardcode the catalog, formulas, signal IDs, or defaults. After a server deployment, restart/reconnect the proxy and re-run discovery — a cached snapshot is not authoritative.
 
-**Market Grid (7)**
-- `list_market_grid_sessions` — List Market Grid game sessions with optional filtering by status and limit
-- `get_market_grid_session` — Get detailed information about a specific Market Grid session
-- `check_market_grid_submission` — Check if the authenticated user has already submitted a grid
-- `submit_market_grid` — Submit a Market Grid prediction (requires mcp:wager scope)
-- `get_market_grid_results` — Get results for a settled Market Grid session
-- `get_market_grid_player_grid` — Get the authenticated user's submitted grid for a Market Grid session
-- `update_market_grid` — Update an existing Market Grid prediction before the session locks
+Capability areas exposed by the server include: Market Grid game play, market context, account state, leaderboards, intelligence agents + automation, strategy discovery/authoring, and trading signals/decisions.
 
-**Coin Grid (6)**
-- `list_coin_grid_sessions` — List Coin Grid game sessions with optional filtering by status and limit
-- `get_coin_grid_session` — Get detailed information about a specific Coin Grid session
-- `check_coin_grid_submission` — Check if the authenticated user has already submitted a grid
-- `submit_coin_grid` — Submit a Coin Grid prediction (requires mcp:wager scope)
-- `get_coin_grid_results` — Get results for a settled Coin Grid session
-- `get_coin_grid_player_grid` — Get the authenticated user's submitted grid for a Coin Grid session
+## Multi-account request envelope
 
-**Account (6)**
-- `get_account_balance` — Get the authenticated user's total play balance (USDC spot + perps withdrawable)
-- `get_user_profile` — Get a user's profile information (defaults to authenticated user)
-- `get_user_stats` — Get a user's game statistics including level, rank, XP progress, and win/loss records
-- `list_user_favorites` — List the authenticated user's canonical preset favorites
-- `add_user_favorite_preset` — Add a preset to the authenticated user's favorites
-- `remove_user_favorite_preset` — Remove a preset from the authenticated user's favorites
+When multiple keys resolve, the proxy injects a required `account` enum into every tool as a **sibling** of the existing input. The strict strategy-authoring tools (`get_strategy_section_template`, `update_strategy_signal_rule`, `compile_strategy_plan`, `apply_strategy_plan`) publish `{ request: canonicalPayload }`; multi-account discovery makes that exactly `{ account, request }`. The proxy strips only `account` and forwards the unchanged `{ request }`. Never nest `account` inside `request`.
 
-**Leaderboard (3)**
-- `get_leaderboard` — Get the global leaderboard ranked by metric (PROFIT, VOLUME, or SCORE) and timeframe
-- `get_market_grid_leaderboard` — Get the Market Grid unified leaderboard showing all 3 KPIs per player
-- `get_hall_of_fame` — Get the Hall of Fame achievement leaders across categories
+## Strategy authoring
 
-**Market Data (4)**
-- `get_coin_overview` — Get real-time overview snapshot for a coin including price, volume, and market metrics
-- `get_recent_candles` — Get recent OHLCV candle data for a coin
-- `get_top_ranked_coins` — Get the top performing coins ranked by absolute change, volatility, or volume
-- `list_game_presets` — List all active game presets showing available game configurations
-
-**Intelligence Agent (2)**
-- `list_intelligence_agents` — List all intelligence agents accessible to the authenticated user
-- `get_intelligence_agent` — Get full configuration for a specific intelligence agent
-
-### Prompts (5)
-
-- `play-market-grid` — End-to-end workflow for playing a Market Grid prediction game
-- `play-coin-grid` — End-to-end workflow for playing a Coin Grid prediction game
-- `analyze-market` — Deep market analysis for informed predictions
-- `check-performance` — Review your game results, stats, and leaderboard standing
-- `strategy-guide` — Learn BattleGrid game mechanics, rules, and strategies
-
-### Resources (3)
-
-- `battlegrid://rules/overview` — Comprehensive game rules for Market Grid and Coin Grid
-- `battlegrid://reference/grid-format` — Grid format reference with JSON examples and validation rules
-- `battlegrid://guide/quick-start` — BattleGrid Quick Start Guide
+Author strategies with the strict workflow: `compile_strategy_plan({ request })` (CREATE / UPDATE / RESTORE — read-only) → review the returned `approvedPlan` + `reviewContext` → `apply_strategy_plan({ request: { approvedPlan, planToken, confirm: true } })` (the only write). Bind a strategy to an agent at creation via `create_intelligence_agent({ …, strategyId })`. The direct `create_strategy` operation is **retired** and absent from discovery.
 
 ## Skills
 
@@ -99,7 +60,7 @@ Header: Authorization: Bearer bg_live_xxx
 npx skills add playbattlegrid/battlegrid-mcp
 ```
 
-## Rate Limits
+## Rate limits
 
 | Limit | Value |
 |-------|-------|
