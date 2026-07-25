@@ -224,6 +224,78 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | 2.0.0 | Default `BATTLEGRID_API_URL` moved to the `/mcp` suffix |
 | **3.0.0** | Strategy-authoring major: strict `{ account, request }` authoring envelopes with strip-only-account routing, compile → review → apply workflow, strategy-bound agent creation, and removal of the retired `create_strategy` operation |
 
+## Maintainer release procedure
+
+> [`.github/workflows/publish.yml`](.github/workflows/publish.yml) is the executable release authority. If this recipe and the workflow diverge, correct them together before creating a release tag.
+
+Publishing runs only in GitHub-hosted Actions. Never run `npm publish` from the BattleGrid application VM or a maintainer workstation. The maintainer's shell prepares and pushes one immutable tag; the workflow checks out that pinned commit, tests, builds, packs, and publishes it with npm provenance.
+
+### Release environments and prerequisites
+
+| Responsibility | Environment |
+|---|---|
+| Confirm npm publishing trust | npmjs.com package settings |
+| Verify the release and push its tag | Clean `battlegrid-mcp` checkout with GitHub write access |
+| Build, test, pack, and publish | GitHub-hosted `ubuntu-latest`, Node 24 |
+| Verify registry publication | Any shell |
+
+Before tagging:
+
+- Merge the complete release into `main`; never release a feature-branch commit.
+- Use Node 22 or 24 locally. CI uses Node 24; odd-numbered Node releases are not supported by the test toolchain.
+- Ensure `package.json`, `package-lock.json`, and `src/index.ts`'s exported `VERSION` all contain the intended version.
+- Confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Actions with organization `playbattlegrid`, repository `battlegrid-mcp`, workflow filename `publish.yml`, no environment name, and `npm publish` allowed. The workflow uses short-lived OIDC credentials; do not add a long-lived `NPM_TOKEN`.
+
+### Verify and tag the merged commit
+
+Run from a clean `battlegrid-mcp` checkout, substituting the intended unused version:
+
+```bash
+release_version=3.0.1
+release_tag="mcp-server@${release_version}"
+
+git fetch origin --tags
+git switch main
+git pull --ff-only origin main
+
+test -z "$(git status --porcelain)"
+test "$(node -p "require('./package.json').version")" = "$release_version"
+test "$(node -p "require('./package-lock.json').version")" = "$release_version"
+test "$(node -p "require('fs').readFileSync('src/index.ts','utf8').match(/VERSION = '([^']+)'/)[1]")" = "$release_version"
+test -z "$(git tag --list "$release_tag")"
+
+npm ci
+npm test
+npm run build
+npm pack --dry-run
+
+release_commit="$(git rev-parse HEAD)"
+git tag -a "$release_tag" "$release_commit" -m "Publish @battlegrid/mcp-server $release_version"
+git show --no-patch --decorate "$release_tag"
+git push origin "$release_tag"
+```
+
+A tag matching `mcp-server@*` starts the [publish workflow](https://github.com/playbattlegrid/battlegrid-mcp/actions/workflows/publish.yml). Wait for that exact tag run to complete successfully before querying npm; a temporary registry `E404` while the workflow is still running is not a publication failure.
+
+The workflow fails closed unless the tag version, package version, lockfile version, and source handshake version are identical. It then runs the test suite, TypeScript build, and package dry run before `npm publish --access public --provenance`.
+
+### Verify publication
+
+```bash
+npm view "@battlegrid/mcp-server@${release_version}" version dist.integrity \
+  --json --registry=https://registry.npmjs.org/
+
+npm view @battlegrid/mcp-server dist-tags \
+  --json --registry=https://registry.npmjs.org/
+
+npm view "@battlegrid/mcp-server@${release_version}" dist.attestations \
+  --json --registry=https://registry.npmjs.org/
+```
+
+Require the exact version, `latest` pointing at that version, and a provenance attestation. Record the release tag and commit. Restart/reconnect running proxies and rediscover `tools/list`, `prompts/list`, and `resources/list`; publication alone does not refresh their startup cache.
+
+If publishing fails, inspect the tag's workflow before taking action. An `ENEEDAUTH` failure means the npm Trusted Publisher fields do not match the workflow. Fix the publisher configuration and rerun the failed job without moving the tag. Never retarget or reuse a published tag, and never mutate a tagged release with `npm audit fix`; dependency remediation goes through a new reviewed commit and version.
+
 ## Skills
 
 Install the BattleGrid skill for AI agent instructions:
