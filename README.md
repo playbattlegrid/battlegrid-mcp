@@ -194,7 +194,7 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation w
    - **UPDATE** supplies at least one changed axis and `expectedRevision`.
    - **RESTORE** targets an owned inactive revision (with any repair axes).
 4. **Review before confirming.** Inspect the returned `approvedPlan` (complete post-state, proposed revision, diff, bound-agent impact, expiry) and `reviewContext` (column contracts, point-in-time report preview, open positions, quota/name admission). The plan token expires after five minutes; recompile after expiry or drift.
-5. **Apply only the exact reviewed plan.** After explicit user approval, call `apply_strategy_plan({ request: { approvedPlan, planToken, confirm: true } })`. Resubmit `approvedPlan` exactly as returned. Changed configuration propagates to every bound agent immediately.
+5. **Apply only the exact reviewed plan.** After explicit user approval, call `apply_strategy_plan({ request: { plan, planToken, confirm: true } })`. Build `plan` from the compiled `approvedPlan` by copying, byte-identical: `operation`; `postState.id` as `strategyId`; `expiresAt`; `expectedRevision` for UPDATE/RESTORE; `explicitRuleOverrides` as `rules`; and from `postState` — `name`, `description`, `tagline`, `timeframe`, `regimeAutoDerive`, `regimeTimeframe`, `marketReadText`, `sections` (including every generated `custom:` key), `minAggregateScore`, `minRequiredCount`, `minAtrPct`. Send nothing else — the server re-derives the scorecard, diff, viability, mismatches, seed, revision, and bound-agent impact, and rejects `diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`, and `reviewContext` as unknown keys. Changed configuration propagates to every bound agent immediately.
 
 `update_strategy_signal_rule({ request })` is the thin, focused one-rule edit. In multi-account mode every one of these calls uses the `{ account, request }` sibling envelope.
 
@@ -222,7 +222,8 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 |---------|---------|
 | 1.x | Single/multi-account stdio proxy, identity discovery, connection retry, capability discovery |
 | 2.0.0 | Default `BATTLEGRID_API_URL` moved to the `/mcp` suffix |
-| **3.0.0** | Strategy-authoring major: strict `{ account, request }` authoring envelopes with strip-only-account routing, compile → review → apply workflow, strategy-bound agent creation, and removal of the retired `create_strategy` operation |
+| 3.0.0 | Strategy-authoring major: strict `{ account, request }` authoring envelopes with strip-only-account routing, compile → review → apply workflow, strategy-bound agent creation, and removal of the retired `create_strategy` operation |
+| **3.0.1** | Docs only — `apply_strategy_plan` now takes `{ plan, planToken, confirm }` instead of `{ approvedPlan, … }`; the server re-derives every planner-derived field and rejects resubmitted ones as unknown keys. No proxy behavior change |
 
 ## Maintainer release procedure
 
