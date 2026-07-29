@@ -7,15 +7,19 @@ MCP server for [BattleGrid](https://battlegrid.trade) — play crypto prediction
 
 It is a thin, authenticated **stdio proxy** to BattleGrid's remote MCP server (Stripe `@stripe/mcp` pattern — no business logic). It discovers tools, prompts, and resources live from the server and re-exposes them to local MCP clients (Claude Desktop, Claude Code, Cursor). Capabilities are always **discovered live** — this package never hardcodes the tool catalog.
 
-## v3 — breaking major (strategy authoring)
+## v4 — breaking major (strategy conditions)
 
-**v3 is a breaking major that pairs with the BattleGrid server's strategy-authoring release.** Upgrade the package and the server major together.
+**v4 pairs with the BattleGrid server's MCP contract v4.0.0.** The package major tracks the server's wire contract, because the proxy announces `battlegrid@<package version>` in its own stdio handshake — the number a client reads has to be the contract it will actually reach. Upgrade the package and the server major together.
+
+- **`apply_strategy_plan` requires the conditions axis.** The plan post-state now carries required `conditions` and `conditionVerdicts`; a payload built from the v3 field list is rejected with `plan.conditions: Required`. **Add both fields to the projection you already build** — apply takes an allowlisted projection of `approvedPlan`, never the object itself (`diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest` are all rejected as unknown keys, and so are the `postState` fields apply does not accept: `id`, `scope`, `systemKey`, `visibility`, `cadence`, `isActive`, `forkedFromStrategyId`). The exact field list is step 7 of **Strategy authoring (compile → review → apply)** below. Only a client that forwards post-state fields generically — stripping the derived keys rather than enumerating the kept ones — picks the axis up without an edit. The proxy itself is unchanged: it embeds no schemas, pins no contract version, and forwards `{ request }` verbatim.
+
+The v3 authoring contract below is unchanged and still current:
 
 - **Strict authoring envelopes.** `get_strategy_section_template`, `update_strategy_signal_rule`, `compile_strategy_plan`, and `apply_strategy_plan` publish one strict server-owned object, `{ request: canonicalPayload }`. In multi-account mode the proxy adds `account` **only** as a sibling of `request`, producing exactly `{ account, request }`; on a call it strips only `account` and forwards the unchanged `{ request }`. It never descends into, flattens, or reconstructs the nested request.
 - **`create_strategy` is retired.** Direct strategy creation no longer exists. Author strategies with the compile → review → apply workflow below, and bind them to agents at agent-creation time (`create_intelligence_agent({ …, strategyId })`). There is no alias, shim, or flat-payload fallback.
 - **Rediscover after deployment.** Publishing the package does **not** refresh a running proxy's cached capability snapshot. After the server cutover, restart/reconnect the proxy process and re-run `tools/list`, `prompts/list`, and `resources/list`.
 
-> Earlier majors: **v1.x** single/multi-account stdio proxy; **v2.0.0** moved the default `BATTLEGRID_API_URL` to the `/mcp` suffix. See [Rediscovery & versioning](#rediscovery--versioning).
+> Earlier majors: **v1.x** single/multi-account stdio proxy; **v2.0.0** moved the default `BATTLEGRID_API_URL` to the `/mcp` suffix; **v3.0.0** the strategy-authoring major. See [Rediscovery & versioning](#rediscovery--versioning).
 
 ## Quick Start
 
@@ -194,7 +198,7 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation w
    - **UPDATE** supplies at least one changed axis and `expectedRevision`.
    - **RESTORE** targets an owned inactive revision (with any repair axes).
 4. **Review before confirming.** Inspect the returned `approvedPlan` (complete post-state, proposed revision, diff, bound-agent impact, expiry) and `reviewContext` (column contracts, point-in-time report preview, open positions, quota/name admission). The plan token expires after five minutes; recompile after expiry or drift.
-5. **Apply only the exact reviewed plan.** After explicit user approval, call `apply_strategy_plan({ request: { plan, planToken, confirm: true } })`. Build `plan` from the compiled `approvedPlan` by copying, byte-identical: `operation`; `postState.id` as `strategyId`; `expiresAt`; `expectedRevision` for UPDATE/RESTORE; `explicitRuleOverrides` as `rules`; and from `postState` — `name`, `description`, `tagline`, `timeframe`, `regimeAutoDerive`, `regimeTimeframe`, `marketReadText`, `sections` (including every generated `custom:` key), `minAggregateScore`, `minRequiredCount`, `minAtrPct`. Send nothing else — the server re-derives the scorecard, diff, viability, mismatches, seed, revision, and bound-agent impact, and rejects `diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`, and `reviewContext` as unknown keys. Changed configuration propagates to every bound agent immediately.
+5. **Apply only the exact reviewed plan.** After explicit user approval, call `apply_strategy_plan({ request: { plan, planToken, confirm: true } })`. Build `plan` from the compiled `approvedPlan` by copying, byte-identical: `operation`; `postState.id` as `strategyId`; `expiresAt`; `expectedRevision` for UPDATE/RESTORE; `explicitRuleOverrides` as `rules`; and from `postState` — `name`, `description`, `tagline`, `timeframe`, `regimeAutoDerive`, `regimeTimeframe`, `marketReadText`, `sections` (including every generated `custom:` key), `conditions`, `conditionVerdicts`, `minAggregateScore`, `minRequiredCount`, `minAtrPct`. Send nothing else — the server re-derives the scorecard, diff, viability, mismatches, seed, revision, and bound-agent impact, and rejects `diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`, and `reviewContext` as unknown keys. Changed configuration propagates to every bound agent immediately.
 
 `update_strategy_signal_rule({ request })` is the thin, focused one-rule edit. In multi-account mode every one of these calls uses the `{ account, request }` sibling envelope.
 
@@ -214,7 +218,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 ## Rediscovery & versioning
 
-- **Package/server major pairing.** This package's major version pairs with the BattleGrid server's strategy-authoring major. Run matching majors.
+- **Package/server major pairing.** This package's major version pairs with the BattleGrid server's published MCP contract version (`MCP_CONTRACT_VERSION`). The pairing is not decorative: the proxy re-announces itself as `battlegrid@<package version>` to the local client, under the same server name the remote handshake uses, so a package major left behind tells clients a contract number that no longer exists. Run matching majors.
 - **Rediscover after a server cutover.** Package publication does not refresh a running proxy's cached startup snapshot. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
 - **Restart after key rotation.** API keys are read once at process startup; rotate a key, then restart the proxy.
 
@@ -223,7 +227,8 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | 1.x | Single/multi-account stdio proxy, identity discovery, connection retry, capability discovery |
 | 2.0.0 | Default `BATTLEGRID_API_URL` moved to the `/mcp` suffix |
 | 3.0.0 | Strategy-authoring major: strict `{ account, request }` authoring envelopes with strip-only-account routing, compile → review → apply workflow, strategy-bound agent creation, and removal of the retired `create_strategy` operation |
-| **3.0.1** | Docs only — `apply_strategy_plan` now takes `{ plan, planToken, confirm }` instead of `{ approvedPlan, … }`; the server re-derives every planner-derived field and rejects resubmitted ones as unknown keys. No proxy behavior change |
+| 3.0.1 | Docs only — `apply_strategy_plan` now takes `{ plan, planToken, confirm }` instead of `{ approvedPlan, … }`; the server re-derives every planner-derived field and rejects resubmitted ones as unknown keys. No proxy behavior change |
+| **4.0.0** | Realigns the package major with the server's MCP contract v4.0.0, which broke on the conditions axis: `apply_strategy_plan` requires `conditions` and `conditionVerdicts` on the plan post-state. No proxy code change — the version is the client-facing signal, and the proxy's handshake carries it |
 
 ## Maintainer release procedure
 
@@ -252,7 +257,7 @@ Before tagging:
 Run from a clean `battlegrid-mcp` checkout, substituting the intended unused version:
 
 ```bash
-release_version=3.0.1
+release_version=4.0.0
 release_tag="mcp-server@${release_version}"
 
 git fetch origin --tags
