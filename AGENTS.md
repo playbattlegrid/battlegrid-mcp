@@ -10,7 +10,7 @@ Machine-readable agent discovery file for `@battlegrid/mcp-server` (thin stdio p
 | Website | https://battlegrid.trade |
 | Protocol | Model Context Protocol (MCP) |
 | Transport | stdio (npm package), streamable-http (remote) |
-| Package major | v4 — pairs with the server's published MCP contract version |
+| Package major | v5 — pairs with the server's published MCP contract version |
 
 ## Authentication
 
@@ -52,7 +52,7 @@ When multiple keys resolve, the proxy injects a required `account` enum into eve
 
 ## Strategy authoring
 
-Author strategies with the strict workflow: `compile_strategy_plan({ request })` (CREATE / UPDATE / RESTORE — read-only) → review the returned `approvedPlan` + `reviewContext` → `apply_strategy_plan({ request: { plan, planToken, confirm: true } })` (the only write), where `plan` carries only the compiled plan's non-derivable inputs — `operation`, `postState.id` as `strategyId`, `expiresAt`, `expectedRevision` for UPDATE/RESTORE, `explicitRuleOverrides` as `rules`, and the authored `postState` fields including normalized `sections` and the required `conditions` + `conditionVerdicts` axis (contract v4.0.0). Every derived field (`diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`) is re-derived server-side and rejected as an unknown key if resubmitted. Bind a strategy to an agent at creation via `create_intelligence_agent({ …, strategyId })`. The direct `create_strategy` operation is **retired** and absent from discovery.
+Author strategies with the strict workflow: `compile_strategy_plan({ request })` (CREATE / UPDATE / RESTORE — read-only) → review the returned `approvedPlan` + `reviewContext` → `apply_strategy_plan({ request: { plan, planToken, confirm: true } })` (the only write), where `plan` carries only the compiled plan's non-derivable inputs — `operation`, `postState.id` as `strategyId`, `expiresAt`, `expectedRevision` for UPDATE/RESTORE, `explicitRuleOverrides` as `rules`, and the authored `postState` fields including normalized `sections` and the required `conditions` axis (contract v5.0.0). Each condition is `{ conditionKey, name, definition, verdict }`, where `verdict` is required and nullable — `UP` | `DOWN` | `NEITHER`, or an explicit `null` for a building block — and declaration order is the precedence: the first condition that resolves TRUE and carries a non-null verdict decides. The separate `conditionVerdicts` array was retired in v5.0.0 and is rejected with a message naming this replacement. Every derived field (`diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`) is re-derived server-side and rejected as an unknown key if resubmitted. Bind a strategy to an agent at creation via `create_intelligence_agent({ …, strategyId })`. The direct `create_strategy` operation is **retired** and absent from discovery.
 
 ## Skills
 
