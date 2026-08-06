@@ -1,16 +1,25 @@
 name: Publish @battlegrid/mcp-server
 
+# A version change on main IS the release. Publication used to be triggered by a tag, which meant a
+# version bump with no tag published nothing and reported nothing — how 5.1.0 came to be declared in
+# this repository and absent from the registry, surfaced by no check at all. The tag is now created
+# after a successful publish, recording what shipped rather than authorizing it.
 on:
   push:
-    tags:
-      - 'mcp-server@*'
+    branches:
+      - main
+    paths:
+      - 'package.json'
+  # Re-runnable by hand when a run failed for a reason outside the diff — an unreachable endpoint
+  # during a deploy, or a registry error. Nothing published means there is no tag to move or reuse.
+  workflow_dispatch: {}
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
+      contents: write # create and push the release tag after publishing
+      id-token: write # OIDC provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -21,27 +30,74 @@ jobs:
 
       - run: npm ci
 
-      # Enforce one immutable release identity: the Git tag, package.json,
-      # package-lock.json, and the source MCP handshake VERSION must all agree
-      # before anything is packed or published.
-      - name: Verify version integrity (tag == package.json == package-lock == src VERSION)
+      # The trigger watches package.json, which also carries dependencies and metadata — so most runs
+      # are NOT releases. Publish if and only if the declared version is not already on the registry.
+      # Without this every dependency edit would reach `npm publish` and fail on a duplicate version.
+      - name: Decide whether this is a release
+        id: gate
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#mcp-server@}"
           PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "@battlegrid/mcp-server@$PKG_VERSION" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
+            echo "$PKG_VERSION is already published — nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$PKG_VERSION is not on the registry — releasing."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Enforce one immutable release identity. All four values that express this package's version
+      # must agree with each other: package.json, BOTH lockfile version fields, and the exported
+      # handshake VERSION a client is actually told. Checking a subset admits the divergence the
+      # check exists to prevent — the lockfile's self-referencing entry was previously unchecked.
+      - name: Verify version integrity (package.json == lock == lock.self == src VERSION)
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          PKG_VERSION="${{ steps.gate.outputs.version }}"
           LOCK_VERSION="$(node -p "require('./package-lock.json').version")"
+          LOCK_SELF_VERSION="$(node -p "require('./package-lock.json').packages[''].version")"
           SRC_VERSION="$(node -p "require('fs').readFileSync('src/index.ts','utf8').match(/VERSION = '([^']+)'/)[1]")"
-          echo "tag=$TAG_VERSION package.json=$PKG_VERSION package-lock.json=$LOCK_VERSION src=$SRC_VERSION"
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$PKG_VERSION" != "$LOCK_VERSION" ] || [ "$PKG_VERSION" != "$SRC_VERSION" ]; then
-            echo "::error::Version mismatch — the Git tag, package.json, package-lock.json, and src VERSION must all match before publish."
+          echo "package.json=$PKG_VERSION package-lock.json=$LOCK_VERSION package-lock.json[packages.'']=$LOCK_SELF_VERSION src=$SRC_VERSION"
+          if [ "$PKG_VERSION" != "$LOCK_VERSION" ] || [ "$PKG_VERSION" != "$LOCK_SELF_VERSION" ] || [ "$PKG_VERSION" != "$SRC_VERSION" ]; then
+            echo "::error::Version mismatch — package.json, both package-lock.json version fields, and src VERSION must all match before publish."
             exit 1
           fi
           echo "Version integrity OK: $PKG_VERSION"
 
-      # Tests must pass before we pack or publish.
-      - run: npm test
+      # The package announces `battlegrid@<version>` in its own stdio handshake, so publishing ahead
+      # of the server's deploy tells clients a contract the server does not answer to. Compares the
+      # MAJOR only — the minor and patch describe this proxy's own code, and exact equality would
+      # reject every proxy-only release. Fails closed, including when the credential is absent.
+      - name: Assert the deployed server serves this contract major
+        if: steps.gate.outputs.release == 'true'
+        env:
+          BATTLEGRID_DEPLOY_CHECK_KEY: ${{ secrets.BATTLEGRID_DEPLOY_CHECK_KEY }}
+        run: node scripts/assert-deployed-contract.mjs
 
-      - run: npm run build
+      - name: Test
+        if: steps.gate.outputs.release == 'true'
+        run: npm test
 
-      - run: npm pack --dry-run
+      - name: Build
+        if: steps.gate.outputs.release == 'true'
+        run: npm run build
 
-      - run: npm publish --access public --provenance
+      - name: Pack (dry run)
+        if: steps.gate.outputs.release == 'true'
+        run: npm pack --dry-run
+
+      - name: Publish
+        if: steps.gate.outputs.release == 'true'
+        run: npm publish --access public --provenance
+
+      # The tag is an OUTPUT of a successful publish, not its prerequisite. If anything above fails,
+      # no tag exists — so a re-run after the cause is fixed has nothing to move or reuse.
+      - name: Tag the published release
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          RELEASE_TAG="mcp-server@${{ steps.gate.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" -m "Publish @battlegrid/mcp-server ${{ steps.gate.outputs.version }}"
+          git push origin "$RELEASE_TAG"
+          echo "Tagged $RELEASE_TAG at $(git rev-parse HEAD)"
