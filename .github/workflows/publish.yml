@@ -2,17 +2,29 @@ name: Publish @battlegrid/mcp-server
 
 # A version change on main IS the release. Publication used to be triggered by a tag, which meant a
 # version bump with no tag published nothing and reported nothing — how 5.1.0 came to be declared in
-# this repository and absent from the registry, surfaced by no check at all. The tag is now created
+# this repository and absent from the registry, caught by no check at all. The tag is now created
 # after a successful publish, recording what shipped rather than authorizing it.
+#
+# Deliberately NOT filtered with `paths: ['package.json']`. GitHub skips a path-filtered workflow
+# when the push diff exceeds 3,000 files and the matching file is not among the first 3,000 returned,
+# so a version bump inside a very large merge would silently fail to release — the exact class of
+# silence this workflow exists to remove. Running on every push to main and deciding in-job costs one
+# registry query on non-release pushes.
 on:
   push:
     branches:
       - main
-    paths:
-      - 'package.json'
   # Re-runnable by hand when a run failed for a reason outside the diff — an unreachable endpoint
-  # during a deploy, or a registry error. Nothing published means there is no tag to move or reuse.
+  # during a deploy, or a registry error.
   workflow_dispatch: {}
+
+# Serialize releases. Two version-bump merges landing close together would otherwise run their
+# publish jobs concurrently, and `npm publish` moves `dist-tags.latest` unconditionally — so if an
+# older merge's slower run finished last, `latest` would move BACKWARD and installs would get the
+# stale package. Never cancel in progress: a cancelled run could stop between publish and tag.
+concurrency:
+  group: publish-mcp-server
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -22,6 +34,8 @@ jobs:
       id-token: write # OIDC provenance
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags, so the reconcile step can tell a missing tag from an existing one
 
       - uses: actions/setup-node@v4
         with:
@@ -30,20 +44,39 @@ jobs:
 
       - run: npm ci
 
-      # The trigger watches package.json, which also carries dependencies and metadata — so most runs
-      # are NOT releases. Publish if and only if the declared version is not already on the registry.
-      # Without this every dependency edit would reach `npm publish` and fail on a duplicate version.
+      # Decide what this run is. Every later step is gated on `release`; nothing relies on a step
+      # exiting 0 to stop the job, because in GitHub Actions exit 0 marks a step SUCCESSFUL and the
+      # job continues.
+      #
+      # Three outcomes:
+      #   release=true            — this version is not on the registry; publish it
+      #   reconcile_tag=true      — already published but its tag is missing; create the tag only
+      #   neither                 — already published and tagged; nothing to do
       - name: Decide whether this is a release
         id: gate
         run: |
           PKG_VERSION="$(node -p "require('./package.json').version")"
+          RELEASE_TAG="mcp-server@$PKG_VERSION"
           echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
           if npm view "@battlegrid/mcp-server@$PKG_VERSION" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
-            echo "$PKG_VERSION is already published — nothing to release."
-            echo "release=false" >> "$GITHUB_OUTPUT"
+            if [ -n "$(git tag --list "$RELEASE_TAG")" ]; then
+              echo "$PKG_VERSION is already published and tagged — nothing to do."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              echo "reconcile_tag=false" >> "$GITHUB_OUTPUT"
+            else
+              # A published version with no tag means a previous run died between publish and tag.
+              # npm versions cannot be republished, so the only correct repair is to create the
+              # missing tag — never to treat this as a finished release and move on silently.
+              echo "::warning::$PKG_VERSION is published but $RELEASE_TAG is missing — reconciling the tag."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              echo "reconcile_tag=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "$PKG_VERSION is not on the registry — releasing."
             echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "reconcile_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Enforce one immutable release identity. All four values that express this package's version
@@ -66,9 +99,10 @@ jobs:
 
       # The package announces `battlegrid@<version>` in its own stdio handshake, so publishing ahead
       # of the server's deploy tells clients a contract the server does not answer to. Compares the
-      # MAJOR only — the minor and patch describe this proxy's own code, and exact equality would
-      # reject every proxy-only release. Fails closed, including when the credential is absent.
-      - name: Assert the deployed server serves this contract major
+      # contract line (MAJOR.MINOR) — the contract ships additive moves as minors, so a package minor
+      # ahead of the server would advertise features it does not serve. Only PATCH is the package's
+      # own space. Fails closed, including when the credential is absent.
+      - name: Assert the deployed server serves this contract line
         if: steps.gate.outputs.release == 'true'
         env:
           BATTLEGRID_DEPLOY_CHECK_KEY: ${{ secrets.BATTLEGRID_DEPLOY_CHECK_KEY }}
@@ -90,12 +124,13 @@ jobs:
         if: steps.gate.outputs.release == 'true'
         run: npm publish --access public --provenance
 
-      # The tag is an OUTPUT of a successful publish, not its prerequisite. If anything above fails,
-      # no tag exists — so a re-run after the cause is fixed has nothing to move or reuse.
-      - name: Tag the published release
-        if: steps.gate.outputs.release == 'true'
+      # The tag is an OUTPUT of a successful publish, not its prerequisite. It also runs on the
+      # reconcile path, where a previous run published but died before tagging — npm versions cannot
+      # be republished, so creating the missing tag is the only repair available.
+      - name: Tag the released version
+        if: steps.gate.outputs.release == 'true' || steps.gate.outputs.reconcile_tag == 'true'
         run: |
-          RELEASE_TAG="mcp-server@${{ steps.gate.outputs.version }}"
+          RELEASE_TAG="${{ steps.gate.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$RELEASE_TAG" -m "Publish @battlegrid/mcp-server ${{ steps.gate.outputs.version }}"

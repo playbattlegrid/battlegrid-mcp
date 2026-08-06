@@ -12,9 +12,12 @@
  * against the deployed endpoint — never against a repository constant or a generated manifest, both
  * of which state what will be served *after* a deploy rather than what is served now.
  *
- * MAJOR ONLY. The major identifies the contract; the minor and patch below it describe this proxy's
- * own code, which changes for reasons the server never sees. Exact equality would reject every
- * proxy-only release — npm already carries five (1.0.1, 1.0.2, 1.1.2, 1.1.4, 3.0.1).
+ * MAJOR AND MINOR. The contract uses MAJOR.MINOR and has never carried a non-zero patch — its minor
+ * is how ADDITIVE contract moves ship (5.1.0, 5.2.0 and 6.1.0 were all additive). The proxy
+ * announces the FULL version it publishes, so a package minor ahead of the server would advertise
+ * additive contract features the deployed endpoint does not serve. Only the PATCH is the package's
+ * own space, which is what proxy-only releases have always used — npm carries five (1.0.1, 1.0.2,
+ * 1.1.2, 1.1.4, 3.0.1).
  *
  * FAILS CLOSED. A missing or rejected credential is a failure, not a skip: a check that passes when
  * misconfigured is not a check.
@@ -22,8 +25,8 @@
  * Usage:
  *   BATTLEGRID_DEPLOY_CHECK_KEY=bg_live_… node scripts/assert-deployed-contract.mjs [--url <url>]
  *
- * Exit 0 = the deployed major matches this package's major. 1 = it does not, or the check could not
- * be completed. Not published — `files` in package.json ships only dist/, README.md, and LICENSE.
+ * Exit 0 = the deployed contract line (MAJOR.MINOR) matches this package's. 1 = it does not, or the
+ * check could not be completed. Not published — `files` ships only dist/, README.md, and LICENSE.
  */
 
 import { readFileSync } from 'node:fs';
@@ -36,12 +39,13 @@ function fail(message) {
   process.exit(1);
 }
 
-function majorOf(version) {
-  const major = /^(\d+)\./.exec(version)?.[1];
-  if (major === undefined) {
-    fail(`Cannot read a major version from "${version}".`);
+/** The contract line a version belongs to: MAJOR.MINOR, ignoring patch. */
+function contractLineOf(version, label) {
+  const parsed = /^(\d+)\.(\d+)\./.exec(version);
+  if (parsed === null) {
+    fail(`Cannot read a MAJOR.MINOR contract line from the ${label} version "${version}".`);
   }
-  return major;
+  return `${parsed[1]}.${parsed[2]}`;
 }
 
 /**
@@ -93,19 +97,21 @@ if (!served?.version) {
   fail(`${url} completed initialize but announced no server version.`);
 }
 
-const servedMajor = majorOf(served.version);
-const packageMajor = majorOf(packageVersion);
+const servedLine = contractLineOf(served.version, 'deployed');
+const packageLine = contractLineOf(packageVersion, 'package');
 
-if (servedMajor !== packageMajor) {
+if (servedLine !== packageLine) {
   fail(
-    `Deployed contract is ${served.version} (major ${servedMajor}) but this package is ` +
-      `${packageVersion} (major ${packageMajor}). Publishing would announce a contract the server ` +
-      'does not serve. Deploy the server first, then re-run this job — nothing has been published ' +
-      'and no tag exists to move.'
+    `Deployed contract is ${served.version} (contract line ${servedLine}) but this package is ` +
+      `${packageVersion} (contract line ${packageLine}). The proxy announces the full version it ` +
+      'publishes, so this would advertise a contract the server does not serve. If the server ' +
+      'has not deployed this contract yet, deploy it and re-run this job — nothing has been ' +
+      'published and no tag exists to move. If this was meant to be a proxy-only release, move ' +
+      `the PATCH instead (${servedLine}.x), which is the package's own space.`
   );
 }
 
 console.log(
-  `[assert-deployed-contract] OK — deployed ${served.name}@${served.version} ` +
-    `matches package major ${packageMajor} (publishing ${packageVersion}).`
+  `[assert-deployed-contract] OK — deployed ${served.name}@${served.version} is on contract line ` +
+    `${servedLine}, matching package ${packageVersion}.`
 );

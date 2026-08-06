@@ -352,10 +352,12 @@ Also confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Acti
 
 ### Which releases need a server deploy
 
-The deploy assertion compares the **major** only.
+The deploy assertion compares the **contract line** — `MAJOR.MINOR` — not the full version and not the major alone.
 
-- **A contract pairing** — the server's contract major moved, so the package major follows. This is the case that needs the deploy to land first.
-- **A proxy-only release** — a fix in this package's own code, a dependency bump, a documentation correction. Patch or minor within the current major, no deploy dependency, because no contract claim changes. This is the historical norm, not an edge case: `1.0.1`, `1.0.2`, `1.1.2`, `1.1.4` and `3.0.1` were all proxy-only, and `3.0.1` is recorded in the version table above as *"Docs only — … No proxy behavior change"*. Comparing exact versions rather than majors would have rejected every one of them.
+- **A contract pairing** — the server's contract moved, so the package follows. This needs the deploy to land first. Note this includes **minor** moves: the contract ships additive changes as minors (`5.1.0`, `5.2.0` and `6.1.0` were all additive), and the proxy announces the full version it publishes, so a package minor ahead of the server would advertise additive features the deployed endpoint does not serve.
+- **A proxy-only release** — a fix in this package's own code, a dependency bump, a documentation correction. Move the **PATCH**, which is the package's own space: the contract has never carried a non-zero patch, so a patch bump makes no claim about the server and needs no deploy. This is the historical norm, not an edge case — `1.0.1`, `1.0.2`, `1.1.2`, `1.1.4` and `3.0.1` were all proxy-only, and `3.0.1` is recorded in the version table above as *"Docs only — … No proxy behavior change"*.
+
+Comparing full versions would reject every one of those patch releases; comparing majors alone would let the package advertise a contract minor the server does not serve. The contract line is the boundary that is actually true.
 
 ### Verify publication
 
