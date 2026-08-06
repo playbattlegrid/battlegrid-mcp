@@ -10,7 +10,7 @@ Machine-readable agent discovery file for `@battlegrid/mcp-server` (thin stdio p
 | Website | https://battlegrid.trade |
 | Protocol | Model Context Protocol (MCP) |
 | Transport | stdio (npm package), streamable-http (remote) |
-| Package major | v5 — pairs with the server's published MCP contract version |
+| Package major | v9 — pairs with the server's published MCP contract version |
 
 ## Authentication
 
