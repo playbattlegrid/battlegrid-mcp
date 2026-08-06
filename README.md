@@ -335,12 +335,11 @@ That inversion is deliberate. Publication used to be triggered by a tag, which m
 | Responsibility | Environment |
 |---|---|
 | Confirm npm publishing trust | npmjs.com package settings |
-| Provision the deploy-check credential | `battlegrid-mcp` repository secrets |
 | Prepare and merge the version change | Pull request against `main` |
 | Check, build, publish, and tag | GitHub-hosted `ubuntu-latest`, Node 24 |
 | Verify registry publication | Any shell |
 
-**`BATTLEGRID_DEPLOY_CHECK_KEY`** must exist as a repository secret — a **read-only** BattleGrid API key. `scripts/assert-deployed-contract.mjs` uses it to read `serverInfo.version` from a real `initialize` against the deployed endpoint; an unauthenticated `initialize` returns 401 by design, so there is no anonymous way to make the check. **The check fails closed when the secret is missing or rejected, so publishing is blocked while it is absent** — a check that passes when misconfigured is not a check.
+**The deploy check needs no credential.** `scripts/assert-deployed-contract.mjs` reads `GET /mcp/version`, which the server serves **unauthenticated by design** — the contract version is announced to every connected client and committed to the app repo's `docs/architecture/mcp-manifest.json`, so it is not a secret. Requiring auth would have meant this workflow holding a BattleGrid API key, and every such key carries `mcp:wager` (there is no read-only variant), i.e. authority to submit wagers and close live positions in order to read a version number. The check fails closed on a mismatch, an unreachable endpoint, a non-200, or an unreadable body — but there is no secret to provision, scope, rotate, or leak.
 
 Also confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Actions with organization `playbattlegrid`, repository `battlegrid-mcp`, workflow filename `publish.yml`, no environment name, and `npm publish` allowed. The workflow uses short-lived OIDC credentials; do not add a long-lived `NPM_TOKEN`.
 

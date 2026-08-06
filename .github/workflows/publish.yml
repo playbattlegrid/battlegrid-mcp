@@ -101,11 +101,15 @@ jobs:
       # of the server's deploy tells clients a contract the server does not answer to. Compares the
       # contract line (MAJOR.MINOR) — the contract ships additive moves as minors, so a package minor
       # ahead of the server would advertise features it does not serve. Only PATCH is the package's
-      # own space. Fails closed, including when the credential is absent.
+      # own space.
+      #
+      # NO CREDENTIAL: it reads GET /mcp/version, which the server serves unauthenticated precisely
+      # so this check needs no key. Every BattleGrid MCP API key carries `mcp:wager` — there is no
+      # read-only variant — so a credentialed check would put wager-and-close-position authority in
+      # this repository's secrets to read a version number. Fails closed on a mismatch, an
+      # unreachable endpoint, a non-200, or an unreadable body.
       - name: Assert the deployed server serves this contract line
         if: steps.gate.outputs.release == 'true'
-        env:
-          BATTLEGRID_DEPLOY_CHECK_KEY: ${{ secrets.BATTLEGRID_DEPLOY_CHECK_KEY }}
         run: node scripts/assert-deployed-contract.mjs
 
       - name: Test
