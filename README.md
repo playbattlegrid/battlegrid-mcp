@@ -300,7 +300,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 ## Rediscovery & versioning
 
-- **Package/server major pairing.** This package's major version pairs with the BattleGrid server's published MCP contract version (`MCP_CONTRACT_VERSION`). The pairing is not decorative: the proxy re-announces itself as `battlegrid@<package version>` to the local client, under the same server name the remote handshake uses, so a package major left behind tells clients a contract number that no longer exists. Run matching majors.
+- **Package/server contract-line pairing.** This package's `MAJOR.MINOR` pairs with the BattleGrid server's published MCP contract version (`MCP_CONTRACT_VERSION`). The pairing is not decorative: the proxy re-announces itself as `battlegrid@<package version>` to the local client, under the same server name the remote handshake uses, so a package left behind tells clients a contract number that no longer exists — and a package *ahead* tells them one that does not exist yet. **The line, not just the major:** the contract ships additive changes as minors (`5.1.0`, `5.2.0`, `6.1.0`), so matching majors alone would let the package advertise a minor the server does not serve. Only the PATCH is the package's own space. The publish workflow enforces this against the deployed endpoint; it is not left to memory.
 - **Rediscover after a server cutover.** Package publication does not refresh a running proxy's cached startup snapshot. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
 - **Restart after key rotation.** API keys are read once at process startup; rotate a key, then restart the proxy.
 
