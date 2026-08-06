@@ -300,7 +300,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 ## Rediscovery & versioning
 
-- **Package/server major pairing.** This package's major version pairs with the BattleGrid server's published MCP contract version (`MCP_CONTRACT_VERSION`). The pairing is not decorative: the proxy re-announces itself as `battlegrid@<package version>` to the local client, under the same server name the remote handshake uses, so a package major left behind tells clients a contract number that no longer exists. Run matching majors.
+- **Package/server contract-line pairing.** This package's `MAJOR.MINOR` pairs with the BattleGrid server's published MCP contract version (`MCP_CONTRACT_VERSION`). The pairing is not decorative: the proxy re-announces itself as `battlegrid@<package version>` to the local client, under the same server name the remote handshake uses, so a package left behind tells clients a contract number that no longer exists — and a package *ahead* tells them one that does not exist yet. **The line, not just the major:** the contract ships additive changes as minors (`5.1.0`, `5.2.0`, `6.1.0`), so matching majors alone would let the package advertise a minor the server does not serve. Only the PATCH is the package's own space. The publish workflow enforces this against the deployed endpoint; it is not left to memory.
 - **Rediscover after a server cutover.** Package publication does not refresh a running proxy's cached startup snapshot. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
 - **Restart after key rotation.** API keys are read once at process startup; rotate a key, then restart the proxy.
 
@@ -322,64 +322,49 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 ## Maintainer release procedure
 
-> [`.github/workflows/publish.yml`](.github/workflows/publish.yml) is the executable release authority. If this recipe and the workflow diverge, correct them together before creating a release tag.
+> [`.github/workflows/publish.yml`](.github/workflows/publish.yml) is the executable release authority. If this recipe and the workflow diverge, correct them together before merging a version change.
 
-Publishing runs only in GitHub-hosted Actions. Never run `npm publish` from the BattleGrid application VM or a maintainer workstation. The maintainer's shell prepares and pushes one immutable tag; the workflow checks out that pinned commit, tests, builds, packs, and publishes it with npm provenance.
+Publishing runs only in GitHub-hosted Actions. Never run `npm publish` from the BattleGrid application VM or a maintainer workstation.
+
+**A version change on `main` is the release.** Merge a pull request that changes `package.json`'s version and the workflow does the rest: it confirms that version is not already on the registry, verifies every value expressing it agrees, asserts the deployed server serves that contract major, tests, builds, packs, publishes with npm provenance, and tags what shipped. There is no manual tag step — the tag is an output of a successful publish, not its prerequisite.
+
+That inversion is deliberate. Publication used to be triggered by a tag, which meant a version bump with no tag published nothing **and reported nothing** — how `5.1.0` came to be declared in this repository and absent from the registry, caught by no check at all.
 
 ### Release environments and prerequisites
 
 | Responsibility | Environment |
 |---|---|
 | Confirm npm publishing trust | npmjs.com package settings |
-| Verify the release and push its tag | Clean `battlegrid-mcp` checkout with GitHub write access |
-| Build, test, pack, and publish | GitHub-hosted `ubuntu-latest`, Node 24 |
+| Prepare and merge the version change | Pull request against `main` |
+| Check, build, publish, and tag | GitHub-hosted `ubuntu-latest`, Node 24 |
 | Verify registry publication | Any shell |
 
-Before tagging:
+**The deploy check needs no credential.** `scripts/assert-deployed-contract.mjs` reads `GET /mcp/version`, which the server serves **unauthenticated by design** — the contract version is announced to every connected client and committed to the app repo's `docs/architecture/mcp-manifest.json`, so it is not a secret. Requiring auth would have meant this workflow holding a BattleGrid API key, and every such key carries `mcp:wager` (there is no read-only variant), i.e. authority to submit wagers and close live positions in order to read a version number. The check fails closed on a mismatch, an unreachable endpoint, a non-200, or an unreadable body — but there is no secret to provision, scope, rotate, or leak.
+
+Also confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Actions with organization `playbattlegrid`, repository `battlegrid-mcp`, workflow filename `publish.yml`, no environment name, and `npm publish` allowed. The workflow uses short-lived OIDC credentials; do not add a long-lived `NPM_TOKEN`.
+
+### Preparing the version change
 
 - **Read the target version from the generated manifest, never from prose.** The number this package pairs to is `server.contractVersion` in `battlegrid-app`'s `docs/architecture/mcp-manifest.json` — generated by `buildMcpManifest` and CI-verified, on a freshly fetched `origin/main` (a stale ref reports a superseded contract silently). **A contract version quoted in an issue, a pull request, or any other hand-written text is not the target.** During active contract development that number changes on merge, so prose carries a value that was true when written and is unverifiable when read. Every pairing before v9 was sourced from prose, and the v9 pairing was filed against a contract three majors stale.
-- **Confirm the server is actually serving that contract before tagging.** Publication must follow deploy: read `serverInfo.version` from an authenticated `initialize` against the deployed endpoint, or run the server-side release canary. Tagging first announces a contract the server does not answer to.
-- Merge the complete release into `main`; never release a feature-branch commit.
-- Use Node 22 or 24 locally. CI uses Node 24; odd-numbered Node releases are not supported by the test toolchain.
-- Ensure `package.json`, `package-lock.json`, and `src/index.ts`'s exported `VERSION` all contain the intended version.
-- Confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Actions with organization `playbattlegrid`, repository `battlegrid-mcp`, workflow filename `publish.yml`, no environment name, and `npm publish` allowed. The workflow uses short-lived OIDC credentials; do not add a long-lived `NPM_TOKEN`.
+- **Move all four values together** — `package.json`, both `package-lock.json` version fields (the root `version` and the self-referencing `packages[""].version`), and the exported `VERSION` in `src/index.ts`. The workflow compares all four against each other and fails closed on any disagreement.
+- **Merge the version change only after the server is deployed.** The deploy assertion is a safety net, not a routine step: with the ordering right it never fires, and a red workflow on `main` means something is genuinely wrong rather than that you are waiting. Merging early blocks the publish until the deploy lands, then re-run the job — nothing was published and no tag exists to move.
 
-### Verify and tag the merged commit
+### Which releases need a server deploy
 
-Run from a clean `battlegrid-mcp` checkout, substituting the intended unused version:
+The deploy assertion compares the **contract line** — `MAJOR.MINOR` — not the full version and not the major alone.
 
-```bash
-release_version=9.0.0
-release_tag="mcp-server@${release_version}"
+- **A contract pairing** — the server's contract moved, so the package follows. This needs the deploy to land first. Note this includes **minor** moves: the contract ships additive changes as minors (`5.1.0`, `5.2.0` and `6.1.0` were all additive), and the proxy announces the full version it publishes, so a package minor ahead of the server would advertise additive features the deployed endpoint does not serve.
+- **A proxy-only release** — a fix in this package's own code, a dependency bump, a documentation correction. Move the **PATCH**, which is the package's own space: the contract has never carried a non-zero patch, so a patch bump makes no claim about the server and needs no deploy. This is the historical norm, not an edge case — `1.0.1`, `1.0.2`, `1.1.2`, `1.1.4` and `3.0.1` were all proxy-only, and `3.0.1` is recorded in the version table above as *"Docs only — … No proxy behavior change"*.
 
-git fetch origin --tags
-git switch main
-git pull --ff-only origin main
-
-test -z "$(git status --porcelain)"
-test "$(node -p "require('./package.json').version")" = "$release_version"
-test "$(node -p "require('./package-lock.json').version")" = "$release_version"
-test "$(node -p "require('fs').readFileSync('src/index.ts','utf8').match(/VERSION = '([^']+)'/)[1]")" = "$release_version"
-test -z "$(git tag --list "$release_tag")"
-
-npm ci
-npm test
-npm run build
-npm pack --dry-run
-
-release_commit="$(git rev-parse HEAD)"
-git tag -a "$release_tag" "$release_commit" -m "Publish @battlegrid/mcp-server $release_version"
-git show --no-patch --decorate "$release_tag"
-git push origin "$release_tag"
-```
-
-A tag matching `mcp-server@*` starts the [publish workflow](https://github.com/playbattlegrid/battlegrid-mcp/actions/workflows/publish.yml). Wait for that exact tag run to complete successfully before querying npm; a temporary registry `E404` while the workflow is still running is not a publication failure.
-
-The workflow fails closed unless the tag version, package version, lockfile version, and source handshake version are identical. It then runs the test suite, TypeScript build, and package dry run before `npm publish --access public --provenance`.
+Comparing full versions would reject every one of those patch releases; comparing majors alone would let the package advertise a contract minor the server does not serve. The contract line is the boundary that is actually true.
 
 ### Verify publication
 
+The workflow publishes and tags on its own; these confirm what landed.
+
 ```bash
+release_version="$(node -p "require('./package.json').version")"
+
 npm view "@battlegrid/mcp-server@${release_version}" version dist.integrity \
   --json --registry=https://registry.npmjs.org/
 
@@ -390,19 +375,15 @@ npm view "@battlegrid/mcp-server@${release_version}" dist.attestations \
   --json --registry=https://registry.npmjs.org/
 ```
 
-Require the exact version, `latest` pointing at that version, and a provenance attestation. Record the release tag and commit. Restart/reconnect running proxies and rediscover `tools/list`, `prompts/list`, and `resources/list`; publication alone does not refresh their startup cache.
+Require the exact version, `latest` pointing at that version, and a provenance attestation. Confirm the workflow created `mcp-server@${release_version}` and that `gitHead` on the published version is the merge commit. Restart/reconnect running proxies and rediscover `tools/list`, `prompts/list`, and `resources/list`; publication alone does not refresh their startup cache.
 
-**Reconcile the registry against the repository — a version bump is not a release until its tag exists.**
+There is no separate registry-reconciliation step to remember. "Is this version already published?" is the workflow's own first question — it decides whether the run publishes at all — so a bump can no longer sit in the repository unpublished and unreported the way `5.1.0` did.
 
-```bash
-test "$(npm view @battlegrid/mcp-server dist-tags.latest)" = "$(node -p "require('./package.json').version")"
-```
+**The server-side release canary is not evidence about this package.** `battlegrid-app`'s `server/scripts/release-canary-mcp.ts` connects to the deployed endpoint and compares `client.getServerVersion()` against the server's own imported `MCP_CONTRACT_VERSION` — **both sides are server-side, and it never queries npm.** It passes with this package at any version, including one that was never published. Package-side evidence is exactly three things: the workflow's version-integrity gate, the registry checks above (plus `gitHead` matching the release commit and the handshake constant in the published `dist/index.js`), and a **reconnect** showing `battlegrid@<version>` in the stdio handshake.
 
-The workflow's integrity gate is one-directional: it proves a *tagged* release is internally consistent and says nothing about a bump that was never tagged. `5.1.0` moved all four version values in `eda8fef` and no `mcp-server@5.1.0` tag was ever pushed, so the workflow never ran and the registry stayed on `5.0.0` — a version the repository claimed and no client could install, reported by nothing. Run the check above at the end of every release; a mismatch means either the tag is missing or the push failed.
+Note the deploy assertion in the workflow is a *different* check from that canary and does not share its limitation: it reads the deployed handshake and compares it against **this package's** version, so both sides are not server-side.
 
-**The server-side release canary is not evidence about this package.** `battlegrid-app`'s `server/scripts/release-canary-mcp.ts` connects to the deployed endpoint and compares `client.getServerVersion()` against the server's own imported `MCP_CONTRACT_VERSION` — **both sides are server-side, and it never queries npm.** It passes with this package at any version, including one that was never published. Package-side evidence is exactly three things: the workflow's version-integrity gate, the registry reconciliation above (plus `gitHead` matching the release commit and the handshake constant in the published `dist/index.js`), and a **reconnect** showing `battlegrid@<version>` in the stdio handshake.
-
-If publishing fails, inspect the tag's workflow before taking action. An `ENEEDAUTH` failure means the npm Trusted Publisher fields do not match the workflow. Fix the publisher configuration and rerun the failed job without moving the tag. Never retarget or reuse a published tag, and never mutate a tagged release with `npm audit fix`; dependency remediation goes through a new reviewed commit and version.
+If a run fails, inspect it before taking action. An `ENEEDAUTH` failure means the npm Trusted Publisher fields do not match the workflow — fix the publisher configuration and re-run the job. A failed deploy assertion means the server has not deployed that contract major yet; deploy, then re-run. In both cases nothing was published and no tag was created, so there is nothing to move or reuse. Never mutate a published release with `npm audit fix`; dependency remediation goes through a new reviewed commit and version.
 
 ## Skills
 
