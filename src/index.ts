@@ -20,6 +20,11 @@
  * the nested request — the server owns every required field, bound, union
  * discriminator, and `additionalProperties:false` constraint.
  *
+ * Versions (two of them, describing two different things):
+ *   - PACKAGE_VERSION — this proxy's own code. Sent UPSTREAM as the client identity.
+ *   - the announced contract — read from the upstream handshake at connect time and relayed
+ *     DOWNSTREAM verbatim. Never a constant compiled into this package. See `announcedIdentityOf`.
+ *
  * Architecture: Matches Stripe's @stripe/mcp pattern — thin authenticated proxy.
  *
  * Usage:
@@ -44,9 +49,21 @@ import {
   GetPromptRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
+  type Implementation,
 } from '@modelcontextprotocol/sdk/types.js';
 
-export const VERSION = '11.0.0';
+/**
+ * This package's own version — the proxy's code, and nothing else.
+ *
+ * It deliberately does NOT describe the server's wire contract. That number is read from the
+ * upstream handshake on every connection and relayed downstream (`announcedIdentityOf`), so the two
+ * cannot drift: there is no second place to update and no release needed when the contract moves.
+ *
+ * Sent upstream as the CLIENT identity, where "which proxy build is calling" is exactly the question
+ * being asked. Move it for a change to THIS package — a proxy fix, a dependency bump, a docs
+ * correction. Never move it to track the server.
+ */
+export const PACKAGE_VERSION = '12.0.0';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade/mcp';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
@@ -248,6 +265,41 @@ export function injectAccountParam(tools: ToolDefinition[], accountNames: string
   }));
 }
 
+// --- Announced identity (exported for testing) ---
+
+/**
+ * The identity the local stdio server announces downstream: the upstream server's own, relayed
+ * verbatim from the handshake that just completed.
+ *
+ * WHY RELAY RATHER THAN DECLARE. A local client reads this handshake as a statement about the
+ * contract it is about to call. Announcing a constant compiled into this package makes that
+ * statement on the server's behalf and then depends on a human keeping the two in step — which is
+ * how the package sat at `11.0.0` against a deployed contract of `19.3.0` for ten days, how `5.1.0`
+ * came to be declared in this repository and absent from the registry, and why four of the last five
+ * releases were version bumps carrying no code change at all. Reading the number off the connection
+ * that will actually serve the calls makes the pairing true by construction, on every connection,
+ * with no release involved.
+ *
+ * VERBATIM, NOT RECONSTRUCTED. `Implementation` also carries optional display metadata (`title`,
+ * `websiteUrl`, `icons`, …). Passing the object through means a field the server adds later reaches
+ * local clients without an edit here — the same reason the tool catalog is never enumerated.
+ *
+ * FAILS CLOSED. `serverInfo` is required in a successful MCP `initialize` result, so a connected
+ * client holding none is a protocol violation rather than a case to design around. Falling back to
+ * PACKAGE_VERSION here would reintroduce the exact fiction this function exists to remove, and would
+ * do it silently, at the one moment the truth was unavailable.
+ */
+export function announcedIdentityOf(serverInfo: Implementation | undefined): Implementation {
+  if (serverInfo === undefined) {
+    throw new Error(
+      'Upstream MCP server completed initialize without announcing serverInfo, so there is no ' +
+      'contract version to relay to local clients. This is a protocol violation by the server — ' +
+      'not a configuration problem, and not something this proxy will substitute a guess for.'
+    );
+  }
+  return serverInfo;
+}
+
 // --- Proxy server factory (exported for protocol testing) ---
 
 export interface CreateProxyServerOptions {
@@ -255,8 +307,6 @@ export interface CreateProxyServerOptions {
   identities: AccountIdentity[];
   /** Connect (or reuse) a remote MCP client for a given API key. Called once per key, lazily. */
   connect: (apiKey: string) => Promise<Client>;
-  /** Advertised server version; defaults to VERSION. */
-  version?: string;
 }
 
 export interface ProxyServer {
@@ -266,6 +316,8 @@ export interface ProxyServer {
   resourceCount: number;
   isMultiAccount: boolean;
   accountNames: string[];
+  /** The upstream identity relayed downstream — the contract a local client will actually reach. */
+  announced: Implementation;
 }
 
 /**
@@ -276,7 +328,6 @@ export interface ProxyServer {
  */
 export async function createProxyServer(options: CreateProxyServerOptions): Promise<ProxyServer> {
   const { identities, connect } = options;
-  const version = options.version ?? VERSION;
 
   const isMultiAccount = identities.length > 1;
   const accountNames = identities.map(id => id.username);
@@ -291,6 +342,10 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
   const primaryKey = identities[0].apiKey;
   const primaryClient = await connect(primaryKey);
 
+  // What this proxy announces downstream is what the upstream just announced to it — read here,
+  // from the completed handshake, so it can never be a stale constant.
+  const announced = announcedIdentityOf(primaryClient.getServerVersion());
+
   // Discover remote capabilities
   const [toolsResult, promptsResult, resourcesResult] = await Promise.all([
     primaryClient.listTools(),
@@ -303,9 +358,9 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
     ? injectAccountParam(toolsResult.tools as ToolDefinition[], accountNames)
     : toolsResult.tools;
 
-  // Create local stdio server
+  // Create local stdio server, announcing the upstream's identity rather than one of our own.
   const localServer = new Server(
-    { name: 'battlegrid', version },
+    announced,
     {
       capabilities: {
         tools: {},
@@ -400,6 +455,7 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
     resourceCount: resourcesResult.resources.length,
     isMultiAccount,
     accountNames,
+    announced,
   };
 }
 
@@ -442,8 +498,9 @@ async function main(): Promise<void> {
       new URL(config.apiUrl),
       { requestInit: { headers: { Authorization: `Bearer ${apiKey}` } } }
     );
+    // Upstream is told which proxy build is calling — the one question PACKAGE_VERSION answers.
     const client = new Client(
-      { name: 'battlegrid-proxy', version: VERSION },
+      { name: 'battlegrid-proxy', version: PACKAGE_VERSION },
       { capabilities: {} }
     );
     await connectWithRetry(client, transport, config.apiUrl);
@@ -458,6 +515,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Both numbers, labelled. They describe different things and are EXPECTED to differ — printing
+  // only one leaves an operator to guess which, and printing neither is how the last drift went
+  // unnoticed for ten days.
+  process.stderr.write(
+    `BattleGrid MCP: announcing ${proxy.announced.name}@${proxy.announced.version} ` +
+    `(server contract, read from the upstream handshake) — proxy ${PACKAGE_VERSION}\n`
+  );
   process.stderr.write(
     `BattleGrid MCP: ${proxy.toolCount} tools, ${proxy.promptCount} prompts, ${proxy.resourceCount} resources\n`
   );
