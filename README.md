@@ -7,13 +7,26 @@ MCP server for [BattleGrid](https://battlegrid.trade) — play crypto prediction
 
 It is a thin, authenticated **stdio proxy** to BattleGrid's remote MCP server (Stripe `@stripe/mcp` pattern — no business logic). It discovers tools, prompts, and resources live from the server and re-exposes them to local MCP clients (Claude Desktop, Claude Code, Cursor). Capabilities are always **discovered live** — this package never hardcodes the tool catalog.
 
-## v30 — breaking cutover (v12 → v30)
+## v31 — the announced contract is read from the server, not declared here
 
-**v30 pairs with the BattleGrid server's MCP contract v30.x — currently v30.0.0.** The package version tracks the server's wire contract, because the proxy announces `battlegrid@<package version>` in its own stdio handshake — the number a client reads has to be the contract it will actually reach.
+**The package version no longer tracks the server's contract, and no longer claims to.** Through v30 it did: the proxy announced `battlegrid@<package version>` downstream, so the published number was read as the contract a client would reach, and keeping the two in step was a manual release chore. It did not hold — the package sat at `11.0.0` against a deployed contract of `19.3.0` for ten days, `5.1.0` was declared here and never published at all, and four of the last five releases were version bumps carrying no code change.
 
-This release absorbs **eighteen** breaking contract majors at once. The published package went from `11.0.0` straight to `30.0.0`, so no `12.x` through `29.x` client exists to upgrade from — the breaks are grouped by **what you will observe**, with the contract version that introduced each.
+From v31 the proxy reads the contract version out of the upstream handshake at connect time and relays it verbatim. What a local client reads is therefore what the connected server just announced — correct by construction, on every connection, with no release involved.
 
-**Why the gap happened, recorded so it does not repeat.** The pairing rule was documented and the publish gate enforced it, but nothing *noticed* when the server's contract advanced: `scripts/assert-deployed-contract.mjs` only runs when a publish is attempted, and none was between 2026-08-07 and this release. A stop sign cannot ring a doorbell. `.github/workflows/contract-drift.yml` now polls the deployed contract line daily and opens a bump PR when it diverges.
+**Two versions, two meanings, and they are expected to differ:**
+
+| | What it describes | Where to read it |
+|---|---|---|
+| Package version | This proxy's own code — a fix here, a dependency bump, a docs correction | `npm view @battlegrid/mcp-server version` |
+| Contract version | The server's wire contract, live | The stdio handshake (`battlegrid@<contract>`), or `GET /mcp/version` |
+
+Seeing package `31.0.0` alongside handshake `battlegrid@30.0.0` is the system working. Both are printed to stderr at startup, labelled.
+
+**What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
+
+## Contract history — v12 → v30
+
+These are the server contract breaks between contract 12 and contract 30 — the span that shipped while the package sat at `11.0.0`. They are **contract** history, not package releases: from v31 the announced contract is relayed live and a contract move is no longer a release here. Grouped by what a client observes, with the contract version that introduced each.
 
 **The proxy itself is unchanged.** It embeds no schemas, pins no contract version, and forwards `{ request }` verbatim. Every break below lands on whatever *authors* the payload or *reads* the result, never on the proxy.
 
@@ -25,50 +38,6 @@ This release absorbs **eighteen** breaking contract majors at once. The publishe
 
 - **The stop-loss ceiling changed unit** (30.0.0). `maxStopLossPct` (a percent of entry) becomes `maxStopLossAtrMultiple` (a multiple of ATR), and the accepted range narrows from `(0, 100]` to `(0, 3]`. It is a rename **and** a re-denomination — mapping the old value onto the new key sends a number one to two orders of magnitude too large. The objects are `.strict()`, so a 29.x client sending `maxStopLossPct` is rejected with an unknown-key error. A new cross-field rule comes with it: `minStopLossAtrMultiple < maxStopLossAtrMultiple` is now a real comparison and is enforced.
 - **The grid-confidence and trade-conviction bars left the agent** (28.0.0, `remove-agent-rule-defaults`). `tradingConfig.gridMinConfidence` and `minTradeConviction` are removed from the shared `.strict()` config; a bar is declared on the arena slot or radar slot that fires.
-- **Both entry-lifecycle guards left the agent** (26.0.0, `move-entry-guards-to-platform`). `tradingConfig.signalTimeoutMinutes` and `maxEntryDeviationAtrMultiple` are removed with no replacement key — both are platform values now.
-- **The arena stopped granting trade authority** (25.0.0, `remove-arena-trade-permissions`). `upsert_deployment_policy` and `preview_deployment_resolution` stop accepting `tradingEnabled`, `minConviction` and `coinRules[]` on a slot.
-- **Post-entry exit policy moved to the strategy** (24.0.0, `move-position-management-to-strategy`). The nested `positionManagement` object is removed from the agent config; the twelve dials are authored on the strategy.
-- **The agent-level trading mode is retired** (23.0.0, `remove-agent-trading-mode`). `tradingConfig.tradingMode` is removed — trading on/off is scoped per deployment.
-- **Trailing gained a required threshold** (22.0.0, `add-trailing-trigger-r`). `positionManagement` gains `trailingTriggerR` as REQUIRED (`0`–`2.0`, `0.01` precision, `0` = trail from entry); the object is `.strict()` all-required, so sending `positionManagement` without it is rejected.
-- **The strategy regime timeframe became derived** (19.0.0, `remove-strategy-regime-override`). It stops being an authored axis anywhere on the contract and is served read-only.
-- **Conditions gained a required `required`** (16.0.0, `add-condition-enforcement-gate`). A condition entry omitting the boolean is REJECTED rather than defaulted.
-- **The trade-level policy moved to the strategy** (15.0.0, `move-trade-level-policy-to-strategy`). It leaves the agent authoring surface and joins the setup gates on the strategy.
-- **The agent's ATR timeframe axis is gone** (14.0.0, `remove-agent-atr-timeframe-axis`). ATR is sampled on the strategy timeframe, always.
-- **Radar's wall-clock condition changed shape** (12.0.0, `unify-deployment-hours-as-sets`).
-
-### Moved or reshaped output — a field you read is somewhere else
-
-- **`get_radar_activity` gained an `EDGE_REARM` variant** (29.0.0, `add-radar-anchor-rearm`), and every member gained five `rearm*` margin keys plus a `rearmReasons` discriminator. Breaking on both counts if you parse the union strictly.
-- **The trade-defaults catalog dropped four seeds** (27.0.0, `retire-orphaned-trade-config-columns`) for fields no surface can author. Read the stop-loss band, ATR floor and risk-reward minimum from the bound STRATEGY.
-- **`get_radar_activity` gained `blockReasonCode` on every member** (21.0.0, `fix-block-reason-attribution`) — non-null only on `BLOCKED_BEFORE_EVALUATION` rows written after 2026-08-17.
-- **`signal_pipeline`'s decision became a discriminated union** (20.0.0, `add-decision-skip-attribution`). `ENTER`/`GATED` carry the seven level fields as REQUIRED; `SKIP` omits them entirely rather than sending nulls, so reading `entryPrice` without narrowing the verdict finds the key absent.
-- **`get_radar_activity` gained an `EVALUATION_OUTCOME` member** (18.0.0, `add-radar-fire-outcome-journal`), and every existing member gained `evaluationOutcome` + `screenReason`.
-- **Scalar families became placeable modules** (13.0.0, `add-scalar-family-modules`); six opt-in scalar headers moved off the shared `session-field` section key.
-
-### Widened enum — new members your own copy rejects
-
-- `TradeEvaluationAttemptReasonCode` gains `OPEN_POSITION_CHECK_UNAVAILABLE` (19.4.0), splitting a code that previously reported a platform fault as a fact about your account.
-- `QualificationGateCode` gains `REQUIRED_CONDITION_FALSE` (19.3.0), from the SCAN-stage gate that now evaluates required conditions before a fire edge is spent.
-- `TradingPipelineGateStage` gains `EVALUATION` and `TradeEvaluationAttemptReasonCode` gains `EVALUATION_FAULTED` (18.2.0).
-
-### What you do NOT need to do
-
-Nothing in the proxy changes. No configuration, no environment variable, no call-shape change on this package's own surface. If your client discovers tools live and reads results generically, `npm i @battlegrid/mcp-server@30` is the whole upgrade.
-
-### Additive in the same span
-
-`27.1.0` exit-policy authoring input on `compile_strategy_plan` · `19.2.0` `get_account_state` account identity · `19.1.0` Standing Orders marker authoring · `18.4.0` `list_gate_blocks` summary groups · `18.3.0` radar maintenance pause · `18.1.0` protection geometry · `17.2.0` break-even/trailing status · `17.1.0` `get_signal_log` condition evaluation · `13.1.0` four owner-scoped read tools · `12.1.0` cross-venue spot price metrics · `11.1.0` discoverable rate limit.
-
-## v11 — breaking cutover (v6 → v11)
-
-**v11 pairs with the BattleGrid server's MCP contract v11.x — currently v11.0.0.** The package version tracks the server's wire contract, because the proxy announces `battlegrid@<package version>` in its own stdio handshake — the number a client reads has to be the contract it will actually reach. Upgrade the package and the server together: the major carries the breaking cutover described below, and the minor tracks additive contract moves that leave every existing call working.
-
-This release absorbs **six** breaking contract majors at once. The published package went from `5.0.0` straight to `11.0.0`, so no `6.x` through `10.x` client exists to upgrade from — the breaks are therefore grouped by **what you will observe**, with the contract version that introduced each, so a client hitting a specific rejection can find it here.
-
-**The proxy itself is unchanged.** It embeds no schemas, pins no contract version, and forwards `{ request }` verbatim. Every break below lands on whatever *authors* the payload or *reads* the result, never on the proxy.
-
-### Rejected input — something you author is no longer accepted
-
 - **The agent no longer carries either entry guard** (26.0.0). `create_agent` and `update_agent` stop
   accepting `tradingConfig.signalTimeoutMinutes` and `tradingConfig.maxEntryDeviationAtrMultiple`.
   The schema is `.strict()`, so a client still sending either is **rejected**, not silently ignored.
@@ -77,6 +46,7 @@ This release absorbs **six** breaking contract majors at once. The published pac
   drift budget for every decision, read at evaluation time; one governs how long an entry may stay
   unfilled, snapshotted onto the position at creation. **Remove both keys and send nothing in their
   place.**
+- **The arena stopped granting trade authority** (25.0.0, `remove-arena-trade-permissions`). `upsert_deployment_policy` and `preview_deployment_resolution` stop accepting `tradingEnabled`, `minConviction` and `coinRules[]` on a slot.
 - **The agent no longer carries an exit policy** (24.0.0). `create_agent` and `update_agent` stop
   accepting `tradingConfig.positionManagement`. The schema is `.strict()`, so a client still sending
   it is **rejected**, not silently ignored. The twelve dials that decide how a stop MOVES after entry
@@ -98,29 +68,28 @@ This release absorbs **six** breaking contract majors at once. The published pac
   both is removed rather than renamed. To stop an agent trading, turn its deployment off (or halt
   the agent); to make one trade autonomously, arm a radar coin or switch trading on for an arena
   slot. **A newly authored arena slot now starts with trading off.**
-- **Challenge participation is no longer a field you set** (10.0.0). `create_agent` and `update_agent` stop accepting `arenaChallengeEnabled`, and a deployment policy's slot rules and per-coin rules stop accepting `challengeEnabled`. All four schemas are `.strict()`, so a client still sending any of them is **rejected**, not silently ignored. Challenge participation is now *identical* to effective trade permission, resolved per coin: to stop an agent taking challenges at a venue, turn that venue's trading off — at the slot, or per coin for finer grain — using fields you already have.
-- **`VOLUME_RATIO` is retired and replaced by `RVOL`** (6.0.0). `MetricKeySchema` auto-derives from the server's metric catalog, so the published enum simply stops accepting the old key: a column authored with `metric: 'VOLUME_RATIO'` is rejected against the enum. **No alias exists** — deliberately. The catalog audit adjudicated the old name as a name-level lie (the value is current volume ÷ its 20-period average, a *multiple*), and the correction was made at the root rather than grandfathered. If you hit an enum rejection naming `VOLUME_RATIO`, this note is the match.
-- **`BB_WIDTH` can no longer be ranked** (8.0.0). `{ metric: 'BB_WIDTH', transformId: 'rank' }` is now rejected. `BBwidth` is a price-unit spread (`upper − lower`) that had falsely declared `percent`, and that declaration was the only thing admitting it to exchange-wide ranking — the ordinal it produced sorted by token denomination rather than by compression. It re-declares `signedPrice` and leaves the ranked contract. **Rank `BB_WIDTH_PCT` (`bbWidthPct`) instead**, which ships in the same release: the capability moved, it was not removed.
-
-### Silently non-matching — a generated header you match on moved
-
-This is the failure mode with no error attached to it. Nothing is rejected; your matcher simply stops finding the column.
-
-- **`vol` → `RVOL`** (6.0.0), and with it **`vol_trend` → `RVOL_trend`** and **`vol_rank_hi` → `RVOL_rank_hi`**. The header code moves with the metric key, because every generated header over that metric derives from the code alone.
-- **`BBwidth_rank_lo` no longer exists** (8.0.0) — it was the header of the ranked pairing retired above.
+- **Trailing gained a required threshold** (22.0.0, `add-trailing-trigger-r`). `positionManagement` gains `trailingTriggerR` as REQUIRED (`0`–`2.0`, `0.01` precision, `0` = trail from entry); the object is `.strict()` all-required, so sending `positionManagement` without it is rejected.
+- **The strategy regime timeframe became derived** (19.0.0, `remove-strategy-regime-override`). It stops being an authored axis anywhere on the contract and is served read-only.
+- **Conditions gained a required `required`** (16.0.0, `add-condition-enforcement-gate`). A condition entry omitting the boolean is REJECTED rather than defaulted.
+- **The trade-level policy moved to the strategy** (15.0.0, `move-trade-level-policy-to-strategy`). It leaves the agent authoring surface and joins the setup gates on the strategy.
+- **The agent's ATR timeframe axis is gone** (14.0.0, `remove-agent-atr-timeframe-axis`). ATR is sampled on the strategy timeframe, always.
+- **Radar's wall-clock condition changed shape** (12.0.0, `unify-deployment-hours-as-sets`).
 
 ### Moved or reshaped output — a field you read is somewhere else
 
-- **`estimatedTokenCount` is gone** (7.0.0). `preview_strategy_report` and `compile_strategy_plan` no longer carry it; the same number now sits one level deeper as **`budgetUsage.estimatedTokens.used`**, paired with the `cap` that governs it — so a client reading the count changes one path and gains the ceiling it was never told. `tokenCountModel` is unchanged. Discovery grows to match: `list_strategy_vocabulary` and the report catalog add `budgets.estimatedTokens` and a `previewExecutionLimits` object carrying the serialized-result byte cap and the preview deadline. Those two are published **cap-only** and deliberately have no `used` companion.
-- **`approvedPlan.mismatches` changed on both axes** (9.0.0). Both report-coverage codes are renamed off "module", because the module is no longer the unit of coverage:
-
-  | Was | Is now |
-  |---|---|
-  | `ACTIVE_SIGNAL_MODULE_NOT_IN_REPORT` | `ACTIVE_SIGNAL_DATA_NOT_IN_REPORT` |
-  | `REPORT_MODULE_SIGNAL_OFF` | `REPORT_DATA_SIGNAL_OFF` |
-
-  Each mismatch also carries a **required** `data: CoverageDatum[]` — the `(metric, rung)` pairs the mismatch is about: every MISSING datum for the not-in-report code, the PRESENT data for the signal-off code, empty for `REQUIRED_SIGNAL_UNAVAILABLE`. A client switching exhaustively on the old code strings stops matching. Behaviourally, coverage is now decided by whether the report renders a signal's declared metrics at the **rung** that signal reads, not by whether its module appears anywhere — so expect warnings you never saw before, and the disappearance of warnings no composition could clear. Mismatches remain advisory and non-blocking; nothing about apply gates on them.
-- **`IntelligenceAgentDTO` drops `arenaChallengeEnabled`** (10.0.0) — the read side of the input removal above. `ResolvedSlotRulesDTO.challengeEnabled` **stays and keeps its shape**; it is now derived server-side, carrying the same value and provenance as `tradingEnabled`, so a client reading the resolved bundle needs no change.
+- **`get_radar_activity` gained an `EDGE_REARM` variant** (29.0.0, `add-radar-anchor-rearm`), and every member gained five `rearm*` margin keys plus a `rearmReasons` discriminator. Breaking on both counts if you parse the union strictly.
+- **`get_trading_config_catalog` drops four trade-default seeds** (27.0.0) — `defaultMinAtrPct`,
+  `defaultMinStopLossPct`, `defaultMaxStopLossPct` and `defaultMinRiskRewardRatio` leave `defaults`.
+  Each seeded a per-agent field that is now **strategy-owned**: the shared `.strict()`
+  `TradingConfigSchema` already rejected all four as unknown keys, so the catalog was advertising
+  defaults no request could apply. A client that wants the stop-loss band, the ATR floor or the
+  risk-reward minimum reads them from the bound **strategy**, which owns and materializes them.
+  Nothing is added in their place. `defaultMaxEntryDeviationAtrMultiple` and `defaultTtlMinutes` are
+  untouched — those are not seeds but the platform values that govern.
+- **`get_radar_activity` gained `blockReasonCode` on every member** (21.0.0, `fix-block-reason-attribution`) — non-null only on `BLOCKED_BEFORE_EVALUATION` rows written after 2026-08-17.
+- **`signal_pipeline`'s decision became a discriminated union** (20.0.0, `add-decision-skip-attribution`). `ENTER`/`GATED` carry the seven level fields as REQUIRED; `SKIP` omits them entirely rather than sending nulls, so reading `entryPrice` without narrowing the verdict finds the key absent.
+- **`get_radar_activity` gained an `EVALUATION_OUTCOME` member** (18.0.0, `add-radar-fire-outcome-journal`), and every existing member gained `evaluationOutcome` + `screenReason`.
+- **Scalar families became placeable modules** (13.0.0, `add-scalar-family-modules`); six opt-in scalar headers moved off the shared `session-field` section key.
 - **Both entry guards leave every agent-returning shape** (26.0.0) — the read side of the input
   removal above. `AgentTradingConfigDTO` drops `signalTimeoutMinutes` and
   `maxEntryDeviationAtrMultiple` on every tool that serves an agent, and the explorer trading spec
@@ -149,6 +118,56 @@ This is the failure mode with no error attached to it. Nothing is rejected; your
 - **`DeploymentResolvedResolutionDTO` drops `agentTradingMode`** (23.0.0) — the field 10.0.0 added,
   now unnecessary: with no account layer to overlay, the resolved `tradingEnabled` is the whole
   answer about whether the previewed deployment trades.
+
+### Widened enum — new members your own copy rejects
+
+- `TradeEvaluationAttemptReasonCode` gains `OPEN_POSITION_CHECK_UNAVAILABLE` (19.4.0), splitting a code that previously reported a platform fault as a fact about your account.
+- `QualificationGateCode` gains `REQUIRED_CONDITION_FALSE` (19.3.0), from the SCAN-stage gate that now evaluates required conditions before a fire edge is spent.
+- `TradingPipelineGateStage` gains `EVALUATION` and `TradeEvaluationAttemptReasonCode` gains `EVALUATION_FAULTED` (18.2.0).
+
+### What you do NOT need to do
+
+Nothing in the proxy changes. No configuration, no environment variable, no call-shape change on this package's own surface. If your client discovers tools live and reads results generically, `npm i @battlegrid/mcp-server@30` is the whole upgrade.
+
+### Additive in the same span
+
+`27.1.0` exit-policy authoring input on `compile_strategy_plan` · `19.2.0` `get_account_state` account identity · `19.1.0` Standing Orders marker authoring · `18.4.0` `list_gate_blocks` summary groups · `18.3.0` radar maintenance pause · `18.1.0` protection geometry · `17.2.0` break-even/trailing status · `17.1.0` `get_signal_log` condition evaluation · `13.1.0` four owner-scoped read tools · `12.1.0` cross-venue spot price metrics · `11.1.0` discoverable rate limit.
+
+## v11 and earlier — contract history (v6 → v11)
+
+> **Historical.** These notes are keyed to the package versions that once paired with contract versions. That pairing ended at v31 (above); the breaks themselves are still real, and still describe the server's contract as it moved from 6.0.0 to 11.0.0.
+
+**v11 paired with the BattleGrid server's MCP contract v11.x.** Under the pairing rule then in force, the package version tracked the server's wire contract because the proxy announced `battlegrid@<package version>` in its own stdio handshake.
+
+This release absorbs **six** breaking contract majors at once. The published package went from `5.0.0` straight to `11.0.0`, so no `6.x` through `10.x` client exists to upgrade from — the breaks are therefore grouped by **what you will observe**, with the contract version that introduced each, so a client hitting a specific rejection can find it here.
+
+**The proxy itself is unchanged.** It embeds no schemas, pins no contract version, and forwards `{ request }` verbatim. Every break below lands on whatever *authors* the payload or *reads* the result, never on the proxy.
+
+### Rejected input — something you author is no longer accepted
+
+- **Challenge participation is no longer a field you set** (10.0.0). `create_agent` and `update_agent` stop accepting `arenaChallengeEnabled`, and a deployment policy's slot rules and per-coin rules stop accepting `challengeEnabled`. All four schemas are `.strict()`, so a client still sending any of them is **rejected**, not silently ignored. Challenge participation is now *identical* to effective trade permission, resolved per coin: to stop an agent taking challenges at a venue, turn that venue's trading off — at the slot, or per coin for finer grain — using fields you already have.
+- **`VOLUME_RATIO` is retired and replaced by `RVOL`** (6.0.0). `MetricKeySchema` auto-derives from the server's metric catalog, so the published enum simply stops accepting the old key: a column authored with `metric: 'VOLUME_RATIO'` is rejected against the enum. **No alias exists** — deliberately. The catalog audit adjudicated the old name as a name-level lie (the value is current volume ÷ its 20-period average, a *multiple*), and the correction was made at the root rather than grandfathered. If you hit an enum rejection naming `VOLUME_RATIO`, this note is the match.
+- **`BB_WIDTH` can no longer be ranked** (8.0.0). `{ metric: 'BB_WIDTH', transformId: 'rank' }` is now rejected. `BBwidth` is a price-unit spread (`upper − lower`) that had falsely declared `percent`, and that declaration was the only thing admitting it to exchange-wide ranking — the ordinal it produced sorted by token denomination rather than by compression. It re-declares `signedPrice` and leaves the ranked contract. **Rank `BB_WIDTH_PCT` (`bbWidthPct`) instead**, which ships in the same release: the capability moved, it was not removed.
+
+### Silently non-matching — a generated header you match on moved
+
+This is the failure mode with no error attached to it. Nothing is rejected; your matcher simply stops finding the column.
+
+- **`vol` → `RVOL`** (6.0.0), and with it **`vol_trend` → `RVOL_trend`** and **`vol_rank_hi` → `RVOL_rank_hi`**. The header code moves with the metric key, because every generated header over that metric derives from the code alone.
+- **`BBwidth_rank_lo` no longer exists** (8.0.0) — it was the header of the ranked pairing retired above.
+
+### Moved or reshaped output — a field you read is somewhere else
+
+- **`estimatedTokenCount` is gone** (7.0.0). `preview_strategy_report` and `compile_strategy_plan` no longer carry it; the same number now sits one level deeper as **`budgetUsage.estimatedTokens.used`**, paired with the `cap` that governs it — so a client reading the count changes one path and gains the ceiling it was never told. `tokenCountModel` is unchanged. Discovery grows to match: `list_strategy_vocabulary` and the report catalog add `budgets.estimatedTokens` and a `previewExecutionLimits` object carrying the serialized-result byte cap and the preview deadline. Those two are published **cap-only** and deliberately have no `used` companion.
+- **`approvedPlan.mismatches` changed on both axes** (9.0.0). Both report-coverage codes are renamed off "module", because the module is no longer the unit of coverage:
+
+  | Was | Is now |
+  |---|---|
+  | `ACTIVE_SIGNAL_MODULE_NOT_IN_REPORT` | `ACTIVE_SIGNAL_DATA_NOT_IN_REPORT` |
+  | `REPORT_MODULE_SIGNAL_OFF` | `REPORT_DATA_SIGNAL_OFF` |
+
+  Each mismatch also carries a **required** `data: CoverageDatum[]` — the `(metric, rung)` pairs the mismatch is about: every MISSING datum for the not-in-report code, the PRESENT data for the signal-off code, empty for `REQUIRED_SIGNAL_UNAVAILABLE`. A client switching exhaustively on the old code strings stops matching. Behaviourally, coverage is now decided by whether the report renders a signal's declared metrics at the **rung** that signal reads, not by whether its module appears anywhere — so expect warnings you never saw before, and the disappearance of warnings no composition could clear. Mismatches remain advisory and non-blocking; nothing about apply gates on them.
+- **`IntelligenceAgentDTO` drops `arenaChallengeEnabled`** (10.0.0) — the read side of the input removal above. `ResolvedSlotRulesDTO.challengeEnabled` **stays and keeps its shape**; it is now derived server-side, carrying the same value and provenance as `tradingEnabled`, so a client reading the resolved bundle needs no change.
 - **`range` is no longer a tuple** (11.0.0). The closed positional pair `[min, max]` becomes the half-open object **`{ min: number; max?: number }`**. It travels through `ScalarSchema`, so this lands on `list_strategy_vocabulary`, `query_report_catalog`, and `get_metric_construction_hints` alike.
 
   **This one fails silently.** A client reading `range[0]` / `range[1]` gets `undefined` with no error raised — read `range.min` / `range.max` instead, and treat a missing `max` as unbounded above. The tuple could not state the truth about the volume/trade-count family, which is non-negative and unbounded above, and `Infinity` serializes to `null` on the wire. Those six metrics now declare `{ min: 0 }`, and as a consequence their **`far`/`near` rank orderings are no longer offered** — on a non-negative value that pair is a synonym pair under the magnitude gate's documented semantics.
@@ -168,7 +187,7 @@ Nothing here is a break, but a client that enumerates these vocabularies will wa
 - **Four metric keys** join the catalog — `SPOT_CVD`, `PERP_SPOT_FLOW`, `PERP_SPOT_STRENGTH`, `PERP_SPOT_CONFIRMS` — and `includePerpSpotFlow` joins the context-source key set as its 23rd member, opt-in (5.2.0).
 - **Two prompt-section `kind`s** join the union: `perp-spot-flow` (5.2.0) and `session-field` (5.1.0). Only a client that switches exhaustively on `kind` needs a default branch; one that renders `content` generically needs nothing.
 - **The transform vocabulary grows 15 → 17** (11.0.0) — `efficiency` and `maxShare` join, and both join the chain-outer enum that `chainSuccessors` is served as. Only a client that switches exhaustively on `transformId` needs new branches; one that renders the served labels generically needs nothing.
-- ~~**The deployment-policy resolution DTO gains `agentTradingMode`**~~ (10.0.0, **removed again in 23.0.0**) — it existed to tell "this rule permits the trade" from "this account can trade at all". The account-level trading mode is gone, so the second question no longer exists and the field was dropped; read the resolved `tradingEnabled` alone.
+- **The deployment-policy resolution DTO gains `agentTradingMode`** (10.0.0) — the preview previously reported trade rules for an agent whose *account-level* trading was off, and the account gate is not part of rule resolution. Read it to tell "this rule permits the trade" from "this account can trade at all".
 - **`PlatformSectionDTO` gains `columns`** (6.1.0) — a platform section's composition in the same wire shape a custom section's columns already travel in, empty for a registry-declared special. **Not a copy source**, which is where it differs from the identically-shaped `CustomSectionTemplateDTO.columns`: six platform columns pair a metric with `classifyState`, a deliberate composability exclusion that authoring rejects at construction. A client that round-trips these into a custom section will be refused, and that refusal is correct.
 
 ## v5 — breaking major (conditions/verdicts fusion)
@@ -416,7 +435,8 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 ## Rediscovery & versioning
 
-- **Package/server contract-line pairing.** This package's `MAJOR.MINOR` pairs with the BattleGrid server's published MCP contract version (`MCP_CONTRACT_VERSION`). The pairing is not decorative: the proxy re-announces itself as `battlegrid@<package version>` to the local client, under the same server name the remote handshake uses, so a package left behind tells clients a contract number that no longer exists — and a package *ahead* tells them one that does not exist yet. **The line, not just the major:** the contract ships additive changes as minors (`5.1.0`, `5.2.0`, `6.1.0`), so matching majors alone would let the package advertise a minor the server does not serve. Only the PATCH is the package's own space. The publish workflow enforces this against the deployed endpoint; it is not left to memory.
+- **The announced contract is relayed, not declared.** The proxy reads the upstream server's identity from the handshake it just completed and re-announces it verbatim to the local client. A local client therefore always reads the contract it will actually reach, and the package version is free to mean only what it should: this proxy's own code. **There is no pairing rule to keep, and no publish-time deploy gate** — a released package makes no claim about the server, so there is no ordering between a release here and a deploy there. This replaces the `MAJOR.MINOR` pairing that held through v11; see [v12](#v12--the-announced-contract-is-read-from-the-server-not-declared-here).
+- **Fails closed, never falls back.** If a connected server announced no `serverInfo` — a protocol violation, since it is required in a successful `initialize` result — the proxy refuses to start rather than substituting its own version. There is no honest number to announce in that case, and announcing a dishonest one silently is the failure this design removes.
 - **Rediscover after a server cutover.** Package publication does not refresh a running proxy's cached startup snapshot. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
 - **Restart after key rotation.** API keys are read once at process startup; rotate a key, then restart the proxy.
 
@@ -436,8 +456,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | 8.0.0 | Server contract v8.0.0, **breaking**, on two axes. `BB_WIDTH × rank` is no longer authorable: `BBwidth` is a price-unit spread that falsely declared `percent`, which was the only thing admitting it to exchange-wide ranking, so it re-declares `signedPrice` and leaves the ranked contract — `{metric: 'BB_WIDTH', transformId: 'rank'}` is rejected and `BBwidth_rank_lo` stops matching, with `BB_WIDTH_PCT` (`bbWidthPct`) shipping as the comparable replacement. Separately the published `unit` enum **widens** with `ratio` and `fraction`, and `RVOL`, `BUY_PRESSURE`, `BB_PCT_B` emit them instead of `percent` — a break for a client holding its own closed copy of that enum, which is the opposite direction from an input narrowing. Values are not rescaled: `buyPres` and `pctB` stay 0–1. Never published as a package version |
 | **9.0.0** | Server contract v9.0.0, **breaking**: `compile_strategy_plan`'s `approvedPlan.mismatches` changes on both axes. Both report-coverage codes are renamed off "module" (`ACTIVE_SIGNAL_MODULE_NOT_IN_REPORT` → `ACTIVE_SIGNAL_DATA_NOT_IN_REPORT`, `REPORT_MODULE_SIGNAL_OFF` → `REPORT_DATA_SIGNAL_OFF`), and each mismatch carries a required `data: CoverageDatum[]` — the `(metric, rung)` pairs it is about. A client switching exhaustively on the old code strings stops matching. Coverage is now decided by whether the report renders a signal's declared metrics at the rung that signal reads, so expect warnings never seen before and the disappearance of warnings no composition could clear; mismatches stay advisory and non-blocking. Never published as a package version |
 | 10.0.0 | Server contract v10.0.0, **breaking**: challenge participation stops being a declared setting anywhere and becomes identical to effective trade permission, resolved per coin. `create_agent`/`update_agent` stop accepting `arenaChallengeEnabled`, and a deployment policy's slot and per-coin rule shapes stop accepting `challengeEnabled` — all four are `.strict()`, so a client still sending them is rejected rather than ignored, the same input-acceptance narrowing that made v4, v5, v6 and v8 majors. `IntelligenceAgentDTO` drops `arenaChallengeEnabled`; `ResolvedSlotRulesDTO.challengeEnabled` stays and keeps its shape, now derived server-side with the same value and provenance as `tradingEnabled`. The resolution DTO also gains `agentTradingMode` — the preview previously reported trade rules for an agent whose account-level trading was off. Never published as a package version |
-| **11.0.0** | Server contract v11.0.0, **breaking**: a catalogued numeric output's `range` changes shape — the closed positional tuple `[min, max]` becomes the half-open object `{ min: number; max?: number }`, travelling through `ScalarSchema` into `list_strategy_vocabulary`, `query_report_catalog` and `get_metric_construction_hints`. A client reading `range[0]`/`range[1]` gets `undefined` **with no error**, which is the silent failure mode a version exists to prevent. The driver: the tuple could not state the truth about the volume/trade-count family — non-negative and unbounded above — and `Infinity` serializes to `null` on the wire; those six metrics now declare `{ min: 0 }` and no longer offer `far`/`near` rank orderings, which on a non-negative value are a synonym pair. Additive alongside it: the transform vocabulary grows 15 → 17 (`efficiency`, `maxShare`), both joining the chain-outer enum served as `chainSuccessors`. **This is the package version paired to the current server contract.** No proxy code change — the version is the client-facing signal, and the proxy's handshake carries it |
-| 11.1.0 | Server contract v11.1.0, **additive**: the per-user request budget becomes discoverable rather than only enforceable |
+| **11.0.0** | Server contract v11.0.0, **breaking**: a catalogued numeric output's `range` changes shape — the closed positional tuple `[min, max]` becomes the half-open object `{ min: number; max?: number }`, travelling through `ScalarSchema` into `list_strategy_vocabulary`, `query_report_catalog` and `get_metric_construction_hints`. A client reading `range[0]`/`range[1]` gets `undefined` **with no error**, which is the silent failure mode a version exists to prevent. The driver: the tuple could not state the truth about the volume/trade-count family — non-negative and unbounded above — and `Infinity` serializes to `null` on the wire; those six metrics now declare `{ min: 0 }` and no longer offer `far`/`near` rank orderings, which on a non-negative value are a synonym pair. Additive alongside it: the transform vocabulary grows 15 → 17 (`efficiency`, `maxShare`), both joining the chain-outer enum served as `chainSuccessors`. **The last version published under the pairing rule.** No proxy code change — the version was the client-facing signal, and the proxy's handshake carried it |
 | 12.0.0 | Server contract v12.0.0, **breaking**: radar's wall-clock condition changes shape (`unify-deployment-hours-as-sets`) |
 | 12.1.0 | Server contract v12.1.0, **additive**: `SPOT_CLOSE_CB` / `SPOT_CLOSE_BN` join the metric catalog |
 | 13.0.0 | Server contract v13.0.0, **breaking**: scalar families become placeable modules; six scalar headers leave the `session-field` key |
@@ -472,12 +491,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | 23.0.0 | Server contract v23.0.0, **breaking**: the agent-level trading mode is retired. `create_agent`/`update_agent` stop accepting `tradingConfig.tradingMode` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8 and v10 majors. On the read side `AgentTradingConfigDTO` drops `tradingMode` on every agent-returning tool, and so do the agents-hub permission envelope, the explorer entry and both public-profile shapes; `DeploymentResolvedResolutionDTO` drops `agentTradingMode`, the field v10.0.0 added, because with no account layer to overlay the resolved `tradingEnabled` is the whole answer. Trading on/off is now scoped per deployment (radar policy `enabled`, arena slot `tradingEnabled`, per-coin `tradeEnabled`) and a newly authored arena slot starts with trading **off**; approval-before-execution is the conversational surface's own contract, so `accept_entry_decision` / `cancel_entry_decision` / `list_pending_approvals` are unchanged on the wire but now carry conversational proposals exclusively — a deployed agent never queues for approval. Never published as a package version |
 | 24.0.0 | Server contract v24.0.0, **breaking**: the post-entry exit policy moves from the agent to the strategy. `create_agent`/`update_agent` stop accepting `tradingConfig.positionManagement` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10 and v23 majors. On the read side `AgentTradingConfigDTO` drops the nested block on every agent-returning tool and the explorer trading spec drops it too; `get_trading_config_catalog` drops `positionManagementPresets` and the `defaultPositionMgmt*` trading defaults. The pistol-preset ladder (COLT / WEBLEY / BERETTA / LUGER / WALTHER) is **retired, not renamed** — once the values live on the strategy, the strategy is the named bundle. Additive on the authoring surface in the same bump: `compile_strategy_plan`/`apply_strategy_plan` post-state gains the twelve authored keys beside the trade-level trio, and the plan diff gains a `positionManagement` axis. Behaviourally the umbrella `enabled` flag is **deleted** rather than moved: each mechanism toggle is the whole truth for that mechanism, so a client can no longer express "trailing on, management off". Never published as a package version |
 | 26.0.0 | Server contract v26.0.0, **breaking**: both entry-lifecycle guards stop being agent configuration. `create_agent`/`update_agent` stop accepting `tradingConfig.signalTimeoutMinutes` and `tradingConfig.maxEntryDeviationAtrMultiple` on the shared `.strict()` `TradingConfigSchema`, so a client still sending either is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10, v23 and v24 majors. Neither has a replacement key: one `platform_config` value governs the entry-price drift budget for every decision (read at evaluation time, so an admin edit applies to the next evaluation), and one governs how long an entry may stay unfilled (snapshotted onto the position at creation, so an edit can never cancel an order already resting on the book). On the read side `AgentTradingConfigDTO` drops both fields on every agent-returning tool, and so do the explorer trading spec and the agent-review payload; `get_trading_config_catalog` drops `defaultSignalTimeoutMinutes` and the `minimum_`/`maximum_maxEntryDeviationAtrMultiple` bound pair, while `defaultMaxEntryDeviationAtrMultiple` and `defaultTtlMinutes` stay and become the values that actually govern. Behaviourally a conversational entry and an autonomous entry on the same setup now receive the **identical** unfilled lifetime — the mode-selecting fallback that chose between a per-agent timeout and a hardcoded 15-minute resting window is gone, and the three-way timeout enum with it. Never published as a package version |
-
-> **Gap: contract 25.0.0 is not recorded in this table.** It shipped server-side as
-> `remove-arena-trade-permissions` (the arena stops granting trade authority; `upsert_deployment_policy`
-> and `preview_deployment_resolution` stop accepting `tradingEnabled` / `minConviction` / `coinRules[]`
-> on a slot, and `DeploymentSlotDTO` reshapes). Its row belongs to that change and is left for it to
-> write rather than reconstructed here.
+| **31.0.0** | **Proxy change, and the end of the pairing rule.** The version announced downstream is now read from the upstream handshake at connect time and relayed verbatim, instead of being a constant compiled into this package. A local client reads the contract it will actually reach, on every connection, with no release involved. Breaking because the package number now means something different — this proxy's own code, not the server's contract — so `npm view` and the handshake legitimately differ, and code keyed to them being equal is wrong. Retired with it: the publish-time deploy gate (`scripts/assert-deployed-contract.mjs`) and the `MAJOR.MINOR` pairing rule, both of which existed only because the two numbers could disagree. Fails closed if a connected server announces no `serverInfo` rather than substituting its own version. Contract moves no longer produce a release here |
 
 ## Maintainer release procedure
 
@@ -485,7 +499,9 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 Publishing runs only in GitHub-hosted Actions. Never run `npm publish` from the BattleGrid application VM or a maintainer workstation.
 
-**A version change on `main` is the release.** Merge a pull request that changes `package.json`'s version and the workflow does the rest: it confirms that version is not already on the registry, verifies every value expressing it agrees, asserts the deployed server serves that contract major, tests, builds, packs, publishes with npm provenance, and tags what shipped. There is no manual tag step — the tag is an output of a successful publish, not its prerequisite.
+**A version change on `main` is the release.** Merge a pull request that changes `package.json`'s version and the workflow does the rest: it confirms that version is not already on the registry, verifies every value expressing it agrees, tests, builds, packs, publishes with npm provenance, and tags what shipped. There is no manual tag step — the tag is an output of a successful publish, not its prerequisite.
+
+**Release whenever this package's code is ready.** Since v12 the package makes no claim about the server's contract, so there is no deploy to sequence against and no gate asserting one. Publishing before, during, or after a server deploy is equally correct.
 
 That inversion is deliberate. Publication used to be triggered by a tag, which meant a version bump with no tag published nothing **and reported nothing** — how `5.1.0` came to be declared in this repository and absent from the registry, caught by no check at all.
 
@@ -498,34 +514,24 @@ That inversion is deliberate. Publication used to be triggered by a tag, which m
 | Check, build, publish, and tag | GitHub-hosted `ubuntu-latest`, Node 24 |
 | Verify registry publication | Any shell |
 
-**The deploy check needs no credential.** `scripts/assert-deployed-contract.mjs` reads `GET /mcp/version`, which the server serves **unauthenticated by design** — the contract version is announced to every connected client and committed to the app repo's `docs/architecture/mcp-manifest.json`, so it is not a secret. Requiring auth would have meant this workflow holding a BattleGrid API key, and every such key carries `mcp:wager` (there is no read-only variant), i.e. authority to submit wagers and close live positions in order to read a version number. The check fails closed on a mismatch, an unreachable endpoint, a non-200, or an unreadable body — but there is no secret to provision, scope, rotate, or leak.
+**The workflow needs no BattleGrid credential.** It never contacts the BattleGrid server at all. The deploy gate that used to (reading `GET /mcp/version`, unauthenticated by design) was retired in v12 along with the pairing rule that motivated it. Its no-credential property is worth keeping in mind if a future check ever needs the contract version: every BattleGrid MCP API key carries `mcp:wager` and there is no read-only variant, so a credentialed check would mean this workflow holding authority to submit wagers and close live positions in order to read a version number. `GET /mcp/version` exists precisely so that trade never has to be made.
 
 Also confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Actions with organization `playbattlegrid`, repository `battlegrid-mcp`, workflow filename `publish.yml`, no environment name, and `npm publish` allowed. The workflow uses short-lived OIDC credentials; do not add a long-lived `NPM_TOKEN`.
 
 ### Preparing the version change
 
-- **Read the target version from the generated manifest, never from prose.** The number this package pairs to is `server.contractVersion` in `battlegrid-app`'s `docs/architecture/mcp-manifest.json` — generated by `buildMcpManifest` and CI-verified, on a freshly fetched `origin/main` (a stale ref reports a superseded contract silently). **A contract version quoted in an issue, a pull request, or any other hand-written text is not the target.** During active contract development that number changes on merge, so prose carries a value that was true when written and is unverifiable when read. Every pairing before v9 was sourced from prose, and the v9 pairing was filed against a contract three majors stale.
-- **Move all four values together** — `package.json`, both `package-lock.json` version fields (the root `version` and the self-referencing `packages[""].version`), and the exported `VERSION` in `src/index.ts`. The workflow compares all four against each other and fails closed on any disagreement.
-- **Merge the version change only after the server is deployed.** The deploy assertion is a safety net, not a routine step: with the ordering right it never fires, and a red workflow on `main` means something is genuinely wrong rather than that you are waiting. Merging early blocks the publish until the deploy lands, then re-run the job — nothing was published and no tag exists to move.
+- **Version this package's own code, and nothing else.** Since v12 the number describes this proxy's build — a fix here, a dependency bump, a documentation correction — and makes no statement about the server. **Do not move it because the server's contract moved**; that used to be the whole job and is now a category error. Ordinary semver against the proxy's own surface: MAJOR for a break in how the proxy behaves or what its number means, MINOR for proxy features, PATCH for fixes and docs.
+- **Move all three values together** — `package.json`, both `package-lock.json` version fields (the root `version` and the self-referencing `packages[""].version`), and `PACKAGE_VERSION` in `src/index.ts`. The workflow compares all of them and fails closed on any disagreement.
+- **No deploy to wait for.** A release here is independent of the server's deploy schedule in both directions.
 
-### What tells you a pairing is owed
+### What a server contract move needs from this package
 
-[`.github/workflows/contract-drift.yml`](.github/workflows/contract-drift.yml) runs daily, reads the same unauthenticated `GET /mcp/version` the deploy assertion reads, compares the same `MAJOR.MINOR` contract line, and **opens a bump PR when they diverge**. Merge it and the release follows, because a version change on `main` IS the release.
+**Nothing.** That is the point of v12. When the server's contract moves, connected proxies announce the new version on their next connection, with no publish, no version bump, and no coordination.
 
-It exists because the deploy assertion could not do this job. `scripts/assert-deployed-contract.mjs` runs only when a publish is ATTEMPTED, so it can refuse a release someone started and cannot say one is owed. Between 2026-08-07 and 2026-08-23 no publish was attempted while the server advanced from contract `11.0` to `30.0`, and this package spent sixteen days announcing `battlegrid@11.0.0` to every client — the exact failure the pairing section above describes. It was also unpublishable for that whole period, since its own gate would have refused `11.0` against `30.0`.
+Two things do still need doing, neither of them a release:
 
-Reading the DEPLOYED endpoint rather than the app repo's merged manifest is deliberate: it makes the watch fire only once the deploy has landed, which is the ordering *Preparing the version change* already requires.
-
-The PR it opens moves all four version values, and its body says what a human still owes — the README release section describing what changed for clients. The bump is mechanical; the changelog is judgement, which is why this opens a PR instead of merging one.
-
-### Which releases need a server deploy
-
-The deploy assertion compares the **contract line** — `MAJOR.MINOR` — not the full version and not the major alone.
-
-- **A contract pairing** — the server's contract moved, so the package follows. This needs the deploy to land first. Note this includes **minor** moves: the contract ships additive changes as minors (`5.1.0`, `5.2.0` and `6.1.0` were all additive), and the proxy announces the full version it publishes, so a package minor ahead of the server would advertise additive features the deployed endpoint does not serve.
-- **A proxy-only release** — a fix in this package's own code, a dependency bump, a documentation correction. Move the **PATCH**, which is the package's own space: the contract has never carried a non-zero patch, so a patch bump makes no claim about the server and needs no deploy. This is the historical norm, not an edge case — `1.0.1`, `1.0.2`, `1.1.2`, `1.1.4` and `3.0.1` were all proxy-only, and `3.0.1` is recorded in the version table above as *"Docs only — … No proxy behavior change"*.
-
-Comparing full versions would reject every one of those patch releases; comparing majors alone would let the package advertise a contract minor the server does not serve. The contract line is the boundary that is actually true.
+- **Reconnect** to pick up the new contract — the announcement and the capability snapshot are both read once at startup (see [Rediscovery & versioning](#rediscovery--versioning)).
+- **Document the break** where the contract is documented, in `battlegrid-app`. Contract breaking-change notes are no longer keyed to package versions in this README, because a contract move is no longer a release here.
 
 ### Verify publication
 
@@ -548,11 +554,11 @@ Require the exact version, `latest` pointing at that version, and a provenance a
 
 There is no separate registry-reconciliation step to remember. "Is this version already published?" is the workflow's own first question — it decides whether the run publishes at all — so a bump can no longer sit in the repository unpublished and unreported the way `5.1.0` did.
 
-**The server-side release canary is not evidence about this package.** `battlegrid-app`'s `server/scripts/release-canary-mcp.ts` connects to the deployed endpoint and compares `client.getServerVersion()` against the server's own imported `MCP_CONTRACT_VERSION` — **both sides are server-side, and it never queries npm.** It passes with this package at any version, including one that was never published. Package-side evidence is exactly three things: the workflow's version-integrity gate, the registry checks above (plus `gitHead` matching the release commit and the handshake constant in the published `dist/index.js`), and a **reconnect** showing `battlegrid@<version>` in the stdio handshake.
+**The server-side release canary is not evidence about this package.** `battlegrid-app`'s `server/scripts/release-canary-mcp.ts` connects to the deployed endpoint and compares `client.getServerVersion()` against the server's own imported `MCP_CONTRACT_VERSION` — **both sides are server-side, and it never queries npm.** It passes with this package at any version, including one that was never published. Package-side evidence is exactly two things: the workflow's version-integrity gate, and the registry checks above with `gitHead` matching the release commit.
 
-Note the deploy assertion in the workflow is a *different* check from that canary and does not share its limitation: it reads the deployed handshake and compares it against **this package's** version, so both sides are not server-side.
+**A reconnect no longer proves which package version is running**, and this is the one verification v12 took away rather than improved. The stdio handshake now shows `battlegrid@<contract>` — the *server's* number — so it is identical whether the local proxy is 12.0.0 or a stale 11.0.0 from a cached `npx`. Read `PACKAGE_VERSION` from the installed `dist/index.js`, or the trailing `proxy <version>` field in the startup stderr line, to confirm which build is running.
 
-If a run fails, inspect it before taking action. An `ENEEDAUTH` failure means the npm Trusted Publisher fields do not match the workflow — fix the publisher configuration and re-run the job. A failed deploy assertion means the server has not deployed that contract major yet; deploy, then re-run. In both cases nothing was published and no tag was created, so there is nothing to move or reuse. Never mutate a published release with `npm audit fix`; dependency remediation goes through a new reviewed commit and version.
+If a run fails, inspect it before taking action. An `ENEEDAUTH` failure means the npm Trusted Publisher fields do not match the workflow — fix the publisher configuration and re-run the job; nothing was published and no tag was created, so there is nothing to move or reuse. Never mutate a published release with `npm audit fix`; dependency remediation goes through a new reviewed commit and version.
 
 ## Skills
 
