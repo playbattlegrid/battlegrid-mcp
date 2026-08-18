@@ -17,6 +17,14 @@ This release absorbs **six** breaking contract majors at once. The published pac
 
 ### Rejected input — something you author is no longer accepted
 
+- **The agent no longer carries either entry guard** (26.0.0). `create_agent` and `update_agent` stop
+  accepting `tradingConfig.signalTimeoutMinutes` and `tradingConfig.maxEntryDeviationAtrMultiple`.
+  The schema is `.strict()`, so a client still sending either is **rejected**, not silently ignored.
+  Neither has a replacement key on any surface: unlike the strategy-owned fields below, these have no
+  owning surface at all beneath the platform. One `platform_config` value governs the entry-price
+  drift budget for every decision, read at evaluation time; one governs how long an entry may stay
+  unfilled, snapshotted onto the position at creation. **Remove both keys and send nothing in their
+  place.**
 - **The agent no longer carries an exit policy** (24.0.0). `create_agent` and `update_agent` stop
   accepting `tradingConfig.positionManagement`. The schema is `.strict()`, so a client still sending
   it is **rejected**, not silently ignored. The twelve dials that decide how a stop MOVES after entry
@@ -61,6 +69,16 @@ This is the failure mode with no error attached to it. Nothing is rejected; your
 
   Each mismatch also carries a **required** `data: CoverageDatum[]` — the `(metric, rung)` pairs the mismatch is about: every MISSING datum for the not-in-report code, the PRESENT data for the signal-off code, empty for `REQUIRED_SIGNAL_UNAVAILABLE`. A client switching exhaustively on the old code strings stops matching. Behaviourally, coverage is now decided by whether the report renders a signal's declared metrics at the **rung** that signal reads, not by whether its module appears anywhere — so expect warnings you never saw before, and the disappearance of warnings no composition could clear. Mismatches remain advisory and non-blocking; nothing about apply gates on them.
 - **`IntelligenceAgentDTO` drops `arenaChallengeEnabled`** (10.0.0) — the read side of the input removal above. `ResolvedSlotRulesDTO.challengeEnabled` **stays and keeps its shape**; it is now derived server-side, carrying the same value and provenance as `tradingEnabled`, so a client reading the resolved bundle needs no change.
+- **Both entry guards leave every agent-returning shape** (26.0.0) — the read side of the input
+  removal above. `AgentTradingConfigDTO` drops `signalTimeoutMinutes` and
+  `maxEntryDeviationAtrMultiple` on every tool that serves an agent, and the explorer trading spec
+  and the agent-review payload drop them too. `get_trading_config_catalog` drops
+  `defaultSignalTimeoutMinutes` from its defaults and the
+  `minimumMaxEntryDeviationAtrMultiple` / `maximumMaxEntryDeviationAtrMultiple` pair from its bounds —
+  a bound pair that constrained a per-agent field which no longer exists.
+  `defaultMaxEntryDeviationAtrMultiple` and `defaultTtlMinutes` **stay**, and are now the values that
+  actually govern rather than seeds a new agent copies. A client reading these objects strictly must
+  drop the removed keys.
 - **`positionManagement` leaves every agent-returning shape** (24.0.0) — the read side of the input
   removal above. `AgentTradingConfigDTO` drops the nested block on every tool that serves an agent,
   and the explorer trading spec drops it too. A client reading these objects strictly must drop the
@@ -369,6 +387,13 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | **11.0.0** | Server contract v11.0.0, **breaking**: a catalogued numeric output's `range` changes shape — the closed positional tuple `[min, max]` becomes the half-open object `{ min: number; max?: number }`, travelling through `ScalarSchema` into `list_strategy_vocabulary`, `query_report_catalog` and `get_metric_construction_hints`. A client reading `range[0]`/`range[1]` gets `undefined` **with no error**, which is the silent failure mode a version exists to prevent. The driver: the tuple could not state the truth about the volume/trade-count family — non-negative and unbounded above — and `Infinity` serializes to `null` on the wire; those six metrics now declare `{ min: 0 }` and no longer offer `far`/`near` rank orderings, which on a non-negative value are a synonym pair. Additive alongside it: the transform vocabulary grows 15 → 17 (`efficiency`, `maxShare`), both joining the chain-outer enum served as `chainSuccessors`. **This is the package version paired to the current server contract.** No proxy code change — the version is the client-facing signal, and the proxy's handshake carries it |
 | 23.0.0 | Server contract v23.0.0, **breaking**: the agent-level trading mode is retired. `create_agent`/`update_agent` stop accepting `tradingConfig.tradingMode` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8 and v10 majors. On the read side `AgentTradingConfigDTO` drops `tradingMode` on every agent-returning tool, and so do the agents-hub permission envelope, the explorer entry and both public-profile shapes; `DeploymentResolvedResolutionDTO` drops `agentTradingMode`, the field v10.0.0 added, because with no account layer to overlay the resolved `tradingEnabled` is the whole answer. Trading on/off is now scoped per deployment (radar policy `enabled`, arena slot `tradingEnabled`, per-coin `tradeEnabled`) and a newly authored arena slot starts with trading **off**; approval-before-execution is the conversational surface's own contract, so `accept_entry_decision` / `cancel_entry_decision` / `list_pending_approvals` are unchanged on the wire but now carry conversational proposals exclusively — a deployed agent never queues for approval. Never published as a package version |
 | 24.0.0 | Server contract v24.0.0, **breaking**: the post-entry exit policy moves from the agent to the strategy. `create_agent`/`update_agent` stop accepting `tradingConfig.positionManagement` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10 and v23 majors. On the read side `AgentTradingConfigDTO` drops the nested block on every agent-returning tool and the explorer trading spec drops it too; `get_trading_config_catalog` drops `positionManagementPresets` and the `defaultPositionMgmt*` trading defaults. The pistol-preset ladder (COLT / WEBLEY / BERETTA / LUGER / WALTHER) is **retired, not renamed** — once the values live on the strategy, the strategy is the named bundle. Additive on the authoring surface in the same bump: `compile_strategy_plan`/`apply_strategy_plan` post-state gains the twelve authored keys beside the trade-level trio, and the plan diff gains a `positionManagement` axis. Behaviourally the umbrella `enabled` flag is **deleted** rather than moved: each mechanism toggle is the whole truth for that mechanism, so a client can no longer express "trailing on, management off". Never published as a package version |
+| 26.0.0 | Server contract v26.0.0, **breaking**: both entry-lifecycle guards stop being agent configuration. `create_agent`/`update_agent` stop accepting `tradingConfig.signalTimeoutMinutes` and `tradingConfig.maxEntryDeviationAtrMultiple` on the shared `.strict()` `TradingConfigSchema`, so a client still sending either is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10, v23 and v24 majors. Neither has a replacement key: one `platform_config` value governs the entry-price drift budget for every decision (read at evaluation time, so an admin edit applies to the next evaluation), and one governs how long an entry may stay unfilled (snapshotted onto the position at creation, so an edit can never cancel an order already resting on the book). On the read side `AgentTradingConfigDTO` drops both fields on every agent-returning tool, and so do the explorer trading spec and the agent-review payload; `get_trading_config_catalog` drops `defaultSignalTimeoutMinutes` and the `minimum_`/`maximum_maxEntryDeviationAtrMultiple` bound pair, while `defaultMaxEntryDeviationAtrMultiple` and `defaultTtlMinutes` stay and become the values that actually govern. Behaviourally a conversational entry and an autonomous entry on the same setup now receive the **identical** unfilled lifetime — the mode-selecting fallback that chose between a per-agent timeout and a hardcoded 15-minute resting window is gone, and the three-way timeout enum with it. Never published as a package version |
+
+> **Gap: contract 25.0.0 is not recorded in this table.** It shipped server-side as
+> `remove-arena-trade-permissions` (the arena stops granting trade authority; `upsert_deployment_policy`
+> and `preview_deployment_resolution` stop accepting `tradingEnabled` / `minConviction` / `coinRules[]`
+> on a slot, and `DeploymentSlotDTO` reshapes). Its row belongs to that change and is left for it to
+> write rather than reconstructed here.
 
 ## Maintainer release procedure
 
