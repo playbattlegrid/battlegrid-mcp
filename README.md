@@ -17,6 +17,19 @@ This release absorbs **six** breaking contract majors at once. The published pac
 
 ### Rejected input — something you author is no longer accepted
 
+- **The agent no longer carries an exit policy** (24.0.0). `create_agent` and `update_agent` stop
+  accepting `tradingConfig.positionManagement`. The schema is `.strict()`, so a client still sending
+  it is **rejected**, not silently ignored. The twelve dials that decide how a stop MOVES after entry
+  — break-even arming, trailing engagement and giveback, time-decay tightening — are denominated in
+  the setup's own payoff shape (multiples of the trade's initial risk, fractions of take-profit
+  distance, minutes since entry) and read no balance, leverage or exposure, so they belong to the
+  thesis rather than to the account running it. **Author them on the strategy instead**, through
+  `compile_strategy_plan` / `apply_strategy_plan`: the post-state gains the same twelve keys beside
+  the trade-level trio, and the plan diff gains a `positionManagement` axis. An agent inherits the
+  policy from the strategy it binds. **The umbrella `enabled` flag is deleted rather than moved** —
+  each mechanism's toggle is now the whole truth for that mechanism, so "trailing on, management
+  off" is no longer expressible, a state the server's own monitor and boot recovery already
+  disagreed about.
 - **The agent-level trading mode is gone** (23.0.0). `create_agent` and `update_agent` stop
   accepting `tradingConfig.tradingMode`. The schema is `.strict()`, so a client still sending it is
   **rejected**, not silently ignored. Trading on/off is now scoped per deployment — a radar policy's
@@ -48,6 +61,17 @@ This is the failure mode with no error attached to it. Nothing is rejected; your
 
   Each mismatch also carries a **required** `data: CoverageDatum[]` — the `(metric, rung)` pairs the mismatch is about: every MISSING datum for the not-in-report code, the PRESENT data for the signal-off code, empty for `REQUIRED_SIGNAL_UNAVAILABLE`. A client switching exhaustively on the old code strings stops matching. Behaviourally, coverage is now decided by whether the report renders a signal's declared metrics at the **rung** that signal reads, not by whether its module appears anywhere — so expect warnings you never saw before, and the disappearance of warnings no composition could clear. Mismatches remain advisory and non-blocking; nothing about apply gates on them.
 - **`IntelligenceAgentDTO` drops `arenaChallengeEnabled`** (10.0.0) — the read side of the input removal above. `ResolvedSlotRulesDTO.challengeEnabled` **stays and keeps its shape**; it is now derived server-side, carrying the same value and provenance as `tradingEnabled`, so a client reading the resolved bundle needs no change.
+- **`positionManagement` leaves every agent-returning shape** (24.0.0) — the read side of the input
+  removal above. `AgentTradingConfigDTO` drops the nested block on every tool that serves an agent,
+  and the explorer trading spec drops it too. A client reading these objects strictly must drop the
+  key; one that wants the policy reads it from the bound strategy.
+- **`get_trading_config_catalog` drops `positionManagementPresets`** (24.0.0) — the pistol ladder
+  (COLT / WEBLEY / BERETTA / LUGER / WALTHER) is **retired, not renamed**. Once the values live on
+  the strategy, the strategy IS the named bundle, with its own name, description and revision
+  history; a parallel vocabulary of anonymous bundles beside it would be a second name for the same
+  thing. There is no replacement enum to migrate to — list strategies instead. The catalog's
+  `defaultPositionMgmt*` trading defaults go with it, for the same reason: nothing seeds an agent's
+  exit policy any more.
 - **`tradingMode` leaves every agent-returning shape** (23.0.0) — the read side of the input
   removal above. `AgentTradingConfigDTO` drops it on every tool that serves an agent, and so do the
   agents-hub permission envelope, the explorer entry, and both public-profile shapes. A client
@@ -344,6 +368,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | 10.0.0 | Server contract v10.0.0, **breaking**: challenge participation stops being a declared setting anywhere and becomes identical to effective trade permission, resolved per coin. `create_agent`/`update_agent` stop accepting `arenaChallengeEnabled`, and a deployment policy's slot and per-coin rule shapes stop accepting `challengeEnabled` — all four are `.strict()`, so a client still sending them is rejected rather than ignored, the same input-acceptance narrowing that made v4, v5, v6 and v8 majors. `IntelligenceAgentDTO` drops `arenaChallengeEnabled`; `ResolvedSlotRulesDTO.challengeEnabled` stays and keeps its shape, now derived server-side with the same value and provenance as `tradingEnabled`. The resolution DTO also gains `agentTradingMode` — the preview previously reported trade rules for an agent whose account-level trading was off. Never published as a package version |
 | **11.0.0** | Server contract v11.0.0, **breaking**: a catalogued numeric output's `range` changes shape — the closed positional tuple `[min, max]` becomes the half-open object `{ min: number; max?: number }`, travelling through `ScalarSchema` into `list_strategy_vocabulary`, `query_report_catalog` and `get_metric_construction_hints`. A client reading `range[0]`/`range[1]` gets `undefined` **with no error**, which is the silent failure mode a version exists to prevent. The driver: the tuple could not state the truth about the volume/trade-count family — non-negative and unbounded above — and `Infinity` serializes to `null` on the wire; those six metrics now declare `{ min: 0 }` and no longer offer `far`/`near` rank orderings, which on a non-negative value are a synonym pair. Additive alongside it: the transform vocabulary grows 15 → 17 (`efficiency`, `maxShare`), both joining the chain-outer enum served as `chainSuccessors`. **This is the package version paired to the current server contract.** No proxy code change — the version is the client-facing signal, and the proxy's handshake carries it |
 | 23.0.0 | Server contract v23.0.0, **breaking**: the agent-level trading mode is retired. `create_agent`/`update_agent` stop accepting `tradingConfig.tradingMode` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8 and v10 majors. On the read side `AgentTradingConfigDTO` drops `tradingMode` on every agent-returning tool, and so do the agents-hub permission envelope, the explorer entry and both public-profile shapes; `DeploymentResolvedResolutionDTO` drops `agentTradingMode`, the field v10.0.0 added, because with no account layer to overlay the resolved `tradingEnabled` is the whole answer. Trading on/off is now scoped per deployment (radar policy `enabled`, arena slot `tradingEnabled`, per-coin `tradeEnabled`) and a newly authored arena slot starts with trading **off**; approval-before-execution is the conversational surface's own contract, so `accept_entry_decision` / `cancel_entry_decision` / `list_pending_approvals` are unchanged on the wire but now carry conversational proposals exclusively — a deployed agent never queues for approval. Never published as a package version |
+| 24.0.0 | Server contract v24.0.0, **breaking**: the post-entry exit policy moves from the agent to the strategy. `create_agent`/`update_agent` stop accepting `tradingConfig.positionManagement` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10 and v23 majors. On the read side `AgentTradingConfigDTO` drops the nested block on every agent-returning tool and the explorer trading spec drops it too; `get_trading_config_catalog` drops `positionManagementPresets` and the `defaultPositionMgmt*` trading defaults. The pistol-preset ladder (COLT / WEBLEY / BERETTA / LUGER / WALTHER) is **retired, not renamed** — once the values live on the strategy, the strategy is the named bundle. Additive on the authoring surface in the same bump: `compile_strategy_plan`/`apply_strategy_plan` post-state gains the twelve authored keys beside the trade-level trio, and the plan diff gains a `positionManagement` axis. Behaviourally the umbrella `enabled` flag is **deleted** rather than moved: each mechanism toggle is the whole truth for that mechanism, so a client can no longer express "trailing on, management off". Never published as a package version |
 
 ## Maintainer release procedure
 
