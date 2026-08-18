@@ -23,7 +23,7 @@ Never put `account` inside `request`, and never flatten request fields beside it
 ## Scopes
 
 - `mcp:read` — strategy discovery **and** non-financial configuration writes (author strategies, edit agents, customize signals). Treat it as configuration authority, not view-only.
-- `mcp:wager` — financial actions (submit paid entries, accept/cancel entry decisions, deployment policies). Enable **Server-Signed Wagers** in Profile → MCP to grant it.
+- `mcp:wager` — financial actions (submit paid entries, accept/cancel entry decisions, deployment policies). Enable **Server-Signed Wagers** in Profile → MCP to grant it. Pending entry decisions come from the conversational surface, which waits for approval; an agent deployed to a radar coin or a trading-enabled arena slot executes without one.
 
 ## Author a strategy: compile → review → apply
 
