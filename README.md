@@ -7,6 +7,58 @@ MCP server for [BattleGrid](https://battlegrid.trade) — play crypto prediction
 
 It is a thin, authenticated **stdio proxy** to BattleGrid's remote MCP server (Stripe `@stripe/mcp` pattern — no business logic). It discovers tools, prompts, and resources live from the server and re-exposes them to local MCP clients (Claude Desktop, Claude Code, Cursor). Capabilities are always **discovered live** — this package never hardcodes the tool catalog.
 
+## v30 — breaking cutover (v12 → v30)
+
+**v30 pairs with the BattleGrid server's MCP contract v30.x — currently v30.0.0.** The package version tracks the server's wire contract, because the proxy announces `battlegrid@<package version>` in its own stdio handshake — the number a client reads has to be the contract it will actually reach.
+
+This release absorbs **eighteen** breaking contract majors at once. The published package went from `11.0.0` straight to `30.0.0`, so no `12.x` through `29.x` client exists to upgrade from — the breaks are grouped by **what you will observe**, with the contract version that introduced each.
+
+**Why the gap happened, recorded so it does not repeat.** The pairing rule was documented and the publish gate enforced it, but nothing *noticed* when the server's contract advanced: `scripts/assert-deployed-contract.mjs` only runs when a publish is attempted, and none was between 2026-08-07 and this release. A stop sign cannot ring a doorbell. `.github/workflows/contract-drift.yml` now polls the deployed contract line daily and opens a bump PR when it diverges.
+
+**The proxy itself is unchanged.** It embeds no schemas, pins no contract version, and forwards `{ request }` verbatim. Every break below lands on whatever *authors* the payload or *reads* the result, never on the proxy.
+
+### Changed meaning, unchanged shape — the one to read first
+
+- **Position-size presets are now a RISK BUDGET** (30.0.0, `split-stop-geometry-from-risk`). `smallPct` / `mediumPct` / `largePct` stop denoting a share of the ORDER (`notional = pct / 100 × headroom × leverage`) and start denoting the share of headroom placed **at risk** (`notional = headroom × riskPct / stopDistancePct`, capped at the margin headroom can post). Same keys, same types, same accepted range: **nothing in the payload tells you the meaning moved.** A client still sending `22.0` for MEDIUM is asking to risk 22% of its budget on one trade rather than roughly 2%. Typical risk budgets are `0.5`–`3`; the platform defaults moved to `1 / 2 / 3`. Leverage stops multiplying order size and becomes a constraint only.
+
+### Rejected input — something you author is no longer accepted
+
+- **The stop-loss ceiling changed unit** (30.0.0). `maxStopLossPct` (a percent of entry) becomes `maxStopLossAtrMultiple` (a multiple of ATR), and the accepted range narrows from `(0, 100]` to `(0, 3]`. It is a rename **and** a re-denomination — mapping the old value onto the new key sends a number one to two orders of magnitude too large. The objects are `.strict()`, so a 29.x client sending `maxStopLossPct` is rejected with an unknown-key error. A new cross-field rule comes with it: `minStopLossAtrMultiple < maxStopLossAtrMultiple` is now a real comparison and is enforced.
+- **The grid-confidence and trade-conviction bars left the agent** (28.0.0, `remove-agent-rule-defaults`). `tradingConfig.gridMinConfidence` and `minTradeConviction` are removed from the shared `.strict()` config; a bar is declared on the arena slot or radar slot that fires.
+- **Both entry-lifecycle guards left the agent** (26.0.0, `move-entry-guards-to-platform`). `tradingConfig.signalTimeoutMinutes` and `maxEntryDeviationAtrMultiple` are removed with no replacement key — both are platform values now.
+- **The arena stopped granting trade authority** (25.0.0, `remove-arena-trade-permissions`). `upsert_deployment_policy` and `preview_deployment_resolution` stop accepting `tradingEnabled`, `minConviction` and `coinRules[]` on a slot.
+- **Post-entry exit policy moved to the strategy** (24.0.0, `move-position-management-to-strategy`). The nested `positionManagement` object is removed from the agent config; the twelve dials are authored on the strategy.
+- **The agent-level trading mode is retired** (23.0.0, `remove-agent-trading-mode`). `tradingConfig.tradingMode` is removed — trading on/off is scoped per deployment.
+- **Trailing gained a required threshold** (22.0.0, `add-trailing-trigger-r`). `positionManagement` gains `trailingTriggerR` as REQUIRED (`0`–`2.0`, `0.01` precision, `0` = trail from entry); the object is `.strict()` all-required, so sending `positionManagement` without it is rejected.
+- **The strategy regime timeframe became derived** (19.0.0, `remove-strategy-regime-override`). It stops being an authored axis anywhere on the contract and is served read-only.
+- **Conditions gained a required `required`** (16.0.0, `add-condition-enforcement-gate`). A condition entry omitting the boolean is REJECTED rather than defaulted.
+- **The trade-level policy moved to the strategy** (15.0.0, `move-trade-level-policy-to-strategy`). It leaves the agent authoring surface and joins the setup gates on the strategy.
+- **The agent's ATR timeframe axis is gone** (14.0.0, `remove-agent-atr-timeframe-axis`). ATR is sampled on the strategy timeframe, always.
+- **Radar's wall-clock condition changed shape** (12.0.0, `unify-deployment-hours-as-sets`).
+
+### Moved or reshaped output — a field you read is somewhere else
+
+- **`get_radar_activity` gained an `EDGE_REARM` variant** (29.0.0, `add-radar-anchor-rearm`), and every member gained five `rearm*` margin keys plus a `rearmReasons` discriminator. Breaking on both counts if you parse the union strictly.
+- **The trade-defaults catalog dropped four seeds** (27.0.0, `retire-orphaned-trade-config-columns`) for fields no surface can author. Read the stop-loss band, ATR floor and risk-reward minimum from the bound STRATEGY.
+- **`get_radar_activity` gained `blockReasonCode` on every member** (21.0.0, `fix-block-reason-attribution`) — non-null only on `BLOCKED_BEFORE_EVALUATION` rows written after 2026-08-17.
+- **`signal_pipeline`'s decision became a discriminated union** (20.0.0, `add-decision-skip-attribution`). `ENTER`/`GATED` carry the seven level fields as REQUIRED; `SKIP` omits them entirely rather than sending nulls, so reading `entryPrice` without narrowing the verdict finds the key absent.
+- **`get_radar_activity` gained an `EVALUATION_OUTCOME` member** (18.0.0, `add-radar-fire-outcome-journal`), and every existing member gained `evaluationOutcome` + `screenReason`.
+- **Scalar families became placeable modules** (13.0.0, `add-scalar-family-modules`); six opt-in scalar headers moved off the shared `session-field` section key.
+
+### Widened enum — new members your own copy rejects
+
+- `TradeEvaluationAttemptReasonCode` gains `OPEN_POSITION_CHECK_UNAVAILABLE` (19.4.0), splitting a code that previously reported a platform fault as a fact about your account.
+- `QualificationGateCode` gains `REQUIRED_CONDITION_FALSE` (19.3.0), from the SCAN-stage gate that now evaluates required conditions before a fire edge is spent.
+- `TradingPipelineGateStage` gains `EVALUATION` and `TradeEvaluationAttemptReasonCode` gains `EVALUATION_FAULTED` (18.2.0).
+
+### What you do NOT need to do
+
+Nothing in the proxy changes. No configuration, no environment variable, no call-shape change on this package's own surface. If your client discovers tools live and reads results generically, `npm i @battlegrid/mcp-server@30` is the whole upgrade.
+
+### Additive in the same span
+
+`27.1.0` exit-policy authoring input on `compile_strategy_plan` · `19.2.0` `get_account_state` account identity · `19.1.0` Standing Orders marker authoring · `18.4.0` `list_gate_blocks` summary groups · `18.3.0` radar maintenance pause · `18.1.0` protection geometry · `17.2.0` break-even/trailing status · `17.1.0` `get_signal_log` condition evaluation · `13.1.0` four owner-scoped read tools · `12.1.0` cross-venue spot price metrics · `11.1.0` discoverable rate limit.
+
 ## v11 — breaking cutover (v6 → v11)
 
 **v11 pairs with the BattleGrid server's MCP contract v11.x — currently v11.0.0.** The package version tracks the server's wire contract, because the proxy announces `battlegrid@<package version>` in its own stdio handshake — the number a client reads has to be the contract it will actually reach. Upgrade the package and the server together: the major carries the breaking cutover described below, and the minor tracks additive contract moves that leave every existing call working.
@@ -385,6 +437,38 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 | **9.0.0** | Server contract v9.0.0, **breaking**: `compile_strategy_plan`'s `approvedPlan.mismatches` changes on both axes. Both report-coverage codes are renamed off "module" (`ACTIVE_SIGNAL_MODULE_NOT_IN_REPORT` → `ACTIVE_SIGNAL_DATA_NOT_IN_REPORT`, `REPORT_MODULE_SIGNAL_OFF` → `REPORT_DATA_SIGNAL_OFF`), and each mismatch carries a required `data: CoverageDatum[]` — the `(metric, rung)` pairs it is about. A client switching exhaustively on the old code strings stops matching. Coverage is now decided by whether the report renders a signal's declared metrics at the rung that signal reads, so expect warnings never seen before and the disappearance of warnings no composition could clear; mismatches stay advisory and non-blocking. Never published as a package version |
 | 10.0.0 | Server contract v10.0.0, **breaking**: challenge participation stops being a declared setting anywhere and becomes identical to effective trade permission, resolved per coin. `create_agent`/`update_agent` stop accepting `arenaChallengeEnabled`, and a deployment policy's slot and per-coin rule shapes stop accepting `challengeEnabled` — all four are `.strict()`, so a client still sending them is rejected rather than ignored, the same input-acceptance narrowing that made v4, v5, v6 and v8 majors. `IntelligenceAgentDTO` drops `arenaChallengeEnabled`; `ResolvedSlotRulesDTO.challengeEnabled` stays and keeps its shape, now derived server-side with the same value and provenance as `tradingEnabled`. The resolution DTO also gains `agentTradingMode` — the preview previously reported trade rules for an agent whose account-level trading was off. Never published as a package version |
 | **11.0.0** | Server contract v11.0.0, **breaking**: a catalogued numeric output's `range` changes shape — the closed positional tuple `[min, max]` becomes the half-open object `{ min: number; max?: number }`, travelling through `ScalarSchema` into `list_strategy_vocabulary`, `query_report_catalog` and `get_metric_construction_hints`. A client reading `range[0]`/`range[1]` gets `undefined` **with no error**, which is the silent failure mode a version exists to prevent. The driver: the tuple could not state the truth about the volume/trade-count family — non-negative and unbounded above — and `Infinity` serializes to `null` on the wire; those six metrics now declare `{ min: 0 }` and no longer offer `far`/`near` rank orderings, which on a non-negative value are a synonym pair. Additive alongside it: the transform vocabulary grows 15 → 17 (`efficiency`, `maxShare`), both joining the chain-outer enum served as `chainSuccessors`. **This is the package version paired to the current server contract.** No proxy code change — the version is the client-facing signal, and the proxy's handshake carries it |
+| 11.1.0 | Server contract v11.1.0, **additive**: the per-user request budget becomes discoverable rather than only enforceable |
+| 12.0.0 | Server contract v12.0.0, **breaking**: radar's wall-clock condition changes shape (`unify-deployment-hours-as-sets`) |
+| 12.1.0 | Server contract v12.1.0, **additive**: `SPOT_CLOSE_CB` / `SPOT_CLOSE_BN` join the metric catalog |
+| 13.0.0 | Server contract v13.0.0, **breaking**: scalar families become placeable modules; six scalar headers leave the `session-field` key |
+| 13.1.0 | Server contract v13.1.0, **additive**: four owner-scoped read tools join the catalog, closing web-client parity gaps |
+| 14.0.0 | Server contract v14.0.0, **breaking**: the agent's ATR timeframe axis is removed — ATR samples on the strategy timeframe |
+| 15.0.0 | Server contract v15.0.0, **breaking**: the trade-level policy moves off the agent onto the strategy |
+| 16.0.0 | Server contract v16.0.0, **breaking**: a strategy condition gains a REQUIRED `required` boolean; omitting it is rejected |
+| 17.1.0 | Server contract v17.1.0, **additive**: `get_signal_log` gains `log.conditionEvaluation` |
+| 17.2.0 | Server contract v17.2.0, **additive**: position rows gain `breakEvenStatus` / `trailingStatus` |
+| 18.0.0 | Server contract v18.0.0, **breaking**: `get_radar_activity` gains an `EVALUATION_OUTCOME` member and two keys on every member |
+| 18.1.0 | Server contract v18.1.0, **additive**: protection geometry behind the v17.2.0 verdicts |
+| 18.2.0 | Server contract v18.2.0, **additive**: `TradingPipelineGateStage` gains `EVALUATION`; reason codes gain `EVALUATION_FAULTED` |
+| 18.3.0 | Server contract v18.3.0, **additive**: the platform maintenance pause reaches the radar surfaces |
+| 18.4.0 | Server contract v18.4.0, **additive**: `list_gate_blocks` gains `summary` groups |
+| 19.0.0 | Server contract v19.0.0, **breaking**: the strategy regime timeframe becomes derived and read-only |
+| 19.1.0 | Server contract v19.1.0, **additive**: Standing Orders markers become authorable and resolvable before save |
+| 19.2.0 | Server contract v19.2.0, **additive**: `get_account_state` gains account-identity fields |
+| 19.3.0 | Server contract v19.3.0, **additive**: `QualificationGateCode` gains `REQUIRED_CONDITION_FALSE` |
+| 19.4.0 | Server contract v19.4.0, **additive**: reason codes gain `OPEN_POSITION_CHECK_UNAVAILABLE` |
+| 20.0.0 | Server contract v20.0.0, **breaking**: the `signal_pipeline` decision becomes a union discriminated on the verdict; `GATED` joins it |
+| 21.0.0 | Server contract v21.0.0, **breaking**: `get_radar_activity` gains `blockReasonCode` on every member |
+| 22.0.0 | Server contract v22.0.0, **breaking**: `positionManagement` gains REQUIRED `trailingTriggerR` |
+| 23.0.0 | Server contract v23.0.0, **breaking**: `tradingConfig.tradingMode` is removed — trading is scoped per deployment |
+| 24.0.0 | Server contract v24.0.0, **breaking**: `positionManagement` leaves the agent for the strategy |
+| 25.0.0 | Server contract v25.0.0, **breaking**: the arena stops granting trade authority; slot trade fields are rejected |
+| 26.0.0 | Server contract v26.0.0, **breaking**: both entry-lifecycle guards leave the agent for platform config |
+| 27.0.0 | Server contract v27.0.0, **breaking**: the trade-defaults catalog drops four unauthorable seeds |
+| 27.1.0 | Server contract v27.1.0, **additive**: `compile_strategy_plan` accepts the twelve exit-policy keys |
+| 28.0.0 | Server contract v28.0.0, **breaking**: grid-confidence and trade-conviction bars become deployment declarations |
+| 29.0.0 | Server contract v29.0.0, **breaking**: `get_radar_activity` gains an `EDGE_REARM` variant and six keys on every member |
+| **30.0.0** | Server contract v30.0.0, **breaking**: the stop-loss ceiling changes unit (`maxStopLossPct` → `maxStopLossAtrMultiple`, range `(0,3]`), a `floor < ceiling` rule is enforced, and **the position-size presets change meaning without changing shape** — they denote a risk budget, not a share of the order |
 | 23.0.0 | Server contract v23.0.0, **breaking**: the agent-level trading mode is retired. `create_agent`/`update_agent` stop accepting `tradingConfig.tradingMode` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8 and v10 majors. On the read side `AgentTradingConfigDTO` drops `tradingMode` on every agent-returning tool, and so do the agents-hub permission envelope, the explorer entry and both public-profile shapes; `DeploymentResolvedResolutionDTO` drops `agentTradingMode`, the field v10.0.0 added, because with no account layer to overlay the resolved `tradingEnabled` is the whole answer. Trading on/off is now scoped per deployment (radar policy `enabled`, arena slot `tradingEnabled`, per-coin `tradeEnabled`) and a newly authored arena slot starts with trading **off**; approval-before-execution is the conversational surface's own contract, so `accept_entry_decision` / `cancel_entry_decision` / `list_pending_approvals` are unchanged on the wire but now carry conversational proposals exclusively — a deployed agent never queues for approval. Never published as a package version |
 | 24.0.0 | Server contract v24.0.0, **breaking**: the post-entry exit policy moves from the agent to the strategy. `create_agent`/`update_agent` stop accepting `tradingConfig.positionManagement` on the shared `.strict()` `TradingConfigSchema`, so a client still sending it is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10 and v23 majors. On the read side `AgentTradingConfigDTO` drops the nested block on every agent-returning tool and the explorer trading spec drops it too; `get_trading_config_catalog` drops `positionManagementPresets` and the `defaultPositionMgmt*` trading defaults. The pistol-preset ladder (COLT / WEBLEY / BERETTA / LUGER / WALTHER) is **retired, not renamed** — once the values live on the strategy, the strategy is the named bundle. Additive on the authoring surface in the same bump: `compile_strategy_plan`/`apply_strategy_plan` post-state gains the twelve authored keys beside the trade-level trio, and the plan diff gains a `positionManagement` axis. Behaviourally the umbrella `enabled` flag is **deleted** rather than moved: each mechanism toggle is the whole truth for that mechanism, so a client can no longer express "trailing on, management off". Never published as a package version |
 | 26.0.0 | Server contract v26.0.0, **breaking**: both entry-lifecycle guards stop being agent configuration. `create_agent`/`update_agent` stop accepting `tradingConfig.signalTimeoutMinutes` and `tradingConfig.maxEntryDeviationAtrMultiple` on the shared `.strict()` `TradingConfigSchema`, so a client still sending either is rejected rather than ignored — the same input-acceptance narrowing that made v4, v5, v6, v8, v10, v23 and v24 majors. Neither has a replacement key: one `platform_config` value governs the entry-price drift budget for every decision (read at evaluation time, so an admin edit applies to the next evaluation), and one governs how long an entry may stay unfilled (snapshotted onto the position at creation, so an edit can never cancel an order already resting on the book). On the read side `AgentTradingConfigDTO` drops both fields on every agent-returning tool, and so do the explorer trading spec and the agent-review payload; `get_trading_config_catalog` drops `defaultSignalTimeoutMinutes` and the `minimum_`/`maximum_maxEntryDeviationAtrMultiple` bound pair, while `defaultMaxEntryDeviationAtrMultiple` and `defaultTtlMinutes` stay and become the values that actually govern. Behaviourally a conversational entry and an autonomous entry on the same setup now receive the **identical** unfilled lifetime — the mode-selecting fallback that chose between a per-agent timeout and a hardcoded 15-minute resting window is gone, and the three-way timeout enum with it. Never published as a package version |
