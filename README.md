@@ -24,9 +24,9 @@ Seeing package `31.0.0` alongside handshake `battlegrid@30.0.0` is the system wo
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v12 → v30
+## Contract history — v12 → v31
 
-These are the server contract breaks between contract 12 and contract 30 — the span that shipped while the package sat at `11.0.0`. They are **contract** history, not package releases: from v31 the announced contract is relayed live and a contract move is no longer a release here. Grouped by what a client observes, with the contract version that introduced each.
+These are the server contract breaks between contract 12 and contract 31. Most of the span shipped while the package sat at `11.0.0`; contract 31 landed after this package reached `31.0.0`, and the two numbers matching is coincidence — since v31 the announced contract is relayed from the server, so a package version says nothing about a contract version. They are **contract** history, not package releases: from v31 the announced contract is relayed live and a contract move is no longer a release here. Grouped by what a client observes, with the contract version that introduced each.
 
 **The proxy itself is unchanged.** It embeds no schemas, pins no contract version, and forwards `{ request }` verbatim. Every break below lands on whatever *authors* the payload or *reads* the result, never on the proxy.
 
@@ -35,6 +35,8 @@ These are the server contract breaks between contract 12 and contract 30 — the
 - **Position-size presets are now a RISK BUDGET** (30.0.0, `split-stop-geometry-from-risk`). `smallPct` / `mediumPct` / `largePct` stop denoting a share of the ORDER (`notional = pct / 100 × headroom × leverage`) and start denoting the share of headroom placed **at risk** (`notional = headroom × riskPct / stopDistancePct`, capped at the margin headroom can post). Same keys, same types, same accepted range: **nothing in the payload tells you the meaning moved.** A client still sending `22.0` for MEDIUM is asking to risk 22% of its budget on one trade rather than roughly 2%. Typical risk budgets are `0.5`–`3`; the platform defaults moved to `1 / 2 / 3`. Leverage stops multiplying order size and becomes a constraint only.
 
 ### Rejected input — something you author is no longer accepted
+
+- **`apply_strategy_plan` now publishes the same bounds as `compile_strategy_plan`** (31.0.0, resolving #4495). Eleven position-management dials were declared three times server-side and two copies had drifted, so apply advertised `trailingGivebackPct` as a bare number where compile advertised 25–55, and dropped `trailingTriggerR`'s `multipleOf 0.01` — the constraint pinning storage precision so a sub-precision value is rejected rather than rounded onto the trail-from-entry sentinel `0`. Nothing bad could ever commit (the digest would not match), but the refusal you got was a binding mismatch, which arrived as a bare `INTERNAL_ERROR`. Apply's published bounds only **narrow** to compile's; a client that copies values from `approvedPlan.postState`, as it should, is unaffected. Separately the trio `minStopLossAtrMultiple` / `maxStopLossAtrMultiple` / `minRiskRewardRatio` is published as a bare declaration by both tools, its real bounds being runtime-tunable and inexpressible in JSON Schema.
 
 - **The stop-loss ceiling changed unit** (30.0.0). `maxStopLossPct` (a percent of entry) becomes `maxStopLossAtrMultiple` (a multiple of ATR), and the accepted range narrows from `(0, 100]` to `(0, 3]`. It is a rename **and** a re-denomination — mapping the old value onto the new key sends a number one to two orders of magnitude too large. The objects are `.strict()`, so a 29.x client sending `maxStopLossPct` is rejected with an unknown-key error. A new cross-field rule comes with it: `minStopLossAtrMultiple < maxStopLossAtrMultiple` is now a real comparison and is enforced.
 - **The grid-confidence and trade-conviction bars left the agent** (28.0.0, `remove-agent-rule-defaults`). `tradingConfig.gridMinConfidence` and `minTradeConviction` are removed from the shared `.strict()` config; a bar is declared on the arena slot or radar slot that fires.
@@ -76,6 +78,8 @@ These are the server contract breaks between contract 12 and contract 30 — the
 - **Radar's wall-clock condition changed shape** (12.0.0, `unify-deployment-hours-as-sets`).
 
 ### Moved or reshaped output — a field you read is somewhere else
+
+- **`approvedPlan` is one object, not an operation union** (31.0.0, resolving #4495). It was published as a discriminated union whose discriminator does not survive JSON-Schema conversion, so what actually shipped was a bare `anyOf`: validating a failing compile response gave you every arm's errors with empty instance paths, and the top one typically complained that an UPDATE was missing `creationSeed` — a CREATE-only key — while the field that really failed went unnamed. It is now one object with a literal `operation` discriminator, and `creationSeed`, `expectedRevision` and `bindingImpact` are **required and nullable on every operation**: a CREATE plan carries a seed and `expectedRevision: null`, an UPDATE/RESTORE plan the reverse. **If you narrowed on the union arms, read `operation` instead and expect explicit `null`s rather than absent keys.** If you read those fields without narrowing, nothing changes except that they may now be null.
 
 - **`get_radar_activity` gained an `EDGE_REARM` variant** (29.0.0, `add-radar-anchor-rearm`), and every member gained five `rearm*` margin keys plus a `rearmReasons` discriminator. Breaking on both counts if you parse the union strictly.
 - **`get_trading_config_catalog` drops four trade-default seeds** (27.0.0) — `defaultMinAtrPct`,
@@ -120,6 +124,8 @@ These are the server contract breaks between contract 12 and contract 30 — the
   answer about whether the previewed deployment trades.
 
 ### Widened enum — new members your own copy rejects
+
+- **Seven plan-token failures became their own error codes** (31.0.0, resolving #4495). `TOKEN_EXPIRED`, `TOKEN_BINDING_MISMATCH`, `INVALID_TOKEN_SIGNATURE`, `INVALID_TOKEN_FORMAT`, `INVALID_TOKEN_CLAIMS`, `INVALID_DIGEST_MATERIAL` and `INVALID_MATERIALIZATION_FENCE` all used to arrive as a bare `INTERNAL_ERROR` — the server wrote the true reason to its own audit log and discarded it at the boundary, so a refused apply told you nothing. They now arrive as themselves, over MCP and HTTP alike, with 409-class status for the two state-conflict codes and 400-class for the five malformed-material codes. A client switching exhaustively on error codes must add the branches; one rendering unknown codes generically is unaffected. Two are worth handling by name: `TOKEN_EXPIRED` means recompile (the token lives five minutes), and `INVALID_TOKEN_SIGNATURE` usually means the token was not forwarded verbatim — it is opaque, so copy it byte-for-byte and never retype or reconstruct it.
 
 - `TradeEvaluationAttemptReasonCode` gains `OPEN_POSITION_CHECK_UNAVAILABLE` (19.4.0), splitting a code that previously reported a platform fault as a fact about your account.
 - `QualificationGateCode` gains `REQUIRED_CONDITION_FALSE` (19.3.0), from the SCAN-stage gate that now evaluates required conditions before a fire edge is spent.
