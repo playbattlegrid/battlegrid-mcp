@@ -81,13 +81,29 @@ jobs:
           fi
 
           git checkout -b "$BRANCH"
+          # ALL FOUR values move together or the publish workflow fails closed on the
+          # disagreement (README "Preparing the version change"). A watcher that bumped only
+          # package.json would open a PR that cannot publish - the first draft of this workflow
+          # did exactly that, and the release procedure caught it.
           node -e "
             const fs=require('fs');
-            const p=JSON.parse(fs.readFileSync('package.json','utf8'));
-            p.version=process.env.SERVED;
-            fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n');
+            const v=process.env.SERVED;
+
+            const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+            pkg.version=v;
+            fs.writeFileSync('package.json', JSON.stringify(pkg,null,2)+'\n');
+
+            const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+            lock.version=v;
+            lock.packages[''].version=v;
+            fs.writeFileSync('package-lock.json', JSON.stringify(lock,null,2)+'\n');
+
+            const idx=fs.readFileSync('src/index.ts','utf8');
+            const next=idx.replace(/VERSION = '[^']+'/, \"VERSION = '\" + v + \"'\");
+            if (next === idx) { throw new Error('VERSION literal not found in src/index.ts'); }
+            fs.writeFileSync('src/index.ts', next);
           "
-          git add package.json
+          git add package.json package-lock.json src/index.ts
           git commit -m "release(v${SERVED}): pair the package with MCP contract ${SERVED}"
           git push -u origin "$BRANCH"
 

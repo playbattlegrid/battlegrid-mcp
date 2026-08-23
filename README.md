@@ -508,6 +508,16 @@ Also confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Acti
 - **Move all four values together** — `package.json`, both `package-lock.json` version fields (the root `version` and the self-referencing `packages[""].version`), and the exported `VERSION` in `src/index.ts`. The workflow compares all four against each other and fails closed on any disagreement.
 - **Merge the version change only after the server is deployed.** The deploy assertion is a safety net, not a routine step: with the ordering right it never fires, and a red workflow on `main` means something is genuinely wrong rather than that you are waiting. Merging early blocks the publish until the deploy lands, then re-run the job — nothing was published and no tag exists to move.
 
+### What tells you a pairing is owed
+
+[`.github/workflows/contract-drift.yml`](.github/workflows/contract-drift.yml) runs daily, reads the same unauthenticated `GET /mcp/version` the deploy assertion reads, compares the same `MAJOR.MINOR` contract line, and **opens a bump PR when they diverge**. Merge it and the release follows, because a version change on `main` IS the release.
+
+It exists because the deploy assertion could not do this job. `scripts/assert-deployed-contract.mjs` runs only when a publish is ATTEMPTED, so it can refuse a release someone started and cannot say one is owed. Between 2026-08-07 and 2026-08-23 no publish was attempted while the server advanced from contract `11.0` to `30.0`, and this package spent sixteen days announcing `battlegrid@11.0.0` to every client — the exact failure the pairing section above describes. It was also unpublishable for that whole period, since its own gate would have refused `11.0` against `30.0`.
+
+Reading the DEPLOYED endpoint rather than the app repo's merged manifest is deliberate: it makes the watch fire only once the deploy has landed, which is the ordering *Preparing the version change* already requires.
+
+The PR it opens moves all four version values, and its body says what a human still owes — the README release section describing what changed for clients. The bump is mechanical; the changelog is judgement, which is why this opens a PR instead of merging one.
+
 ### Which releases need a server deploy
 
 The deploy assertion compares the **contract line** — `MAJOR.MINOR` — not the full version and not the major alone.
