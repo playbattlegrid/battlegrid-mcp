@@ -10,7 +10,8 @@ Machine-readable agent discovery file for `@battlegrid/mcp-server` (thin stdio p
 | Website | https://battlegrid.trade |
 | Protocol | Model Context Protocol (MCP) |
 | Transport | stdio (npm package), streamable-http (remote) |
-| Package version | Tracks the **deployed** server MCP contract line (MAJOR.MINOR); the patch is the proxy's own space. Read the live line from `GET https://mcp.battlegrid.trade/mcp/version` rather than this file — `scripts/assert-deployed-contract.mjs` gates publishing on that comparison, so a number restated here can only go stale. |
+| Package version | The **proxy's own build identity**. It makes no claim about the server's contract and never needs to move when the contract does. |
+| Contract version | Relayed from the upstream handshake on every connection, so it is always the contract you will actually reach. Read it from the stdio handshake (`battlegrid@<contract>`, printed to stderr at startup) or `GET https://mcp.battlegrid.trade/mcp/version`. The two versions differ by design — that is not drift. |
 
 ## Authentication
 

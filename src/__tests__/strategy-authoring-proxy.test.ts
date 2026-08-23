@@ -296,6 +296,11 @@ interface ToolResult {
 
 function makeUpstream(apiKey: string, calls: RecordedCall[]): Client {
   const upstream = {
+    // What the real SDK returns once `initialize` has completed. The proxy relays it downstream
+    // instead of announcing a constant of its own, so a fake upstream has to answer it.
+    getServerVersion() {
+      return { name: 'battlegrid', version: '19.3.0' };
+    },
     async listTools() {
       return { tools: structuredClone(SERVER_TOOLS) };
     },

@@ -79,38 +79,36 @@ jobs:
             echo "reconcile_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Enforce one immutable release identity. All four values that express this package's version
-      # must agree with each other: package.json, BOTH lockfile version fields, and the exported
-      # handshake VERSION a client is actually told. Checking a subset admits the divergence the
-      # check exists to prevent — the lockfile's self-referencing entry was previously unchecked.
-      - name: Verify version integrity (package.json == lock == lock.self == src VERSION)
+      # Enforce one immutable release identity. All three values that express this package's version
+      # must agree: package.json and BOTH lockfile version fields. Checking a subset admits the
+      # divergence the check exists to prevent — the lockfile's self-referencing entry was previously
+      # unchecked.
+      #
+      # PACKAGE_VERSION in src/index.ts is checked here too, but it now means something narrower than
+      # it used to: the proxy's OWN build identity, sent upstream as the client identity. It is no
+      # longer the number a local client reads as the contract — that one is relayed from the
+      # upstream handshake at runtime and is not knowable at publish time.
+      - name: Verify version integrity (package.json == lock == lock.self == src PACKAGE_VERSION)
         if: steps.gate.outputs.release == 'true'
         run: |
           PKG_VERSION="${{ steps.gate.outputs.version }}"
           LOCK_VERSION="$(node -p "require('./package-lock.json').version")"
           LOCK_SELF_VERSION="$(node -p "require('./package-lock.json').packages[''].version")"
-          SRC_VERSION="$(node -p "require('fs').readFileSync('src/index.ts','utf8').match(/VERSION = '([^']+)'/)[1]")"
+          SRC_VERSION="$(node -p "require('fs').readFileSync('src/index.ts','utf8').match(/PACKAGE_VERSION = '([^']+)'/)[1]")"
           echo "package.json=$PKG_VERSION package-lock.json=$LOCK_VERSION package-lock.json[packages.'']=$LOCK_SELF_VERSION src=$SRC_VERSION"
           if [ "$PKG_VERSION" != "$LOCK_VERSION" ] || [ "$PKG_VERSION" != "$LOCK_SELF_VERSION" ] || [ "$PKG_VERSION" != "$SRC_VERSION" ]; then
-            echo "::error::Version mismatch — package.json, both package-lock.json version fields, and src VERSION must all match before publish."
+            echo "::error::Version mismatch — package.json, both package-lock.json version fields, and src PACKAGE_VERSION must all match before publish."
             exit 1
           fi
           echo "Version integrity OK: $PKG_VERSION"
 
-      # The package announces `battlegrid@<version>` in its own stdio handshake, so publishing ahead
-      # of the server's deploy tells clients a contract the server does not answer to. Compares the
-      # contract line (MAJOR.MINOR) — the contract ships additive moves as minors, so a package minor
-      # ahead of the server would advertise features it does not serve. Only PATCH is the package's
-      # own space.
-      #
-      # NO CREDENTIAL: it reads GET /mcp/version, which the server serves unauthenticated precisely
-      # so this check needs no key. Every BattleGrid MCP API key carries `mcp:wager` — there is no
-      # read-only variant — so a credentialed check would put wager-and-close-position authority in
-      # this repository's secrets to read a version number. Fails closed on a mismatch, an
-      # unreachable endpoint, a non-200, or an unreadable body.
-      - name: Assert the deployed server serves this contract line
-        if: steps.gate.outputs.release == 'true'
-        run: node scripts/assert-deployed-contract.mjs
+      # NO DEPLOY GATE. There used to be one here: the package announced `battlegrid@<its own
+      # version>` downstream, so publishing ahead of the server's deploy told clients a contract the
+      # server did not answer to, and a step asserted the deployed contract line before allowing the
+      # release. As of 12.0.0 the proxy relays the contract version from the upstream handshake on
+      # every connection, so a published package makes no claim about the server at all — there is no
+      # ordering left to enforce, and nothing a pre-publish check could usefully compare. Releasing
+      # before, during, or after a server deploy is now equally correct.
 
       - name: Test
         if: steps.gate.outputs.release == 'true'
