@@ -1,0 +1,130 @@
+name: Contract drift watch
+
+# WHY THIS EXISTS: the package version pairs with the server's MCP contract line, that rule is
+# documented in AGENTS.md and README.md, and `scripts/assert-deployed-contract.mjs` enforces it —
+# but only when a publish is ATTEMPTED. Between 2026-08-07 and 2026-08-23 no publish was attempted
+# and the server advanced from contract 11.0 to 30.0, so the package spent sixteen days telling
+# every client `battlegrid@11.0.0` — a contract number that no longer existed. The gate is a stop
+# sign; it can refuse a release someone started, and cannot tell anyone one is owed.
+#
+# This is the doorbell. It reads the same unauthenticated endpoint the publish gate reads, compares
+# the same MAJOR.MINOR contract line, and opens a PR when they diverge. A human merges it — the
+# README's per-release prose describes what broke for clients, and that judgement is not mechanical.
+# Merging then trips the existing rule in publish.yml: a version change on main IS the release.
+#
+# NOT auto-merged, and NOT a failing check on unrelated PRs: drift is a fact about the deployed
+# server, not a defect in whatever branch happens to be open.
+
+on:
+  schedule:
+    # Daily. The contract moves on merges to the app repo, not continuously; hourly polling would
+    # add noise without shortening the window that matters.
+    - cron: '17 6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: contract-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Compare the published package line against the deployed contract line
+        id: drift
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('./package.json').version")
+          PKG_LINE=$(echo "$PKG" | cut -d. -f1,2)
+
+          # Same source the publish gate uses: DEFAULT_URL in src/index.ts, + /version.
+          URL="$(node -p "/DEFAULT_URL = '([^']+)'/.exec(require('fs').readFileSync('src/index.ts','utf8'))[1]")/version"
+          SERVED=$(curl -fsS --max-time 30 "$URL" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).contractVersion")
+          SERVED_LINE=$(echo "$SERVED" | cut -d. -f1,2)
+
+          echo "package=$PKG  line=$PKG_LINE"
+          echo "served=$SERVED  line=$SERVED_LINE"
+          echo "served=$SERVED" >> "$GITHUB_OUTPUT"
+          echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
+
+          if [ "$PKG_LINE" = "$SERVED_LINE" ]; then
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update the bump PR
+        if: steps.drift.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SERVED: ${{ steps.drift.outputs.served }}
+          PKG: ${{ steps.drift.outputs.pkg }}
+        run: |
+          set -euo pipefail
+          BRANCH="contract-drift/${SERVED}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Bump branch $BRANCH already exists — nothing to do."
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          # ALL FOUR values move together or the publish workflow fails closed on the
+          # disagreement (README "Preparing the version change"). A watcher that bumped only
+          # package.json would open a PR that cannot publish - the first draft of this workflow
+          # did exactly that, and the release procedure caught it.
+          node -e "
+            const fs=require('fs');
+            const v=process.env.SERVED;
+
+            const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+            pkg.version=v;
+            fs.writeFileSync('package.json', JSON.stringify(pkg,null,2)+'\n');
+
+            const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+            lock.version=v;
+            lock.packages[''].version=v;
+            fs.writeFileSync('package-lock.json', JSON.stringify(lock,null,2)+'\n');
+
+            const idx=fs.readFileSync('src/index.ts','utf8');
+            const next=idx.replace(/VERSION = '[^']+'/, \"VERSION = '\" + v + \"'\");
+            if (next === idx) { throw new Error('VERSION literal not found in src/index.ts'); }
+            fs.writeFileSync('src/index.ts', next);
+          "
+          git add package.json package-lock.json src/index.ts
+          git commit -m "release(v${SERVED}): pair the package with MCP contract ${SERVED}"
+          git push -u origin "$BRANCH"
+
+          cat > /tmp/pr-body.md <<'BODY'
+          The deployed server serves MCP contract `__SERVED__`; this package is published as `__PKG__`.
+
+          The proxy announces `battlegrid@<package version>` in its stdio handshake, so a package left
+          behind tells clients a contract number that no longer exists.
+
+          **Before merging**, add the README release section describing what changed for clients across
+          the absorbed contract versions. The source of truth is `MCP_CONTRACT_VERSION`'s changelog in
+          the app repo, which names the OpenSpec change behind every entry. The version bump is
+          mechanical; the changelog is not.
+
+          Merging publishes: a version change on `main` IS the release (see `publish.yml`).
+
+          ---
+          _Opened by the contract drift watch._
+          BODY
+          sed -i "s/__SERVED__/${SERVED}/g; s/__PKG__/${PKG}/g; s/^          //" /tmp/pr-body.md
+
+          gh pr create \
+            --title "release(v${SERVED}): pair the package with MCP contract ${SERVED}" \
+            --body-file /tmp/pr-body.md
