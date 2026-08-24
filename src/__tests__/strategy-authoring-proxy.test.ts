@@ -142,15 +142,16 @@ const RULE_UPDATE_REQUEST_SCHEMA: JsonSchema = {
   additionalProperties: false,
 };
 
-// apply_strategy_plan request — the exact approved plan + credential-bound token.
+// apply_strategy_plan request — the credential-bound token and the confirmation, nothing else.
+// The server holds the plan its own compile approved and reads it back (contract 33.0.0), so this
+// fixture carries no plan member; `additionalProperties: false` is what rejects one upstream.
 const APPLY_REQUEST_SCHEMA: JsonSchema = {
   type: 'object',
   properties: {
-    approvedPlan: { type: 'object' },
     planToken: { type: 'string', minLength: 1, maxLength: 4096 },
     confirm: { const: true },
   },
-  required: ['approvedPlan', 'planToken', 'confirm'],
+  required: ['planToken', 'confirm'],
   additionalProperties: false,
 };
 
@@ -273,7 +274,6 @@ const RULE_UPDATE_REQUEST = {
 } as const;
 
 const APPLY_REQUEST = {
-  approvedPlan: { operation: 'CREATE', postState: { id: STRATEGY_ID, name: 'Protocol momentum' }, proposedRevision: 1 },
   planToken: 'plan_tok_abcdef',
   confirm: true,
 } as const;
