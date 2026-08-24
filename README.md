@@ -20,11 +20,18 @@ From v31 the proxy reads the contract version out of the upstream handshake at c
 | Package version | This proxy's own code — a fix here, a dependency bump, a docs correction | `npm view @battlegrid/mcp-server version` |
 | Contract version | The server's wire contract, live | The stdio handshake (`battlegrid@<contract>`), or `GET /mcp/version` |
 
-Seeing package `31.0.0` alongside handshake `battlegrid@30.0.0` is the system working. Both are printed to stderr at startup, labelled.
+Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **behind** the contract — is the system working, not a missed release. That is the pair that looks alarming and is not: the contract moved, and no release here was needed. Both numbers are printed to stderr at startup, labelled.
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
 ## Contract history — v12 → v33
+
+> **The number in this heading is a CONTRACT version, not this package's version.** The npm badge at the top
+> tracks the proxy's own code; this section tracks the server's wire contract. They move independently **by
+> design**: a contract move needs no release here, because a connected proxy relays the contract out of the
+> upstream handshake rather than declaring it. So a package on `31.x` listing contract history up to `33.x` is
+> correct — not a version someone forgot to bump. Read the live pair from the startup stderr lines or
+> `GET /mcp/version`; see [Rediscovery & versioning](#rediscovery--versioning) for why.
 
 These are the server contract breaks between contract 12 and contract 33. Most of the span shipped while the package sat at `11.0.0`; contract 31 landed after this package reached `31.0.0`, and the two numbers matching is coincidence — since v31 the announced contract is relayed from the server, so a package version says nothing about a contract version. They are **contract** history, not package releases: from v31 the announced contract is relayed live and a contract move is no longer a release here. Grouped by what a client observes, with the contract version that introduced each.
 
