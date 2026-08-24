@@ -45,6 +45,7 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation w
      - **UPDATE** — supplies at least one changed axis and `expectedRevision`.
      - **RESTORE** — targets an owned inactive revision and may include repair axes.
    - Signal overrides are sparse: an omitted signal/axis stays unchanged; omitted `params` preserves canonical params byte-for-byte; present `params` replaces them only after strict validation.
+   - **`required` needs a weight.** A rule with `required: true` at `allocation: 0` is rejected (contract 32): the scorecard's triggered set excludes Off, so the flag could satisfy no gate and block no trade. Either raise the allocation or leave `required: false` — the server picks neither for you. The refusal names every offending signal in `details.inertRequiredSignalIds`, and it can fire on rules you did not touch: a strategy authored before contract 32 may hold the pair, and the merged post-state is what gets checked.
 6. **Review before confirming.**
    - `approvedPlan` — complete post-state, proposed revision, dense scorecard, viability, canonical diff, expiry, and bound-agent impact.
    - `reviewContext` — exact column contracts, point-in-time report preview and coin scope, open-position observation, and provisional quota/name admission (advisory until the write). Open positions are awareness only and do not block an edit.
@@ -54,7 +55,7 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation w
    - Each entry in `conditions` carries `{ conditionKey, name, definition, verdict }`. `verdict` is **required and nullable** — `UP`, `DOWN`, `NEITHER`, or an explicit `null` for a building block that decides nothing; never omit the key. Precedence is the array's declaration order: the first condition whose tree is TRUE and whose `verdict` is non-null decides. There is no separate `conditionVerdicts` array — sending one is rejected with a message naming this replacement.
    - Send nothing else. The server re-derives the dense scorecard, diff, viability, mismatches, creation seed, proposed revision, and bound-agent impact, and rejects the call when the result does not match the digest the token bound — so `diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`, and any `reviewContext` field are unknown keys, not values the server compares. Never rebuild a scorecard client-side. Changed configuration reaches every bound agent immediately.
 
-**Focused edits & lifecycle:** `update_strategy_signal_rule({ request })` is the thin one-rule edit (requires `required`; omit `params` to preserve them). `fork_strategy` requires `sourceRevision`; `archive_strategy` requires `expectedRevision` and `confirm:true`; `restore_strategy` is only the thin unchanged-content path — if it reports `REPAIR_REQUIRED`, use the RESTORE compile/review/apply flow instead.
+**Focused edits & lifecycle:** `update_strategy_signal_rule({ request })` is the thin one-rule edit (requires `required`; omit `params` to preserve them; `required: true` needs `allocation > 0`). `fork_strategy` requires `sourceRevision`; `archive_strategy` requires `expectedRevision` and `confirm:true`; `restore_strategy` is only the thin unchanged-content path — if it reports `REPAIR_REQUIRED`, use the RESTORE compile/review/apply flow instead.
 
 ## Strategy-bound agents
 
@@ -95,5 +96,6 @@ The `play-market-grid` prompt (discover via `prompts/list`) provides a guided en
 | Authentication failed (401/403) | Key revoked/rotated | Generate a new key and **restart** the proxy (keys read once at startup) |
 | `"account" parameter is required` | Multi-account call missing `account` | Add the outer `account`; keep `request` unchanged |
 | Plan token expired / revision drift | >5 min since compile, or upstream changed | Recompile, review the fresh plan, then apply |
+| Required at allocation Off | A rule flags `required` on a signal weighted `0` (contract 32) | Read `details.inertRequiredSignalIds`; per signal either raise `allocation` or set `required: false` |
 | Method not found | Calling a retired/unknown tool | Re-run `tools/list`; use the compile → review → apply flow |
 | `Wager scope required` | `mcp:wager` not enabled | Enable Server-Signed Wagers in Profile → MCP |
