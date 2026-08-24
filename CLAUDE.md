@@ -97,7 +97,7 @@ distinction matters: the bump is for publishing **the documentation**, never for
 
 1. Change the code or docs.
 2. Move all four version values together; run the integrity snippet above.
-3. `npm run build && npm test` (47 tests as of v31.0.2).
+3. `npm run build && npm test` (47 tests as of v31.0.3).
 4. Open a PR; merge it.
 5. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
 
