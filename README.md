@@ -24,16 +24,16 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v12 → v35
+## Contract history — v12 → v36
 
 > **The number in this heading is a CONTRACT version, not this package's version.** The npm badge at the top
 > tracks the proxy's own code; this section tracks the server's wire contract. They move independently **by
 > design**: a contract move needs no release here, because a connected proxy relays the contract out of the
-> upstream handshake rather than declaring it. So a package on `31.x` listing contract history up to `35.x` is
+> upstream handshake rather than declaring it. So a package on `31.x` listing contract history up to `36.x` is
 > correct — not a version someone forgot to bump. Read the live pair from the startup stderr lines or
 > `GET /mcp/version`; see [Rediscovery & versioning](#rediscovery--versioning) for why.
 
-These are the server contract breaks between contract 12 and contract 35. Most of the span shipped while the package sat at `11.0.0`; contract 31 landed after this package reached `31.0.0`, and the two numbers matching is coincidence — since v31 the announced contract is relayed from the server, so a package version says nothing about a contract version. They are **contract** history, not package releases: from v31 the announced contract is relayed live and a contract move is no longer a release here. Grouped by what a client observes, with the contract version that introduced each.
+These are the server contract breaks between contract 12 and contract 36. Most of the span shipped while the package sat at `11.0.0`; contract 31 landed after this package reached `31.0.0`, and the two numbers matching is coincidence — since v31 the announced contract is relayed from the server, so a package version says nothing about a contract version. They are **contract** history, not package releases: from v31 the announced contract is relayed live and a contract move is no longer a release here. Grouped by what a client observes, with the contract version that introduced each.
 
 **The proxy itself is unchanged.** It embeds no schemas, pins no contract version, and forwards `{ request }` verbatim. Every break below lands on whatever *authors* the payload or *reads* the result, never on the proxy.
 
@@ -101,6 +101,16 @@ These are the server contract breaks between contract 12 and contract 35. Most o
 - **Radar's wall-clock condition changed shape** (12.0.0, `unify-deployment-hours-as-sets`).
 
 ### Moved or reshaped output — a field you read is somewhere else
+
+- **The signal scorecard stops serializing its entries three times over** (36.0.0, `mcp-signal-log-contents`). `get_signal_log` and `get_public_agent_signal_log_detail` drop `scorecard.triggeredSignals`, `scorecard.primarySignals` and `scorecard.supportingSignals`. Every one held the **same entry objects** `allEvaluatedSignals` already carried, so each is one filter over flags every entry still publishes:
+
+  | Removed | Read instead |
+  |---|---|
+  | `triggeredSignals` | `allEvaluatedSignals.filter(s => s.triggered)` |
+  | `primarySignals` | `allEvaluatedSignals.filter(s => s.triggered && s.isPrimary)` |
+  | `supportingSignals` | `allEvaluatedSignals.filter(s => s.triggered && !s.isPrimary)` |
+
+  **Keep the `triggered` half of those last two predicates.** Both collections were triggered-only by construction, so filtering on `isPrimary` alone surfaces signals that never fired — a silent widening, not an error. No field is removed from an entry: the key set on an `allEvaluatedSignals` member is unchanged, every evaluated signal is still returned whether or not it triggered, and `details` prose and `indicatorValues` are intact. There is no opt-in to get the three back and no default filter. Breaking only if you read one of the three names; on an 84-signal / 16-triggered log the duplication was 10,682 bytes, 28% of the scorecard, carrying no information.
 
 - **The fleet roll-up on `list_deployment_policies` drops `unconfigured` and gains `paused`** (35.0.0, `add-arena-deployment-pause`, `fix-arena-deployment-undeploy`). `unconfigured` counted a deployment holding zero slots — a state that can no longer exist, because a stored policy now carries at least one slot and the withdrawn state is the **absence** of a policy rather than an empty one. The bucket was constant `0` at the moment of removal, so no number you read was wrong; a client reading the key still breaks on it, which is why this is a break and not a cleanup. `paused` is the owner's own switch, counted separately from `retired` — an administrator disabling the arena — because conflating them tells an owner to wait for something that will not happen. Every policy lands in exactly one bucket, so the buckets sum to `arenas`: worth asserting if you reconcile these counts.
 
