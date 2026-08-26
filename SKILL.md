@@ -45,7 +45,7 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation c
      - **UPDATE** — supplies at least one changed axis and `expectedRevision`.
      - **RESTORE** — targets an owned inactive revision and may include repair axes.
    - Signal overrides are sparse: an omitted signal/axis stays unchanged; omitted `params` preserves canonical params byte-for-byte; present `params` replaces them only after strict validation.
-   - **`required` needs a weight.** A rule with `required: true` at `allocation: 0` is rejected (contract 32): the scorecard's triggered set excludes Off, so the flag could satisfy no gate and block no trade. Either raise the allocation or leave `required: false` — the server picks neither for you. The refusal names every offending signal in `details.inertRequiredSignalIds`, and it can fire on rules you did not touch: a strategy authored before contract 32 may hold the pair, and the merged post-state is what gets checked.
+   - **`required` needs a weight.** A rule with `required: true` at `allocation: 0` is rejected (contract 34): the scorecard's triggered set excludes Off, so the flag could satisfy no gate and block no trade. Either raise the allocation or leave `required: false` — the server picks neither for you. The refusal names every offending signal in `details.inertRequiredSignalIds`, and it can fire on rules you did not touch: a strategy authored before contract 34 may hold the pair, and the merged post-state is what gets checked.
 6. **Review before confirming.**
    - `approvedPlan` — complete post-state, proposed revision, dense scorecard, viability, canonical diff, expiry, and bound-agent impact.
    - `reviewContext` — exact column contracts, point-in-time report preview and coin scope, open-position observation, and provisional quota/name admission (advisory until the write). Open positions are awareness only and do not block an edit.
@@ -97,6 +97,6 @@ The `play-market-grid` prompt (discover via `prompts/list`) provides a guided en
 | Authentication failed (401/403) | Key revoked/rotated | Generate a new key and **restart** the proxy (keys read once at startup) |
 | `"account" parameter is required` | Multi-account call missing `account` | Add the outer `account`; keep `request` unchanged |
 | Plan token expired / revision drift | >5 min since compile, or upstream changed | Recompile, review the fresh plan, then apply |
-| Required at allocation Off | A rule flags `required` on a signal weighted `0` (contract 32) | Read `details.inertRequiredSignalIds`; per signal either raise `allocation` or set `required: false` |
+| Required at allocation Off | A rule flags `required` on a signal weighted `0` (contract 34) | Read `details.inertRequiredSignalIds`; per signal either raise `allocation` or set `required: false` |
 | Method not found | Calling a retired/unknown tool | Re-run `tools/list`; use the compile → review → apply flow |
 | `Wager scope required` | `mcp:wager` not enabled | Enable Server-Signed Wagers in Profile → MCP |
