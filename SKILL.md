@@ -42,7 +42,13 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation c
 5. **Compile one complete plan.**
    - `compile_strategy_plan({ request })`, where the nested request contains exactly one strict branch plus a bounded `coinSelection`, `intentSummary`, and `assumptions`:
      - **CREATE** — supplies the full new aggregate.
-     - **UPDATE** — supplies at least one changed axis and `expectedRevision`.
+     - **UPDATE** — supplies at least one changed axis and `expectedRevision`. **Send only the
+       axes that change.** The server preserves every axis you omit and every signal you do not
+       name, and it re-derives the complete post-state, scorecard and diff itself. Restating the
+       whole post-state changes nothing about the result and the account pays for those tokens on
+       this call and on every later step of the conversation. Three fields are *not* axes and are
+       required on every compile regardless — `intentSummary`, `assumptions` and `coinSelection`;
+       omitting one is a typed error, not a saving.
      - **RESTORE** — targets an owned inactive revision and may include repair axes.
    - Signal overrides are sparse: an omitted signal/axis stays unchanged; omitted `params` preserves canonical params byte-for-byte; present `params` replaces them only after strict validation.
    - **`required` needs a weight.** A rule with `required: true` at `allocation: 0` is rejected (contract 34): the scorecard's triggered set excludes Off, so the flag could satisfy no gate and block no trade. Either raise the allocation or leave `required: false` — the server picks neither for you. The refusal names every offending signal in `details.inertRequiredSignalIds`, and it can fire on rules you did not touch: a strategy authored before contract 34 may hold the pair, and the merged post-state is what gets checked.
