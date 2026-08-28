@@ -77,9 +77,9 @@ values instead of the evaluated coin's — the standard way to gate a whole book
 regime. `benchmarkTicker` is required-nullable on every custom section: send `null` for an
 ordinary section, never omit it.
 
-Budgets are served by discovery (validated today: 32 sections, 32 columns/section, 8 distinct
-timeframes, 16 conditions, 16 clauses, 16k estimated tokens). `preview_strategy_report` echoes
-your usage against each cap.
+Budgets are served by discovery (validated today: 32 sections, 32 custom columns, 8 distinct
+timeframes, 16 conditions, 16 clauses, 16k estimated report tokens). `preview_strategy_report`
+echoes your usage against each cap.
 
 ## Conditions — deterministic logic over your own report
 
