@@ -65,6 +65,13 @@ The compile request carries the authored axes, including normalized `sections` a
 npx skills add playbattlegrid/battlegrid-mcp
 ```
 
+Two skills ship from this repo (and inside the npm tarball, under `SKILL.md` + `skills/`):
+
+| Skill | Teaches |
+|---|---|
+| `battlegrid` (repo root) | Connection, scopes, game play, and the strict compile → review → apply strategy workflow |
+| `battlegrid-strategy-studio` (`skills/battlegrid-strategy-studio/`) | Full-power strategy authoring: custom report sections, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights, routing gates, ATR trade levels, position management — with validated desk-grade playbooks and recipes in `references/` |
+
 ## Rate limits
 
 | Limit | Value |

@@ -609,11 +609,25 @@ If a run fails, inspect it before taking action. An `ENEEDAUTH` failure means th
 
 ## Skills
 
-Install the BattleGrid skill for AI agent instructions:
+Install the BattleGrid skills for AI agent instructions:
 
 ```bash
 npx skills add playbattlegrid/battlegrid-mcp
 ```
+
+Two skills ship from this repo, and both are inside the npm tarball (`SKILL.md`, `skills/`):
+
+- **`battlegrid`** — connection, scopes, game play, and the strict compile → review → apply
+  strategy workflow.
+- **`battlegrid-strategy-studio`** — full-power strategy authoring, for agents that would
+  otherwise compile bare template strategies: custom report sections and system-generated header
+  grammar, benchmark sections, condition trees (verdict precedence, `required` enforcement
+  gates, `N_OF`/`NOT` groups, condition references), tiered signal weights and the
+  weighted-aggregate gate math, ATR trade levels, and post-entry position management. Its
+  `references/` carry five validated desk-grade playbooks (volatility-compression breakout,
+  crowded-positioning fade, benchmark-gated relative-strength rotation, HTF trend pullback,
+  perp/spot flow divergence at structure) plus copy-adaptable recipes. Shapes are binding;
+  vocabulary stays live-discovered.
 
 ## License
 
