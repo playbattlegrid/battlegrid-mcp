@@ -178,6 +178,11 @@ marker's resolution status — fix `unknown`/`ambiguous` markers before compilin
   gate, HTF trend pullback, perp/spot flow divergence at structure.
 - `references/recipes.md` — copy-adaptable column recipes, condition patterns, weight matrices,
   and trade-level/position-management presets per trading persona.
+- `references/tradingview-ports.md` — the most popular TradingView community scripts (Squeeze
+  Momentum [LazyBear], Supertrend/UT Bot, Chandelier Exit, MACD + 200 MA, golden cross, RSI-2,
+  VWAP reversion, Donchian/Turtle, ICT FVG/order blocks) translated process-for-process onto
+  the studio's vocabulary, with an expressibility triage and honest named substitutions for
+  what the grammar cannot carry.
 
 Validate a draft cheaply before compiling: `derive_strategy_rule_view` (report membership +
 rule defaults, no write) and `preview_strategy_report` (rendered tables, condition outcomes

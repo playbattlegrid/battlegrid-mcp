@@ -626,8 +626,11 @@ Two skills ship from this repo, and both are inside the npm tarball (`SKILL.md`,
   weighted-aggregate gate math, ATR trade levels, and post-entry position management. Its
   `references/` carry five validated desk-grade playbooks (volatility-compression breakout,
   crowded-positioning fade, benchmark-gated relative-strength rotation, HTF trend pullback,
-  perp/spot flow divergence at structure) plus copy-adaptable recipes. Shapes are binding;
-  vocabulary stays live-discovered.
+  perp/spot flow divergence at structure), copy-adaptable recipes, and process-for-process
+  ports of the most popular TradingView community scripts (Squeeze Momentum [LazyBear],
+  Supertrend/UT Bot, Chandelier Exit, MACD + 200 MA, golden cross, RSI-2, VWAP reversion,
+  Donchian/Turtle, ICT FVG/order blocks) with honest named substitutions where the grammar
+  lacks a primitive. Shapes are binding; vocabulary stays live-discovered.
 
 ## License
 
