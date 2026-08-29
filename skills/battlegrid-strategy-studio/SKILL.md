@@ -72,6 +72,17 @@ Non-anchor rungs add a rung affix: `_ltf` (lower) / `_htf` (regime), e.g. `MAali
 `get_strategy_column_contract` or a `preview_strategy_report`'s `conditionColumns` before
 writing conditions against them.
 
+**Timeframe references — two families.** *Relative* (`{rel: "anchor" | "lower" | "regime"}`)
+re-resolve when the strategy timeframe changes; `regime` is the anchor's ladder successor (a 4h
+anchor's regime rung is 1d today). *Pinned* (`{abs: "<tf>"}`) is fixed and ignores anchor
+retunes; its legal set is discovery's `rankedTimeframes` — a **superset** of the authorable
+anchor set (`timeframes`), so `{abs: "1d"}` is valid while `1d` is not an anchor. Pinned
+headers suffix the literal: `RSI14_1d`, `dist_SMA200_1d`, `MAalign_1d` (validated). `offset: 1`
+on a pinned `value` column reads the **last closed** bar of that timeframe — the deterministic
+daily-close read; offset does not change the header, so one section carries one offset per
+`metric × timeframe`. This is how higher-timeframe theses (daily-chart strategies included)
+are authored on an intraday anchor — see the daily pattern in `references/tradingview-ports.md`.
+
 **Benchmark sections** (`benchmarkTicker: "BTC"` on a custom section) read the *benchmark's*
 values instead of the evaluated coin's — the standard way to gate a whole book on market-leader
 regime. `benchmarkTicker` is required-nullable on every custom section: send `null` for an

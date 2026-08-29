@@ -13,6 +13,26 @@ null resolves a clause UNRESOLVED, not FALSE. Use them as *triggers* inside a ca
 them with a persistent *state* (the spread's sign, `MAalign`) for regime, exactly as the source
 scripts separate trigger from filter.
 
+## 0 · Daily-chart strategies — the pattern that carries every TV daily script
+
+Most TradingView strategies run on the daily chart. The studio's anchors top out intraday
+(discovery's `timeframes`), but **pinned timeframes** carry the daily thesis onto any anchor:
+`{abs: "1d"}` columns are valid wherever discovery's `rankedTimeframes` includes `1d`
+(validated), render with a `_1d` header suffix (`MAalign_1d`, `dist_SMA200_1d`, `RSI14_1d`),
+and ignore anchor retunes. Two dials make the port faithful:
+
+- **`offset: 1` on a pinned `value` column reads the last CLOSED daily bar** (`RSI14[t - 1]`,
+  validated) — the strategy's daily inputs then change exactly once per daily close, so a
+  required condition on them decides "on daily closes" even though the anchor cycle re-checks
+  intraday. Offset 0 reads the forming daily bar (marked provisional).
+- **A 4h anchor's regime rung is the daily** (ladder successor), so `{rel: "regime"}` columns
+  (`MAalign_htf`) and the `htf_*` signals already evaluate on 1d for 4h strategies.
+
+Recipe: anchor 4h → pinned-1d thesis section (trend, RSI, distance-to-MA at `offset: 1`) →
+`required: true` daily conditions gating every carrier → anchor-rung columns only for entry
+timing and risk. The result is arguably stronger than the TV original: decisions bind to daily
+closes while stops, trailing, and time decay keep managing the position intraday.
+
 ## Expressibility triage
 
 | TradingView script | Verdict | Port anchor |
