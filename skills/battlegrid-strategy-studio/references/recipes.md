@@ -26,13 +26,19 @@ recipes drop into `conditions[]`.
 | Daily trend state on any anchor | `{ "metric": "MA_ALIGN", "transformId": "value", "timeframe": { "abs": "1d" } }` | `MAalign_1d` |
 | Last **closed** daily read (deterministic) | `{ "metric": "RSI14", "transformId": "value", "timeframe": { "abs": "1d" }, "offset": 1 }` | `RSI14_1d` — formula `RSI14[t - 1]` |
 | Daily extension from the 200 | `{ "metric": "SMA200", "transformId": "distance", "timeframe": { "abs": "1d" } }` | `dist_SMA200_1d` |
+| Daily-structure breakout state | `{ "metric": "PRICE_ZONE", "transformId": "value", "timeframe": { "abs": "1d" } }` | `zone_1d` — `is "breakout high"` / `"breakdown low"` |
+| Room to the daily swing high | `{ "metric": "SWING_HIGH", "transformId": "distance", "timeframe": { "abs": "1d" } }` | `dist_swingHi_1d` (signed %; `gte 0` = above it) |
 
 Rung suffixes: `{ "rel": "lower" }` → `_ltf`, `{ "rel": "regime" }` → `_htf` (the anchor's
 ladder successor — 1d for a 4h anchor), pinned `{ "abs": "<tf>" }` → `_<tf>` (e.g. `_1d`).
 Pins bind to discovery's `rankedTimeframes` (a superset of the anchor set), are fixed across
 anchor retunes, and `offset` does not change the header — one offset per `metric × timeframe`
-per section. Rank ordering semantics: `hi` most positive, `lo` most negative, `far`/`near`
-by magnitude (offered only where sign matters).
+per section. `offset` is a `value`-transform parameter only: `distance` rejects it (typed
+error), so a level is always measured as it stands now — the literal *previous-day* high/low
+(PDH/PDL) is not addressable, and the daily swing levels (`zone_1d`, `dist_swingHi_1d`) are
+the named nearest level for daily-breakout intents. Conditions compare a column against a
+literal, never against another column. Rank ordering semantics: `hi` most positive, `lo` most
+negative, `far`/`near` by magnitude (offered only where sign matters).
 
 ## Condition patterns
 
