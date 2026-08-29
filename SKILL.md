@@ -64,6 +64,8 @@ Strategies are authored through one strict, whole-plan workflow. **Compilation c
 
 **Focused edits & lifecycle:** `update_strategy_signal_rule({ request })` is the thin one-rule edit (requires `required`; omit `params` to preserve them; `required: true` needs `allocation > 0`). `fork_strategy` requires `sourceRevision`; `archive_strategy` requires `expectedRevision` and `confirm:true`; `restore_strategy` is only the thin unchanged-content path — if it reports `REPAIR_REQUIRED`, use the RESTORE compile/review/apply flow instead.
 
+**Author the full surface, not a template.** A bare compile — a few platform sections, no conditions, untouched signal weights — uses a fraction of the studio: the strategy aggregate also owns typed conditions (verdicts + `required` enforcement gates), tiered signal allocations with per-signal params, routing gates (`minAggregateScore`, `minRequiredCount`, `minAtrPct`), the ATR stop band + risk-reward floor, post-entry position management (break-even / trailing / time-decay), and marker-bearing Market Read prose. The companion **`battlegrid-strategy-studio` skill** (shipped beside this one) carries the capability map plus validated desk-grade playbooks and recipes for all of it — activate it whenever a strategy is being created or upgraded.
+
 ## Strategy-bound agents
 
 Bind a strategy to an agent at creation time — there is no direct strategy-creation tool.
