@@ -24,6 +24,110 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v37 → v47
+
+Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
+oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
+and the documentation ships inside the tarball, so a note written but unpublished reaches nobody.
+Both halves are now closed by a rule keyed to the *served* contract rather than to a release of this
+package.
+
+### Rejected input — something you author is no longer accepted
+
+- **A custom report section requires `notes`** (43.0.0, `add-authored-section-notes`). Every tool
+  accepting a section array — `compile_strategy_plan`, `preview_strategy_report`,
+  `derive_strategy_rule_view` — refuses a section without it: `sections[N].notes: Required`, with no
+  byte of your body changing. Send explicit `null` for "no note". It is required rather than optional
+  because these payloads are a FULL REPLACE: an omitted key and an explicit `null` would be the same
+  request on the wire, so every rebuild site would silently clear a note its author wrote.
+  `benchmarkTicker` carries the same required-nullable discipline for the same reason.
+
+- **Every condition requires `clock` and `closes`** (44.0.0, `add-condition-clock`), and **`exit`**
+  arrives with them. A condition entry now carries eight keys, not five. `clock` is `"LIVE"` (the
+  previous behaviour — the forming bar) or `"CLOSE"` (settled bars); `closes` is how many consecutive
+  closed bars must read true, 1–5, and is always `1` under LIVE. No wire default, for the same
+  whole-set-replacement reason as `notes`: a defaulted key would let an unrelated re-save silently
+  un-clock an enforced money gate back to forming-bar evidence.
+
+  A `CLOSE` clock is accepted only where a closed frame can change the reading — the clause must
+  resolve from the coin's own candle series at offset 0. Frame-inert operands (perp-payload scalars,
+  published rolling changes, ranks, zone entities, regime labels, enrichment metrics, session
+  scalars) are refused with `CONDITION_CLOCK_OPERAND_ILLEGAL` naming the header and the remedy: split
+  that clause into its own LIVE condition and `conditionRef` it. `exit: true` is legal only under
+  `clock: "CLOSE"` — an exit fired on a forming bar is an intrabar exit.
+
+- **A strategy requires a seven-key `entry` object** (44.0.0 for four keys, 47.0.0 for three more —
+  `add-entry-on-close`, `add-level-trigger-execution`). Required on every CREATE, on
+  `compile_strategy_plan`, `apply_strategy_plan` and `update_intelligence_agent`. A client sending
+  44.0.0's four-key object is refused under 47 with `entry.levelSource: Required` without one byte of
+  it changing.
+
+  ```jsonc
+  "entry": {
+    "trigger": "AT_SIGNAL",          // | ON_CANDLE_CLOSE | STOP_THROUGH_LEVEL | ON_RETEST
+    "confirmTf": "4h",               // the strategy timeframe or the rung below it — nothing else
+    "closes": 1,                     // 1–5; must be 1 unless ON_CANDLE_CLOSE
+    "bandAtrMultiple": 1.0,          // > 0, and <= the platform's entry-deviation gate
+    "levelSource": "SWING_HIGH",     // | SWING_LOW | BOLLINGER_UPPER | BOLLINGER_LOWER
+    "levelOffsetAtrMultiple": 0,     // 0–2, UNSIGNED; must be 0 unless a level trigger
+    "validForBars": 4                // 1–24 of the strategy's own bars
+  }
+  ```
+
+  `AT_SIGNAL` with those values is byte-identical to pre-44 behaviour. The legality matrix runs one
+  way: all seven keys are always present, so a MEANINGFUL value under a trigger that ignores it is
+  refused rather than accepted-and-dropped — a dial never silently does nothing.
+
+- **A `strategyTimeframe` the platform does not ingest is refused** (39.0.0,
+  `move-renderer-to-rendered-section`) on `get_coin_market_context`, where it was previously
+  accepted. The number is the only signal a client gets.
+
+### Removed — no alias exists
+
+- **`get_coin_market_context` is REMOVED** (40.0.0, `retire-get-coin-market-context`). Calling it
+  returns an unknown-tool error. There is deliberately **no alias**: a silent redirect would hide a
+  payload shape change from a client that never asked for one. Use `get_market_context`.
+
+- **`get_macd_heatmap` leaves the published surface** (41.0.0). Same shape of break, same absence of
+  an alias.
+
+- **`isPrimary` is removed from every published `EvaluatedSignal`** (38.0.0) — `get_signal_log`,
+  `get_public_agent_signal_log_detail`, and every other tool returning a signal scorecard. Reading it
+  now finds the key absent rather than false.
+
+### Reshaped output — the same call returns a different shape
+
+- **`RenderedSection.notes` stops carrying provenance** (42.0.0, `separate-section-facts-from-read`),
+  on `preview_strategy_report`, `compile_strategy_plan` and `get_market_context`. A new REQUIRED
+  `provenance: string[]` carries it instead. A client reading provenance out of `notes` now reads an
+  author's prose, or nothing — which is a silent misread, not an error.
+
+- **`preview_strategy_report.renderedSections[]` gains `authoredNote`** (43.0.0), the author's read
+  for a custom row and `null` on a platform row. Additive, but published on a `.strict()` shape.
+
+- **`get_radar_activity` serves its evaluation curve on the FIRST PAGE ONLY** (37.0.0), and
+  `get_radar_activity_summary` is added. A client reading the curve off a later page finds it absent.
+
+### Widened enum — new members your own copy rejects
+
+- **The authorable metric vocabulary widens by 29 keys** (46.1.0, `add-indicator-catalog-coverage`):
+  Keltner (`KC_UPPER`/`KC_MID`/`KC_LOWER`), Supertrend (`ST_LINE`/`ST_DIR`), Hull (`HMA20`),
+  WaveTrend (`WT1`/`WT2`), QQE (`QQE_RSI_MA`/`QQE_STOP`), Parabolic SAR (`PSAR`), Ichimoku
+  (`ICHI_CONV`/`ICHI_BASE`/`ICHI_SPAN_A`/`ICHI_SPAN_B`/`ICHI_LAG`), Williams %R (`WILLR14`),
+  Stochastic RSI (`STOCH_RSI14`), session pivots (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), plus
+  four already-published fields that became addressable: `BB_UPPER`, `BB_LOWER`, `DI_PLUS`,
+  `DI_MINUS`.
+
+  Additive on the wire — every request you can send today is still accepted. It is called out here
+  because a client holding its own closed copy of the metric enum rejects the new members, and
+  because **an agent holding a cached belief that these are inexpressible will substitute for a
+  primitive the platform now serves**. That failure raises no error at all: the author is simply told
+  a strategy cannot be built.
+
+- **`EntryTrigger` gains `STOP_THROUGH_LEVEL` and `ON_RETEST`, and `EntryLevelSource` is published
+  for the first time** with four members (47.0.0). Additive on their own; the required keys above are
+  what make that bump a major.
+
 ## Contract history — v12 → v36
 
 > **The number in this heading is a CONTRACT version, not this package's version.** The npm badge at the top
