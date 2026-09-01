@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "47.0.0"
+    "contractVersion": "47.2.0"
   },
   "axes": {
     "create": [
@@ -206,9 +206,22 @@
     "PSAR",
     "QQE_RSI_MA",
     "QQE_STOP",
+    "REGIME_CONVICTION",
+    "REGIME_CRASH_LATCH",
+    "REGIME_CRASH_MARGIN",
+    "REGIME_DI_SPREAD",
     "REGIME_MOM",
+    "REGIME_MOM_BEAR_VOTES",
+    "REGIME_MOM_BULL_VOTES",
+    "REGIME_RUN_BARS",
+    "REGIME_STATE",
     "REGIME_TREND",
+    "REGIME_TREND_GATE",
+    "REGIME_TREND_MARGIN",
+    "REGIME_TREND_SOURCE",
     "REGIME_VOL",
+    "REGIME_VOL_ATR_RATIO",
+    "REGIME_VOL_BBW_RATIO",
     "ROC12",
     "RSI14",
     "RSI7",

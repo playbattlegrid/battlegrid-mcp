@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v47
+## Contract history — v37 → v47.2
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -127,6 +127,16 @@ package.
 - **`EntryTrigger` gains `STOP_THROUGH_LEVEL` and `ON_RETEST`, and `EntryLevelSource` is published
   for the first time** with four members (47.0.0). Additive on their own; the required keys above are
   what make that bump a major.
+
+- **Each signal-checklist item's `measured` object gains a required `triggered` boolean** (47.2.0,
+  `fix-entry-prompt-signal-evidence`) on `get_signal_log` and `get_public_agent_signal_log_detail`,
+  on the `numeric` and `categorical` arms. Additive and MINOR — a client ignoring it is unaffected —
+  but it is named here because a client parsing that output strictly rejects the new key, and because
+  leaving 47.2 unlisted would make a reader wonder what happened to it.
+
+  The `unavailable` arm deliberately does **not** carry `triggered`: "the claim could not be joined to
+  a stored result" and "the signal did not fire" are different states, and leaving the key off that
+  arm makes conflating them a type error rather than a convention.
 
 ## Contract history — v12 → v36
 
