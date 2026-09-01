@@ -54,9 +54,15 @@ before any billing or LLM call:
 
 ```json
 { "conditionKey": "NO_EVENT_RISK", "name": "No liquidation tape", "verdict": null, "required": true,
+  "exit": false, "clock": "LIVE", "closes": 1,
   "definition": { "kind": "group", "op": "NOT", "members": [
     { "kind": "clause", "column": { "sectionKey": null, "header": "oiRegime" }, "op": "is", "label": "long liquidation" } ] } }
 ```
+
+All eight keys are required on every condition — `exit`, `clock` and `closes` included. `clock`
+selects the evidence frame (`LIVE` reads the forming bar, `CLOSE` reads settled bars) and `closes`
+(1–5) is how many consecutive closed bars must hold; `closes` is always `1` under `LIVE`. `exit:
+true` closes open positions the verdict opposes and is legal only under `clock: "CLOSE"`.
 
 **Quorum (N_OF).** Robust confirmation instead of a brittle ALL:
 
@@ -76,6 +82,31 @@ values) and `conditionRef` it from every carrier — one place to flip the book 
 
 **Required-count trap.** `required: true` at `allocation: 0` on a *signal rule* is rejected
 (contract 34). A required *condition* is independent of signal weights — the two gates stack.
+
+## Entry discipline recipes
+
+The `entry` object is required on every CREATE, all seven keys, no defaults.
+
+| Intent | Object |
+|---|---|
+| Today's behaviour, unchanged | `{ "trigger": "AT_SIGNAL", "confirmTf": "<strategy tf>", "closes": 1, "bandAtrMultiple": 1.0, "levelSource": "SWING_HIGH", "levelOffsetAtrMultiple": 0, "validForBars": 4 }` |
+| Wait for the bar to close, skip a runaway | `{ "trigger": "ON_CANDLE_CLOSE", "confirmTf": "<strategy tf>", "closes": 1, "bandAtrMultiple": 1.0, … }` |
+| Two-close confirmation on the lower rung | `{ "trigger": "ON_CANDLE_CLOSE", "confirmTf": "<lower rung>", "closes": 2, "bandAtrMultiple": 0.75, … }` |
+| Break of the swing high, half an ATR through | `{ "trigger": "STOP_THROUGH_LEVEL", "levelSource": "SWING_HIGH", "levelOffsetAtrMultiple": 0.5, "validForBars": 8, "closes": 1, … }` |
+| Buy the retest of the broken level | `{ "trigger": "ON_RETEST", "levelSource": "SWING_HIGH", "levelOffsetAtrMultiple": 0, "validForBars": 12, "closes": 1, … }` |
+
+Bounds: `closes` 1–5 and `1` unless `ON_CANDLE_CLOSE`; `bandAtrMultiple` > 0 and ≤ the platform's
+`defaultMaxEntryDeviationAtrMultiple`; `levelOffsetAtrMultiple` 0–2 unsigned and `0` unless a level
+trigger; `validForBars` 1–24. `confirmTf` is the strategy timeframe or the rung below it, nothing
+else. A meaningful value under a trigger that ignores it is REFUSED, not ignored — that is
+deliberate, so a dial never silently does nothing.
+
+## Custom section shape
+
+`{ kind, sectionKey, title, timeframe, benchmarkTicker, notes, columns }`. `benchmarkTicker` and
+`notes` are **required-nullable** — send explicit `null` rather than omitting them, because the
+section is rebuilt whole on save and an omitted key clears the value. **Omit `sectionKey` on a
+CREATE**: the server derives it from the section.
 
 ## Weight matrices (rules)
 
@@ -106,6 +137,10 @@ send the full replacement object. Examples validated as canonical defaults: `vol
 | Intraday mean-revert (1h) | 1.0 – 2.5 | 1.5 | 0.8R | off | ON: 120/60 min, tighten 10 → max 40, stale 25 |
 | Swing breakout (4h) | 0.75 – 1.75 | 2 | 1R | 1.2R, giveback 35, buffer 0.3 | off |
 | Swing trend (4h) | 1.0 – 2.5 | 2 | 1R | 1.5R, giveback 45–55, buffer 0.3 | off |
+
+Post-entry invalidation: `decisionInvalidationExitEnabled: true` closes a filled position when a
+**closed** strategy-timeframe candle finishes beyond the decision's invalidation level, reduce-only.
+Bar-close only — the protective stop still owns intrabar moves.
 
 Bounds to respect (validated): break-even trigger 0.5–2R; trailing trigger 0–2R step 0.01
 (0 = trail from entry); giveback 25–55%; buffer 0.01–1%; grace ≥ interval; stop-band floor <

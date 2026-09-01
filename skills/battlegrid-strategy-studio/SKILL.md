@@ -94,8 +94,9 @@ echoes your usage against each cap.
 
 ## Conditions — deterministic logic over your own report
 
-Each condition: `{ conditionKey, name, definition, verdict, required }` — all five required;
-`verdict` and `required` have no defaults.
+Each condition: `{ conditionKey, name, definition, verdict, required, exit, clock, closes }` —
+all eight required, no defaults. The conditions axis saves by whole-set replacement, so an omitted
+key would silently un-clock a money gate on the next unrelated edit rather than be refused.
 
 - **Clauses** compare one column: numeric/rank headers take `lt|lte|gte|gt|between`;
   classification/direction/event headers take `is|in` with the column's exact vocabulary
@@ -106,8 +107,11 @@ Each condition: `{ conditionKey, name, definition, verdict, required }` — all 
   rejected, forward references are legal.
 - **Column addressing**: `{sectionKey, header}`. `sectionKey: null` is authoring sugar for a
   header unique across the whole report; a duplicated header (e.g. `ADX` in two sections) must
-  be section-qualified. To reference your own custom sections at CREATE time, mint the
-  `custom:<uuid>` sectionKey yourself and reuse it in the clauses.
+  be section-qualified. On a **CREATE you omit `sectionKey` entirely** — the server derives it
+  from the section itself, so the same submitted section yields the same key on every compile, and
+  minting a `custom:<uuid>` yourself is refused. On an UPDATE or RESTORE, send back the keys
+  `get_strategy` returned. To qualify a duplicated header, read the key from a preview's
+  `conditionColumns` or from the candidates a `CONDITION_COLUMN_AMBIGUOUS` refusal offers.
 - **Verdict**: `UP` | `DOWN` | `NEITHER` on deciding conditions, explicit `null` on building
   blocks. Declaration order is precedence: the first TRUE condition with a non-null verdict
   decides the coin's verdict. Put the more specific carrier first.
@@ -116,6 +120,48 @@ Each condition: `{ conditionKey, name, definition, verdict, required }` — all 
   use it for liquidity floors, regime vetoes, and "never fight the HTF" rules.
 - Evaluation is three-valued: `UNRESOLVED` (missing input) is never collapsed to FALSE, and
   outcomes read from a still-forming bar are marked provisional.
+- **The evidence clock.** `clock: "LIVE"` reads the forming bar; `clock: "CLOSE"` reads settled
+  bars, and `closes` (1–5) is how many consecutive closed bars must read TRUE — always `1` under
+  LIVE, which has exactly one frame. A CLOSE clock is legal **only** over a header resolved from
+  the coin's own candle series at offset 0; frame-inert operands (perp-payload scalars, published
+  rolling changes, ranks, zone entities, regime labels, enrichment metrics, session scalars) are
+  refused with `CONDITION_CLOCK_OPERAND_ILLEGAL`. The remedy is a split, not a re-clock: move that
+  clause into its own LIVE condition and `conditionRef` it.
+- **The exit role.** `exit: true` makes a settled TRUE reading close open positions its verdict
+  opposes — UP exits SHORTs, DOWN exits LONGs, a `NEITHER` or `null` verdict exits both. Legal only
+  under `clock: "CLOSE"`, because an exit fired on a forming bar is an intrabar exit. Orthogonal to
+  `required`: the two act on disjoint lifecycles, pre-entry versus open.
+
+## Entry — when, and where, an entry is taken
+
+`{ trigger, confirmTf, closes, bandAtrMultiple, levelSource, levelOffsetAtrMultiple, validForBars }`
+— all seven required on every CREATE, no defaults. Replaced WHOLE on save, so an omitted key
+reverts an author's discipline silently rather than being refused.
+
+| `trigger` | What it does |
+|---|---|
+| `AT_SIGNAL` | Fire on the qualification flip, at whatever bar is on the tape. The platform's flat wall-clock entry window applies. |
+| `ON_CANDLE_CLOSE` | The flip ARMS the pair; entry is taken only after a `confirmTf` close that still reads the conditions true and has not displaced beyond the band. |
+| `STOP_THROUGH_LEVEL` | A TRIGGER order rests at the level ± offset; the exchange book is the watcher. |
+| `ON_RETEST` | A LIMIT order rests at the broken level. Not filling is a correct outcome, not a failure. |
+
+- `confirmTf` — exactly two values are legal: the strategy's own timeframe and the rung below it
+  (one only, at the ladder floor). Not the authorable main-candle set.
+- `closes` — 1–5 consecutive confirming closes. Must be `1` under any trigger but `ON_CANDLE_CLOSE`.
+- `bandAtrMultiple` — the veto width. The entry is VOIDED when the confirming close moved at or
+  beyond that many ATR against the armed verdict. Strictly `> 0` (zero voids on any adverse move,
+  which is a filter, not "off"), and at or below the platform's own entry-deviation gate — read it
+  from `get_trading_config_catalog`.
+- `levelSource` — `SWING_HIGH` | `SWING_LOW` | `BOLLINGER_UPPER` | `BOLLINGER_LOWER`, resolved once
+  at decision time.
+- `levelOffsetAtrMultiple` — 0–2, UNSIGNED. Direction is implied by the trigger and the verdict, so
+  a signed value would invert the trigger's meaning. Must be `0` under a non-level trigger.
+- `validForBars` — 1–24 of the strategy's OWN bars, not minutes: a 1h setup waiting for a retest has
+  not failed after fifteen minutes.
+
+The legality matrix runs **one way**: all seven keys are always present, so the question is never
+"is it set" but "is it set to something that MEANS anything under this trigger". Leave a dial at its
+inert value rather than setting one the platform will ignore.
 
 ## Signal weights — the scorecard is a weighted average, budget it
 

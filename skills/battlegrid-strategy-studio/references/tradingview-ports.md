@@ -37,8 +37,8 @@ closes while stops, trailing, and time decay keep managing the position intraday
 
 | TradingView script | Verdict | Port anchor |
 |---|---|---|
-| Squeeze Momentum [LazyBear] / TTM Squeeze | Process port (Keltner not in catalog — substitute named) | `bbWidthPct` + rank, `bollinger_squeeze`, momentum trajectory |
-| Supertrend / UT Bot Alerts | Split port: entry substitute + **native stop engine** | `EMA5_13`, `MAalign`, position-management trailing |
+| Squeeze Momentum [LazyBear] / TTM Squeeze | **Direct port** — Keltner is native | `BB_UPPER spread KC_UPPER`, `BB_LOWER spread KC_LOWER`, `bollinger_squeeze` |
+| Supertrend / UT Bot Alerts | **Direct port** for the state; flip still substituted | `ST_LINE`, `ST_DIR`, `EMA5_13` for the flip, position-management trailing |
 | Chandelier Exit | Direct port of the *mechanism* | trailing from entry (`trailingTriggerR: 0`) |
 | MACD + 200 MA filter | Direct process port | `MACD_cross`, `dist_SMA200`, `macd_bull_cross` |
 | Golden / Death Cross | Direct process port | `SMA50_SMA200_spread` + `_trend` |
@@ -46,7 +46,7 @@ closes while stops, trailing, and time decay keep managing the position intraday
 | VWAP reversion | Direct process port | `dist_VWAP`, `dist_VWAP_rank_far` |
 | Donchian / Turtle breakout | Process port (N-bar channel → swing structure) | `zone`, `dist_swingHi`, `sr_resistance_break` |
 | ICT/SMC: FVG + Order Blocks | Direct process port of the zone logic | `STRUCT_ZONES` columns + `structure_*` signals |
-| WaveTrend, QQE, Hull Suite, Ichimoku, Parabolic SAR, Keltner | **Not expressible** — say so; nearest neighbors below | — |
+| WaveTrend, QQE, Hull Suite, Ichimoku, Parabolic SAR, Keltner | **All native since contract 46.1** — port directly | `WT1`/`WT2`, `QQE_RSI_MA`/`QQE_STOP`, `HMA20`, `ICHI_*`, `PSAR`, `KC_*` |
 
 ---
 
@@ -55,7 +55,10 @@ closes while stops, trailing, and time decay keep managing the position intraday
 **Source process.** Squeeze ON while Bollinger Bands sit inside Keltner Channels (volatility
 coiled); wait; when the squeeze releases, enter in the direction of the momentum histogram.
 
-**Port.** Keltner Channels are not in the catalog, so squeeze detection substitutes
+**Port.** Keltner Channels are native (`KC_UPPER`/`KC_MID`/`KC_LOWER`), so the squeeze is the
+source's own definition: `BB_UPPER spread KC_UPPER` negative AND `BB_LOWER spread KC_LOWER`
+positive is bands-inside-Keltner. The board-relative proxy below remains serviceable but is no
+longer the only option — it substitutes
 *cross-sectional and absolute* Bollinger compression — a stricter, universe-aware read:
 `bbWidthPct_rank_lo lte 10` AND `ADX lt 20` as the `SQUEEZE_ON` building block. Momentum
 direction comes from the MACD histogram trajectory (`MACD_now gt 0` with `MACD_trend rising`
@@ -75,7 +78,10 @@ Pine script simulates with a plotted line, position management executes: enable 
 `trailingTriggerR: 0` (trail from entry — the Supertrend/UT Bot behavior), `giveback` as the
 ATR-offset analog (30–40 tight like factor-2 Supertrend, 45–55 loose like factor-3), plus the
 stop band (`minStopLossAtrMultiple`/`max…`) bounding the initial distance. The *flip entry*
-has no direct equivalent (no supertrend metric) — the named substitute is a trend-state change:
+is native: `ST_DIR` carries the direction and `ST_LINE` the plotted stop. **`ST_DIR` is a
+persisting state, not a flip event** — it reads the same on every bar of a trend, so the FLIP
+itself still needs an event column beside it. The named substitute for the flip is a trend-state
+change:
 `MAalign is "bullish"` (state) with the `EMA5_13 is "Bullish"` cross event as the trigger, and
 `ma_ema_bull_cross` / `ma_ema_aligned_bull` Critical/Important-required in `rules`. Say the
 substitution out loud when presenting the strategy.
@@ -139,7 +145,8 @@ the book out of single-name traps. Rules: `ma_sma200_above` 3 required, `ma_ema_
 **Source process.** In an uptrend (close > 200 SMA), buy panic dips (RSI(2) < 10); exit fast
 (cross of the 5-period average / a few bars).
 
-**Port — named substitute.** The catalog carries no RSI(2); `RSI7` is the fastest RSI series
+**Port — named substitute.** The catalog carries `RSI14` and `RSI7` only, so there is no `RSI2`;
+`RSI7` is the fastest RSI series
 and `lte 10` on it is a rarer, deeper panic — state that trade-off rather than hiding it.
 `DIP_BUY` verdict UP = `dist_SMA200 gt 0` (ref a required `ABOVE_200`) AND `RSI7 lte 10`.
 Rules: `rsi_oversold` 3 required `{"threshold": 25}` (RSI14 gate tuned toward the fast-dip
@@ -193,22 +200,36 @@ quorum (`N_OF(2)`: `buyPres gte 0.55`, `RVOL gte 1.2`, `closeChg gt 0`). Rules:
 `structure_fvg_approach` / `structure_ob_approach` 3/2 required (their `proximityPct` params
 are the "in the zone" dial), `structure_zone_confluence` 2, `sr_at_support` 2. Stops: tight
 band (0.5–1.5 ATR) — the zone's far edge is the invalidation, and the studio places stops by
-ATR/structure natively. **Not expressible, say so:** liquidity sweeps, displacement legs,
+ATR/structure natively. **A grammar limit, not a missing metric** — a clause compares one column
+against a literal, so an ordered sequence of events has no expressible form at all: liquidity
+sweeps, displacement legs,
 killzone clocks, and Turtle-Soup false-break sequencing (ordering between events is outside
 the grammar) — offer this zone-reaction port as the nearest expressible neighbor, labelled.
 
-## Not expressible — and the honest nearest neighbor
+## Now native — do not substitute for these
 
-| Script | Missing primitive | Nearest expressible neighbor |
+WaveTrend (`WT1`/`WT2`), QQE (`QQE_RSI_MA`/`QQE_STOP`), Hull (`HMA20`), Ichimoku
+(`ICHI_CONV`/`ICHI_BASE`/`ICHI_SPAN_A`/`ICHI_SPAN_B`/`ICHI_LAG`), Parabolic SAR (`PSAR`), Keltner
+(`KC_UPPER`/`KC_MID`/`KC_LOWER`), daily pivots (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`),
+Williams %R (`WILLR14`), Stochastic RSI (`STOCH_RSI14`), Bollinger boundaries
+(`BB_UPPER`/`BB_LOWER`), ADX components (`DI_PLUS`/`DI_MINUS`). All arrived with contract 46.1 —
+every one of them was listed as inexpressible in this file before it.
+
+## Not expressible — the catalog keys this needs
+
+The one section where a claim that the catalog LACKS something may live, and every row names the key
+it denies so the claim stays checkable. A claim about the grammar's SHAPE (a clause compares one
+column against a literal; `distance` rejects an `offset`) is permanent and belongs in prose above.
+A claim that a metric is absent belongs here, or nowhere.
+
+| Script / primitive | Key the catalog would need | Nearest expressible neighbour |
 |---|---|---|
-| WaveTrend [LazyBear] | WT oscillator | `STOCH_K`/`STOCH_D` zones + crosses (`stoch_*` signals) |
-| QQE / QQE MOD | smoothed-RSI ATR bands | `RSI7` trajectory + `rsi_*` signals with tuned thresholds |
-| Hull Suite | Hull MA | `EMA5/13/20` ribbon (`MAalign`, EMA spread trend) |
-| Ichimoku | cloud spans | `MAalign` + `SMA50_SMA200_spread` + `zones_htf_*` levels |
-| Parabolic SAR | SAR dots | trailing stop from entry (`trailingTriggerR: 0`) |
-| Keltner Channels | ATR envelope | `bbWidthPct` compression + `atrPct` band logic |
-| Pivot Points (daily) | session pivots | `VWAP` + `swingHi`/`swingLo` distances |
-| Previous-day / previous-week high-low (PDH/PDL) | offset-able levels (`distance` takes no `offset`; clauses are column-vs-literal) | daily swing structure: `zone_1d is "breakout high"`, `dist_swingHi_1d` / `dist_swingLo_1d` |
+| RSI-2 (Connors) | `RSI2` | `RSI7 lte 10` as a named fast-dip substitute |
+
+**PDH/PDL** stays inexpressible for a different reason, and the distinction matters: `distance`
+rejects an `offset` and a clause never compares two columns, so the *grammar* has no form for it.
+No metric would fix that. Use the daily swing structure (`zone_1d`, `dist_swingHi_1d`) and name the
+substitution.
 
 Never compile a "port" of these under the source's name without the substitution note — a
 player who asked for WaveTrend and silently got Stochastic has no way to learn otherwise.
