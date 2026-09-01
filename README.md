@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v47.2
+## Contract history — v37 → v48
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -33,6 +33,15 @@ Both halves are now closed by a rule keyed to the *served* contract rather than 
 package.
 
 ### Rejected input — something you author is no longer accepted
+
+- **A custom report section no longer accepts `timeframe`** (48.0.0,
+  `remove-section-anchor-override`). The per-section anchor override is gone. Every tool accepting a
+  section array — `compile_strategy_plan`, `preview_strategy_report`, `derive_strategy_rule_view`,
+  and `apply_strategy_plan` — refuses a section carrying it: `sections[N]: Unrecognized key(s)`,
+  with no other byte of your body changing. Drop the key. A section's columns resolve against the
+  **strategy** timeframe, and a column reaches any other timeframe by pinning it on the column
+  (`timeframe: { abs: '4h' }`) — which it could always do. Relative column references
+  (`anchor`/`lower`/`regime`) are untouched, and are the point: they track the strategy.
 
 - **A custom report section requires `notes`** (43.0.0, `add-authored-section-notes`). Every tool
   accepting a section array — `compile_strategy_plan`, `preview_strategy_report`,
@@ -96,6 +105,20 @@ package.
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **The normalized report section loses `timeframe`** (48.0.0, `remove-section-anchor-override`), on
+  every tool that publishes a strategy: `get_strategy`, `fork_strategy`, `archive_strategy`,
+  `restore_strategy`, `update_strategy_signal_rule`, `apply_strategy_plan`, and
+  `compile_strategy_plan`'s post-state. A strict parser rejects the shorter object; a lenient one
+  reads a section whose anchor is the strategy timeframe, which it now always is.
+
+- **`get_strategy_column_contract` renames its anchor, both ways** (48.0.0). The request field
+  `sectionTimeframe` becomes `anchorTimeframe` — same meaning, and still optional. On the response,
+  `timeframe.requiresSectionTimeframe` becomes `requiresAnchorTimeframe`, and
+  `timeframe.sectionTimeframeOverrideAllowed` is **removed**: it published whether a column could go
+  in an anchor-overridden section, and no section can be overridden. One call also stops being
+  refused — a timeframe-inert metric supplied with an anchor now compiles.
+  `REPORT_COLUMN_SECTION_TIMEFRAME_UNSUPPORTED` leaves the `authoringCode` vocabulary.
 
 - **`RenderedSection.notes` stops carrying provenance** (42.0.0, `separate-section-facts-from-read`),
   on `preview_strategy_report`, `compile_strategy_plan` and `get_market_context`. A new REQUIRED
