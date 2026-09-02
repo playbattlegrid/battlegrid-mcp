@@ -88,6 +88,13 @@ values instead of the evaluated coin's — the standard way to gate a whole book
 regime. `benchmarkTicker` is required-nullable on every custom section: send `null` for an
 ordinary section, never omit it.
 
+A bound section takes **indicator** columns only. Crowd/session metrics (the `CROWD_*` family,
+`FLOW_ALIGN`, `SMART_RETAIL`, `CAPTAIN_CONF`, `CONFIDENCE`, `SETTLED_AT`, `PERP_SPOT_*`) and any
+`rank` transform are refused there (contract 49), because both are defined relative to the cohort
+being evaluated and a benchmark sits outside it — a crowd reading is what this session's players
+did, a rank is a position among the coins under evaluation. Neither has a value for BTC-as-yardstick.
+Put those columns on an ordinary section and `conditionRef` across.
+
 Budgets are served by discovery (validated today: 32 sections, 32 custom columns, 8 distinct
 timeframes, 16 conditions, 16 clauses, 16k estimated report tokens). `preview_strategy_report`
 echoes your usage against each cap.

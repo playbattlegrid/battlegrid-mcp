@@ -51,6 +51,26 @@ package.
 
 ### Rejected input — something you author is no longer accepted
 
+- **A benchmark-bound section no longer accepts crowd metrics or rank transforms** (49.0.0,
+  `fix-benchmark-legality-save-path`). On a custom section carrying a non-null `benchmarkTicker`, a
+  column whose metric is enrichment-stage (the `CROWD_*` family, `FLOW_ALIGN`, `SMART_RETAIL`,
+  `CAPTAIN_CONF`, `CONFIDENCE`, `SETTLED_AT`, the `PERP_SPOT_*` trio) is refused with
+  `REPORT_COLUMN_BENCHMARK_METRIC_UNSUPPORTED`, and one carrying a `rank` transform in either the
+  direct or the chained position with `REPORT_COLUMN_BENCHMARK_TRANSFORM_UNSUPPORTED`. Every tool
+  accepting a section array is affected, and no other byte of your body changes.
+
+  **Fix it by moving the column, not by retrying.** Both readings are defined *relative to the
+  cohort being evaluated* — a crowd reading is what this session's players did, a rank is a position
+  among the coins under evaluation — and a benchmark is deliberately outside that cohort. Neither
+  has a value there, which is why such a column could never render. Put it on an ordinary section
+  (`benchmarkTicker: null`), or drop it.
+
+  **This is a fix, not a new rule.** The restriction shipped with benchmark sections and was already
+  enforced by the column builder, by report materialization, and by `get_strategy_column_contract` —
+  so an author who checked a column against discovery first has been seeing this refusal all along.
+  What changed is that the SAVE path now asks the same question. Previously it did not, so such a
+  section persisted and then failed at every evaluation instead of at authoring.
+
 - **A custom report section no longer accepts `timeframe`** (48.0.0,
   `remove-section-anchor-override`). The per-section anchor override is gone. Every tool accepting a
   section array — `compile_strategy_plan`, `preview_strategy_report`, `derive_strategy_rule_view`,

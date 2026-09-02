@@ -78,7 +78,9 @@ directional carriers; the first TRUE carrier **in declaration order** decides �
 most-specific first.
 
 **Benchmark gate.** Read regime off a `benchmarkTicker` section (all rows are the benchmark's
-values) and `conditionRef` it from every carrier — one place to flip the book risk-on/off.
+values) and `conditionRef` it from every carrier — one place to flip the book risk-on/off. Keep that
+section to indicators: crowd/session metrics and `rank` transforms are refused on a bound section
+(contract 49) — rank the coins on an ordinary section and `conditionRef` the two together.
 
 **Required-count trap.** `required: true` at `allocation: 0` on a *signal rule* is rejected
 (contract 34). A required *condition* is independent of signal weights — the two gates stack.
