@@ -705,7 +705,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 
 - **The announced contract is relayed, not declared.** The proxy reads the upstream server's identity from the handshake it just completed and re-announces it verbatim to the local client. A local client therefore always reads the contract it will actually reach, and the package version is free to mean only what it should: this proxy's own code. **There is no pairing rule to keep, and no publish-time deploy gate** — a released package makes no claim about the server, so there is no ordering between a release here and a deploy there. This replaces the `MAJOR.MINOR` pairing that held through v11; see [v12](#v12--the-announced-contract-is-read-from-the-server-not-declared-here).
 - **Fails closed, never falls back.** If a connected server announced no `serverInfo` — a protocol violation, since it is required in a successful `initialize` result — the proxy refuses to start rather than substituting its own version. There is no honest number to announce in that case, and announcing a dishonest one silently is the failure this design removes.
-- **Rediscover after a server cutover.** Package publication does not refresh a running proxy's cached startup snapshot. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
+- **Rediscover after a server cutover.** The proxy resolves its catalog on first use and then caches it for the life of the process; a resolution that *failed* is retried on the next request, but a server deploy is never noticed. Package publication does not refresh it either. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
 - **Restart after key rotation.** API keys are read once at process startup; rotate a key, then restart the proxy.
 
 | Version | Changes |
@@ -798,7 +798,7 @@ Also confirm npm's Trusted Publisher for `@battlegrid/mcp-server` is GitHub Acti
 
 Two things do still need doing, neither of them a release:
 
-- **Reconnect** to pick up the new contract — the announcement and the capability snapshot are both read once at startup (see [Rediscovery & versioning](#rediscovery--versioning)).
+- **Reconnect** to pick up the new contract — the announcement is read once from the handshake at startup, and the capability snapshot is resolved on first use and cached thereafter (see [Rediscovery & versioning](#rediscovery--versioning)).
 - **Document the break** where the contract is documented, in `battlegrid-app`. Contract breaking-change notes are no longer keyed to package versions in this README, because a contract move is no longer a release here.
 
 ### Verify publication
