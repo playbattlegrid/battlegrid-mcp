@@ -24,13 +24,30 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v48
+## Contract history — v37 → v48.1
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
 and the documentation ships inside the tarball, so a note written but unpublished reaches nobody.
 Both halves are now closed by a rule keyed to the *served* contract rather than to a release of this
 package.
+
+### Changed meaning, unchanged shape
+
+- **Three tools serve different values for identical input** (47.3.0, `derive-scan-fetch-from-report`).
+  The radar scan leg now derives its timeframe fetch from the strategy's **report** rather than the
+  on-duty agent's three perception rungs, so a required condition addressing an absolute timeframe
+  outside those rungs — never evaluated at scan before — now is. No field moves; the values do:
+
+  | Tool | What moves |
+  |---|---|
+  | `preview_radar_resolution` | `conditionReach[].reachReason` goes `AGENT_TIMEFRAME` → `null` |
+  | `get_radar_activity` | `scanReachReason` moves the same way, **on new rows only** — rows already written keep what they were recorded with |
+  | `get_agent_coin_qualification` | `reachReason` moves the same way; its sibling `verdict` moves `UNMEASURABLE` → a decided verdict |
+
+  **Read the last one carefully:** a client treating `UNMEASURABLE` as "this gate is switched off"
+  will now see that gate **BLOCK**. `AGENT_TIMEFRAME` keeps its member and narrows to the one cause
+  no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
 
@@ -90,6 +107,21 @@ package.
 - **A `strategyTimeframe` the platform does not ingest is refused** (39.0.0,
   `move-renderer-to-rendered-section`) on `get_coin_market_context`, where it was previously
   accepted. The number is the only signal a client gets.
+
+- **`eventType` gains `ENTRY_EXPIRED_UNCONFIRMED`** (48.1.0, `fix-entry-arming-lifecycle`) on
+  `get_radar_activity` and `get_radar_activity_summary` — an armed entry that reached its episode
+  lifetime without ever receiving a confirming close. A client holding its own closed copy of that
+  enum rejects the new member; one that switches exhaustively on it needs the branch.
+
+  `entryVoidCause` is deliberately **unchanged** and still carries exactly `BAND`, `CONDITIONS`,
+  `STRUCTURAL`. Each of those is a measurement taken *at* a close, so an episode that reached no
+  close gets its own event type rather than a fourth cause — `ENTRY_VOIDED` means "called off at the
+  close", a claim this outcome must not make.
+
+  The authoring boundary also gains a refusal with **no schema change**: a strategy declaring an
+  arming trigger whose `required` conditions read the `LIVE` clock is rejected on the existing
+  `VALIDATION_ERROR` code, naming the offending condition key. Same code, same shape, new reason —
+  so nothing in the published schema tells you it can now happen.
 
 ### Removed — no alias exists
 
