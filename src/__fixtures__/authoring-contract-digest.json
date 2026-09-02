@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "47.3.0"
+    "contractVersion": "48.1.0"
   },
   "axes": {
     "create": [
@@ -60,7 +60,6 @@
       "kind",
       "notes",
       "sectionKey",
-      "timeframe",
       "title"
     ],
     "rule": [

@@ -103,10 +103,14 @@ deliberate, so a dial never silently does nothing.
 
 ## Custom section shape
 
-`{ kind, sectionKey, title, timeframe, benchmarkTicker, notes, columns }`. `benchmarkTicker` and
+`{ kind, sectionKey, title, benchmarkTicker, notes, columns }`. `benchmarkTicker` and
 `notes` are **required-nullable** — send explicit `null` rather than omitting them, because the
 section is rebuilt whole on save and an omitted key clears the value. **Omit `sectionKey` on a
 CREATE**: the server derives it from the section.
+
+A section carries **no `timeframe`** (48.0.0). Its relative columns resolve against the strategy
+timeframe; a column reaches any other timeframe by pinning it — `timeframe: { abs: '4h' }` on the
+column, which it could always do.
 
 ## Weight matrices (rules)
 

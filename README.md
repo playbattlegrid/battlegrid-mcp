@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v47.3
+## Contract history — v37 → v48.1
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -34,23 +34,31 @@ package.
 
 ### Changed meaning, unchanged shape
 
-- **Three tools serve different values for identical input** (47.3.0,
-  `derive-scan-fetch-from-report`). The radar scan leg now derives its timeframe fetch from the
-  strategy's **report** rather than from the on-duty agent's three perception rungs, so a required
-  condition addressing an absolute timeframe outside those rungs — never evaluated at scan before —
-  now is. No field moves; the numbers behind them do:
+- **Three tools serve different values for identical input** (47.3.0, `derive-scan-fetch-from-report`).
+  The radar scan leg now derives its timeframe fetch from the strategy's **report** rather than the
+  on-duty agent's three perception rungs, so a required condition addressing an absolute timeframe
+  outside those rungs — never evaluated at scan before — now is. No field moves; the values do:
 
   | Tool | What moves |
   |---|---|
-  | `preview_radar_resolution` | `conditionReach[].reachReason` goes `AGENT_TIMEFRAME` → `null` for a condition the scan can now serve |
-  | `get_radar_activity` | `scanReachReason` moves the same way **on new rows only** — rows already written keep the value they were recorded with |
-  | `get_agent_coin_qualification` | `gates.requiredConditions.reachReason` moves the same way, and its sibling `verdict` moves `UNMEASURABLE` → a decided verdict |
+  | `preview_radar_resolution` | `conditionReach[].reachReason` goes `AGENT_TIMEFRAME` → `null` |
+  | `get_radar_activity` | `scanReachReason` moves the same way, **on new rows only** — rows already written keep what they were recorded with |
+  | `get_agent_coin_qualification` | `reachReason` moves the same way; its sibling `verdict` moves `UNMEASURABLE` → a decided verdict |
 
   **Read the last one carefully:** a client treating `UNMEASURABLE` as "this gate is switched off"
-  will now see that gate **BLOCK**. `AGENT_TIMEFRAME` keeps its member and narrows its meaning to
-  the one cause no fetch can discharge. Nothing in the payload tells you this moved.
+  will now see that gate **BLOCK**. `AGENT_TIMEFRAME` keeps its member and narrows to the one cause
+  no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
+
+- **A custom report section no longer accepts `timeframe`** (48.0.0,
+  `remove-section-anchor-override`). The per-section anchor override is gone. Every tool accepting a
+  section array — `compile_strategy_plan`, `preview_strategy_report`, `derive_strategy_rule_view`,
+  and `apply_strategy_plan` — refuses a section carrying it: `sections[N]: Unrecognized key(s)`,
+  with no other byte of your body changing. Drop the key. A section's columns resolve against the
+  **strategy** timeframe, and a column reaches any other timeframe by pinning it on the column
+  (`timeframe: { abs: '4h' }`) — which it could always do. Relative column references
+  (`anchor`/`lower`/`regime`) are untouched, and are the point: they track the strategy.
 
 - **A custom report section requires `notes`** (43.0.0, `add-authored-section-notes`). Every tool
   accepting a section array — `compile_strategy_plan`, `preview_strategy_report`,
@@ -100,6 +108,21 @@ package.
   `move-renderer-to-rendered-section`) on `get_coin_market_context`, where it was previously
   accepted. The number is the only signal a client gets.
 
+- **`eventType` gains `ENTRY_EXPIRED_UNCONFIRMED`** (48.1.0, `fix-entry-arming-lifecycle`) on
+  `get_radar_activity` and `get_radar_activity_summary` — an armed entry that reached its episode
+  lifetime without ever receiving a confirming close. A client holding its own closed copy of that
+  enum rejects the new member; one that switches exhaustively on it needs the branch.
+
+  `entryVoidCause` is deliberately **unchanged** and still carries exactly `BAND`, `CONDITIONS`,
+  `STRUCTURAL`. Each of those is a measurement taken *at* a close, so an episode that reached no
+  close gets its own event type rather than a fourth cause — `ENTRY_VOIDED` means "called off at the
+  close", a claim this outcome must not make.
+
+  The authoring boundary also gains a refusal with **no schema change**: a strategy declaring an
+  arming trigger whose `required` conditions read the `LIVE` clock is rejected on the existing
+  `VALIDATION_ERROR` code, naming the offending condition key. Same code, same shape, new reason —
+  so nothing in the published schema tells you it can now happen.
+
 ### Removed — no alias exists
 
 - **`get_coin_market_context` is REMOVED** (40.0.0, `retire-get-coin-market-context`). Calling it
@@ -114,6 +137,20 @@ package.
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **The normalized report section loses `timeframe`** (48.0.0, `remove-section-anchor-override`), on
+  every tool that publishes a strategy: `get_strategy`, `fork_strategy`, `archive_strategy`,
+  `restore_strategy`, `update_strategy_signal_rule`, `apply_strategy_plan`, and
+  `compile_strategy_plan`'s post-state. A strict parser rejects the shorter object; a lenient one
+  reads a section whose anchor is the strategy timeframe, which it now always is.
+
+- **`get_strategy_column_contract` renames its anchor, both ways** (48.0.0). The request field
+  `sectionTimeframe` becomes `anchorTimeframe` — same meaning, and still optional. On the response,
+  `timeframe.requiresSectionTimeframe` becomes `requiresAnchorTimeframe`, and
+  `timeframe.sectionTimeframeOverrideAllowed` is **removed**: it published whether a column could go
+  in an anchor-overridden section, and no section can be overridden. One call also stops being
+  refused — a timeframe-inert metric supplied with an anchor now compiles.
+  `REPORT_COLUMN_SECTION_TIMEFRAME_UNSUPPORTED` leaves the `authoringCode` vocabulary.
 
 - **`RenderedSection.notes` stops carrying provenance** (42.0.0, `separate-section-facts-from-read`),
   on `preview_strategy_report`, `compile_strategy_plan` and `get_market_context`. A new REQUIRED
