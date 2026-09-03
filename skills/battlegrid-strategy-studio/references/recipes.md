@@ -34,11 +34,14 @@ ladder successor — 1d for a 4h anchor), pinned `{ "abs": "<tf>" }` → `_<tf>`
 Pins bind to discovery's `rankedTimeframes` (a superset of the anchor set), are fixed across
 anchor retunes, and `offset` does not change the header — one offset per `metric × timeframe`
 per section. `offset` is a `value`-transform parameter only: `distance` rejects it (typed
-error), so a level is always measured as it stands now — the literal *previous-day* high/low
-(PDH/PDL) is not addressable, and the daily swing levels (`zone_1d`, `dist_swingHi_1d`) are
-the named nearest level for daily-breakout intents. Conditions compare a column against a
-literal, never against another column. Rank ordering semantics: `hi` most positive, `lo` most
-negative, `far`/`near` by magnitude (offered only where sign matters).
+error), so a level is always measured as it stands now. That is a statement about `offset`, not
+about prior-day levels: `PDH`/`PDL` are published structure metrics at the daily anchor and take
+`distance` and `crossDetect`, so the literal previous-session extreme is authored as
+`dist_PDH_1d` rather than reconstructed from an offset. The daily *swing* levels (`zone_1d`,
+`dist_swingHi_1d`) are the tracked pivot — a different level, not a substitute. Conditions
+compare a column against a literal, never against another column. Rank ordering semantics:
+`hi` most positive, `lo` most negative, `far`/`near` by magnitude (offered only where sign
+matters).
 
 ## Condition patterns
 
