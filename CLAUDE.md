@@ -97,7 +97,7 @@ distinction matters: the bump is for publishing **the documentation**, never for
 
 1. Change the code or docs.
 2. Move all four version values together; run the integrity snippet above.
-3. `npm run build && npm test` (47 tests as of v31.0.3).
+3. `npm run build && npm test` (85 tests as of v31.2.0).
 4. Open a PR; merge it.
 5. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
 
@@ -109,7 +109,8 @@ hand-publish with no tag is the exact silence this workflow was built to remove.
 
 ```
 src/index.ts           the entire proxy
-src/__tests__/         announced-version, identity, strategy-authoring-proxy, validate-env
+src/__tests__/         announced-version, identity, skill-contract, skill-package,
+                       startup-ordering, strategy-authoring-proxy, validate-env
 AGENTS.md              discovery file for external agents — how to CONNECT
 README.md              user docs + contract history; SHIPS in the tarball
 SKILL.md               the published agent skill
