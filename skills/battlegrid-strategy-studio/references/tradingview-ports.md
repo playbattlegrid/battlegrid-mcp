@@ -145,7 +145,7 @@ the book out of single-name traps. Rules: `ma_sma200_above` 3 required, `ma_ema_
 **Source process.** In an uptrend (close > 200 SMA), buy panic dips (RSI(2) < 10); exit fast
 (cross of the 5-period average / a few bars).
 
-**Port — direct.** `RSI2` is native as of contract 49.1, so this ports exactly and no substitution
+**Port — direct.** `RSI2` is native as of contract 49.2, so this ports exactly and no substitution
 note is owed. `DIP_BUY` verdict UP = `dist_SMA200 gt 0` (ref a required `ABOVE_200`) AND
 `RSI2 lte 10`. Keep the literal `lte 10` as the gate: `RSI2 × classifyZone` exists and reads on the
 same Connors 10/90 bands, but a zone label is a fixed reading while the literal is a threshold the
@@ -217,7 +217,7 @@ Williams %R (`WILLR14`), Stochastic RSI (`STOCH_RSI14`), Bollinger boundaries
 (`BB_UPPER`/`BB_LOWER`), ADX components (`DI_PLUS`/`DI_MINUS`). All arrived with contract 46.1 —
 every one of them was listed as inexpressible in this file before it.
 
-Contract 49.1 did it again with seven more: Connors RSI-2 (`RSI2`, and `RSI2 × classifyZone` on its
+Contract 49.2 did it again with seven more: Connors RSI-2 (`RSI2`, and `RSI2 × classifyZone` on its
 own 10/90 bands), the TTM squeeze state (`KC_SQUEEZE`), the 9/21/50 EMAs (`EMA9`/`EMA21`/`EMA50`)
 and the prior-day levels (`PDH`/`PDL`). Two of those were standing absence claims in this file:
 RSI-2 was called a named substitute, and the prior-day levels were said to need a grammar form no
