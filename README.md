@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v49.2
+## Contract history — v37 → v49.3
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -178,6 +178,23 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **An entry void now names the gate that refused it** (49.3.0,
+  `fix-arming-trigger-clock-authority`), on `get_radar_activity_summary`. In the cause rollup, the
+  `ENTRY_VOID` group's `gateCode` widens from always-`null` to `QualificationGateCode | null`: a
+  conditions-side void carries the gate that blocked — `AGGREGATE_BELOW_MIN`,
+  `REQUIRED_COUNT_BELOW_MIN`, `REQUIRED_CONDITION_FALSE` — while a band void stays `null`, because
+  that void happens on a reading that qualified and has no failing gate to name.
+
+  A client that renders the field through the same enum the response already uses on four other
+  cause arms needs no change. One that treated it as a literal `null` — a strict decoder pinning the
+  type, or a branch keyed to its absence — sees a value it did not expect. That is the whole
+  migration.
+
+  Why it moved: the group previously collapsed every conditions-side void under one label. The
+  first 26 in production carried that label while two different gates had produced them, and none of
+  them was a required condition being false. The rollup ships counts rather than rows, so the gate
+  could not be recovered client-side.
 
 - **The normalized report section loses `timeframe`** (48.0.0, `remove-section-anchor-override`), on
   every tool that publishes a strategy: `get_strategy`, `fork_strategy`, `archive_strategy`,
