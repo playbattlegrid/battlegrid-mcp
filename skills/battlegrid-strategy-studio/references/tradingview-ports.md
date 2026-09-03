@@ -182,10 +182,11 @@ in rules (its own params define the break). Turtle exits are the trend preset: s
 ATR, RR 2+, trail from 1R with giveback 50, no time decay. Mirror with `"breakdown low"` /
 `dist_swingLo` / `sr_support_break` for shorts. **Daily variant on any anchor:** pin the same
 structure at 1d — `zone_1d is "breakout high"`, `dist_swingHi_1d gte 0` (both validated) —
-which is the studio's daily-breakout condition. Note the substitution: the level is the
-tracked *daily swing* pivot, not the literal previous-day high — `distance` takes no `offset`
-and clauses never compare two columns, so PDH/PDL as exact levels are not addressable (see
-the not-expressible table).
+which is the studio's daily-breakout condition. That pins the tracked *daily swing* pivot. For
+the literal previous-session extreme instead, author `PDH`/`PDL` directly — both are native
+structure metrics at the daily anchor, and both take `distance` and `crossDetect`, so
+`dist_PDH_1d gte 0` or a `crossDetect` on `PDH` expresses the prior-day break exactly. Pick by
+which level the source actually means; neither is a substitution for the other.
 
 ## 9 · ICT / Smart Money Concepts: FVG + Order Blocks — 15m/1h
 

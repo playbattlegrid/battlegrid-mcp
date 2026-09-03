@@ -55,6 +55,12 @@ const ABSENCE_PHRASES = [
   'not in the catalog',
   'no direct equivalent',
   'catalog carries no',
+  // Added after it slipped through: contract 49.1's `PDH`/`PDL` retraction corrected the summary
+  // table, the RSI-2 section and the absence table, but section 8 still told authors "PDH/PDL as
+  // exact levels are not addressable" — a metric-absence claim wearing a synonym this list did not
+  // carry, written with unbackticked keys so the key check above could not see it either. Both
+  // detectors were blind to the same sentence, and it shipped to npm.
+  'not addressable',
 ] as const;
 
 /**
