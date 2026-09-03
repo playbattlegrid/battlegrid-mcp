@@ -50,6 +50,8 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   type Implementation,
+  type Prompt,
+  type Resource,
 } from '@modelcontextprotocol/sdk/types.js';
 
 /**
@@ -67,6 +69,15 @@ export const PACKAGE_VERSION = '31.1.5';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade/mcp';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
+
+// One rule, two expressions. Asserted here so the delay table genuinely bounds the attempt count,
+// which is what lets connectWithRetry index it without a fallback.
+if (RETRY_DELAYS_MS.length !== MAX_RETRIES) {
+  throw new Error(
+    `Retry budget disagrees with itself: MAX_RETRIES=${MAX_RETRIES} but RETRY_DELAYS_MS carries ` +
+    `${RETRY_DELAYS_MS.length} delays. Reconcile them at their declaration.`
+  );
+}
 
 // --- Types ---
 
@@ -185,7 +196,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function connectWithRetry(client: Client, transport: StreamableHTTPClientTransport, apiUrl: string): Promise<void> {
+async function connectWithRetry(client: Client, transport: StreamableHTTPClientTransport, apiUrl: string, apiKey: string): Promise<void> {
+  const keyPrefix = apiKey.substring(0, 12);
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       await client.connect(transport);
@@ -199,7 +211,7 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
 
       if (isAuthError(error)) {
         throw new Error(
-          `Authentication failed (HTTP ${errorCode ?? 'unknown'}): ${errorMessage}\n` +
+          `Authentication failed for key ${keyPrefix} (HTTP ${errorCode ?? 'unknown'}): ${errorMessage}\n` +
           'This means the server rejected your API key. Possible causes:\n' +
           '  1. Key was revoked (a new key invalidates all previous keys)\n' +
           '  2. Key was corrupted during copy-paste\n' +
@@ -210,14 +222,15 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
 
       if (attempt === MAX_RETRIES) {
         throw new Error(
-          `Cannot connect to BattleGrid server at ${apiUrl} after ${MAX_RETRIES + 1} attempts.\n` +
+          `Cannot connect to BattleGrid server at ${apiUrl} with key ${keyPrefix} after ` +
+          `${MAX_RETRIES + 1} attempts.\n` +
           `Last error: ${errorMessage}\n` +
           `Check your internet connection or verify the server is running.\n` +
           `Health check: ${apiUrl.replace('/mcp', '')}/health`
         );
       }
 
-      const delay = RETRY_DELAYS_MS[attempt] ?? 8000;
+      const delay = RETRY_DELAYS_MS[attempt];
       process.stderr.write(
         `Connection attempt ${attempt + 1} failed (${errorMessage}), retrying in ${delay / 1000}s...\n`
       );
@@ -303,98 +316,242 @@ export function announcedIdentityOf(serverInfo: Implementation | undefined): Imp
 // --- Proxy server factory (exported for protocol testing) ---
 
 export interface CreateProxyServerOptions {
-  /** Discovered account identities (index 0 is the primary key used for capability discovery). */
-  identities: AccountIdentity[];
-  /** Connect (or reuse) a remote MCP client for a given API key. Called once per key, lazily. */
+  /**
+   * The operator's FIRST configured key — used for the announcing handshake, the prompt and
+   * resource surfaces, and single-account routing. Deliberately not derived from whichever
+   * identity lookups happened to succeed: that made a mistyped first key silently promote the
+   * second, relocating every unqualified call to a different account.
+   */
+  primaryKey: string;
+  /**
+   * Whether a tool call must name an account. Derived from the CONFIGURED key count, so the guard
+   * is armed before any network call. Deriving it from resolved identities would let a transient
+   * identity failure convert a multi-account proxy into a single-account one and route an
+   * unqualified money-moving call to the primary.
+   */
+  isMultiAccount: boolean;
+  /** Connect (or reuse) a remote MCP client for a given API key. */
   connect: (apiKey: string) => Promise<Client>;
+  /** Resolve account identities. Awaited lazily, on the first request that needs the catalog. */
+  resolveIdentities: () => Promise<AccountIdentity[]>;
+}
+
+/**
+ * Everything the catalog resolution produces, resolved together as one shared value.
+ *
+ * The account selector published on every tool schema and the membership check applied to an
+ * incoming call are one rule at two altitudes, so `accountNames` and `keyByAccount` are members
+ * here rather than re-derived at each handler.
+ */
+export interface ProxyCatalog {
+  identities: AccountIdentity[];
+  accountNames: string[];
+  keyByAccount: Map<string, string>;
+  tools: ToolDefinition[];
+  prompts: Prompt[];
+  resources: Resource[];
+}
+
+/**
+ * What a completed warm-up reports back to `main()`, which owns every startup diagnostic.
+ *
+ * Carries `accountNames` as well as the counts because the account-roster line is the only surface
+ * naming which accounts actually resolved — the signal a dangling primary or a silent single-account
+ * collapse would otherwise hide.
+ */
+export interface WarmSummary {
+  accountNames: string[];
+  toolCount: number;
+  promptCount: number;
+  resourceCount: number;
 }
 
 export interface ProxyServer {
   server: Server;
-  toolCount: number;
-  promptCount: number;
-  resourceCount: number;
-  isMultiAccount: boolean;
-  accountNames: string[];
   /** The upstream identity relayed downstream — the contract a local client will actually reach. */
   announced: Implementation;
+  /**
+   * Resolve the catalog, returning its counts. Returns the SAME memoized resolution a request
+   * triggers — it starts nothing of its own, so warm-up and a first request never resolve twice.
+   */
+  warm: () => Promise<WarmSummary>;
 }
 
 /**
- * Build the local stdio-facing MCP server that proxies to the remote BattleGrid
- * server. Discovers remote capabilities through the primary client, augments
- * tools with the `account` enum when multiple accounts resolved, and wires
- * strip-only-account routing to a lazily-populated per-key client pool.
+ * Build the local stdio-facing MCP server that proxies to the remote BattleGrid server.
+ *
+ * ORDERING IS THE POINT. Exactly one upstream operation happens here: the handshake that yields the
+ * identity this proxy relays. `serverInfo` is captured by the SDK at `Server` construction and read
+ * when `initialize` is answered, with no setter, so relaying the upstream's identity verbatim makes
+ * one round trip inherent. Everything else — identity discovery and the three catalog calls —
+ * resolves lazily, after the caller has bound the transport, because none of it is needed to answer
+ * `initialize` and every unit of work placed ahead of the bind is paid by every client on every
+ * start.
  */
 export async function createProxyServer(options: CreateProxyServerOptions): Promise<ProxyServer> {
-  const { identities, connect } = options;
+  const { primaryKey, isMultiAccount, connect, resolveIdentities } = options;
 
-  const isMultiAccount = identities.length > 1;
-  const accountNames = identities.map(id => id.username);
-
-  // Build lookup: username → apiKey
-  const keyByAccount = new Map<string, string>();
-  for (const id of identities) {
-    keyByAccount.set(id.username, id.apiKey);
-  }
-
-  // Primary client (first key) is used for capability discovery and non-tool proxying.
-  const primaryKey = identities[0].apiKey;
+  // The one retained pre-bind round trip.
   const primaryClient = await connect(primaryKey);
 
   // What this proxy announces downstream is what the upstream just announced to it — read here,
   // from the completed handshake, so it can never be a stale constant.
   const announced = announcedIdentityOf(primaryClient.getServerVersion());
 
-  // Discover remote capabilities
-  const [toolsResult, promptsResult, resourcesResult] = await Promise.all([
-    primaryClient.listTools(),
-    primaryClient.listPrompts(),
-    primaryClient.listResources(),
-  ]);
-
-  // Augment tools with account parameter if multi-account
-  const exposedTools = isMultiAccount
-    ? injectAccountParam(toolsResult.tools as ToolDefinition[], accountNames)
-    : toolsResult.tools;
-
-  // Create local stdio server, announcing the upstream's identity rather than one of our own.
+  // `listChanged` is declared HERE and can never be added later: registerCapabilities throws once a
+  // transport is connected, and a client only registers list-changed handlers for capabilities the
+  // server advertised. Without it, a client whose first tools/list failed holds an empty catalog for
+  // the life of the process — the symptom this lazy catalog exists to remove, made silent.
   const localServer = new Server(
     announced,
     {
       capabilities: {
-        tools: {},
-        prompts: {},
-        resources: {},
+        tools: { listChanged: true },
+        prompts: { listChanged: true },
+        resources: { listChanged: true },
       },
     }
   );
 
-  // Keep a pool of remote clients keyed by API key for routing
-  const clientPool = new Map<string, Client>();
-  clientPool.set(primaryKey, primaryClient);
+  // Pool of PROMISES, not clients: concurrent callers for one key share one in-flight connect
+  // rather than each building a transport that is never closed. A rejection is removed so the next
+  // caller retries.
+  const clientPool = new Map<string, Promise<Client>>();
+  clientPool.set(primaryKey, Promise.resolve(primaryClient));
 
-  async function getClientForKey(apiKey: string): Promise<Client> {
+  function getClientForKey(apiKey: string): Promise<Client> {
     const existing = clientPool.get(apiKey);
     if (existing) return existing;
 
-    const client = await connect(apiKey);
-    clientPool.set(apiKey, client);
-    return client;
+    const pending = connect(apiKey);
+    clientPool.set(apiKey, pending);
+    pending.catch(() => {
+      if (clientPool.get(apiKey) === pending) clientPool.delete(apiKey);
+    });
+    return pending;
+  }
+
+  let catalogMemo: Promise<ProxyCatalog> | null = null;
+  let servedCatalogError = false;
+
+  async function announceListsChanged(): Promise<void> {
+    try {
+      await Promise.all([
+        localServer.sendToolListChanged(),
+        localServer.sendPromptListChanged(),
+        localServer.sendResourceListChanged(),
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`Warning: could not notify client that the catalog recovered: ${message}\n`);
+    }
+  }
+
+  async function buildCatalog(): Promise<ProxyCatalog> {
+    const identities = await resolveIdentities();
+
+    // The declared primary must be in the resolved roster. Identity discovery is a single unretried
+    // request while the handshake retries three times, so a primary can complete the handshake and
+    // still be missing here — which would serve prompts and resources as an account that appears in
+    // no selector and no log line.
+    if (!identities.some((identity) => identity.apiKey === primaryKey)) {
+      throw new Error(
+        `Primary key (${primaryKey.substring(0, 12)}) is absent from the resolved account roster, ` +
+        'so every call routed to it would execute as an account this proxy never resolved.'
+      );
+    }
+
+    const accountNames = identities.map((identity) => identity.username);
+    const keyByAccount = new Map<string, string>();
+    for (const identity of identities) {
+      if (keyByAccount.has(identity.username)) {
+        throw new Error(
+          `Two configured accounts resolved to the display name "${identity.username}", so an ` +
+          'account selection cannot name one of them unambiguously.'
+        );
+      }
+      keyByAccount.set(identity.username, identity.apiKey);
+    }
+
+    const [toolsResult, promptsResult, resourcesResult] = await Promise.all([
+      primaryClient.listTools(),
+      primaryClient.listPrompts(),
+      primaryClient.listResources(),
+    ]);
+
+    const discovered = toolsResult.tools as ToolDefinition[];
+
+    return {
+      identities,
+      accountNames,
+      keyByAccount,
+      tools: isMultiAccount ? injectAccountParam(discovered, accountNames) : discovered,
+      prompts: promptsResult.prompts,
+      resources: resourcesResult.resources,
+    };
+  }
+
+  /**
+   * The catalog, resolved at most once and shared by every caller.
+   *
+   * The clear-on-failure is identity-guarded deliberately. The obvious shape — an async IIFE whose
+   * inner catch nulls the memo — poisons it permanently when the body throws before its first
+   * `await`: that catch runs during the synchronous prefix and the outer assignment then
+   * re-installs the rejected promise. Guarding on identity is correct for both timings and also
+   * cannot discard a newer resolution another request installed.
+   */
+  function resolveCatalog(): Promise<ProxyCatalog> {
+    const existing = catalogMemo;
+    if (existing) return existing;
+
+    const pending = buildCatalog();
+    catalogMemo = pending;
+
+    pending.catch(() => {
+      if (catalogMemo === pending) catalogMemo = null;
+    });
+
+    void pending.then(
+      () => {
+        if (!servedCatalogError) return;
+        servedCatalogError = false;
+        void announceListsChanged();
+      },
+      () => undefined,
+    );
+
+    return pending;
+  }
+
+  /** Resolve the catalog, remembering that a failure was served so a later recovery can be announced. */
+  async function catalogOrThrow(): Promise<ProxyCatalog> {
+    try {
+      return await resolveCatalog();
+    } catch (error) {
+      servedCatalogError = true;
+      throw error;
+    }
   }
 
   // --- Proxy: tools ---
 
-  localServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: exposedTools,
-  }));
+  // Throws on rejection: ListToolsResult carries only `tools`, so the tools/call in-band
+  // `{content, isError}` shape would ship as a SUCCESSFUL result that fails the client's own parse.
+  // The SDK maps a thrown handler error to a proper JSON-RPC error.
+  localServer.setRequestHandler(ListToolsRequestSchema, async () => {
+    const catalog = await catalogOrThrow();
+    return { tools: catalog.tools };
+  });
 
   localServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       let targetKey = primaryKey;
       const args = { ...request.params.arguments } as Record<string, unknown>;
 
+      // Read from the constructor option, never from the catalog: the guard must be armed even
+      // while the account set is still unknown.
       if (isMultiAccount) {
+        const { keyByAccount, accountNames } = await catalogOrThrow();
         const selectedAccount = args.account as string | undefined;
         if (!selectedAccount || !keyByAccount.has(selectedAccount)) {
           return {
@@ -425,9 +582,10 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
 
   // --- Proxy: prompts ---
 
-  localServer.setRequestHandler(ListPromptsRequestSchema, async () => ({
-    prompts: promptsResult.prompts,
-  }));
+  localServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+    const catalog = await catalogOrThrow();
+    return { prompts: catalog.prompts };
+  });
 
   localServer.setRequestHandler(GetPromptRequestSchema, async (request) => {
     return await primaryClient.getPrompt({
@@ -438,9 +596,10 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
 
   // --- Proxy: resources ---
 
-  localServer.setRequestHandler(ListResourcesRequestSchema, async () => ({
-    resources: resourcesResult.resources,
-  }));
+  localServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const catalog = await catalogOrThrow();
+    return { resources: catalog.resources };
+  });
 
   localServer.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     return await primaryClient.readResource({
@@ -450,12 +609,16 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
 
   return {
     server: localServer,
-    toolCount: toolsResult.tools.length,
-    promptCount: promptsResult.prompts.length,
-    resourceCount: resourcesResult.resources.length,
-    isMultiAccount,
-    accountNames,
     announced,
+    warm: async (): Promise<WarmSummary> => {
+      const catalog = await resolveCatalog();
+      return {
+        accountNames: catalog.accountNames,
+        toolCount: catalog.tools.length,
+        promptCount: catalog.prompts.length,
+        resourceCount: catalog.resources.length,
+      };
+    },
   };
 }
 
@@ -479,20 +642,7 @@ async function main(): Promise<void> {
     );
   }
 
-  // Discover identities for all keys
-  let identities: AccountIdentity[];
-  try {
-    identities = await discoverIdentities(config.apiKeys, config.apiUrl);
-  } catch (error) {
-    process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(1);
-  }
-
-  process.stderr.write(
-    `BattleGrid MCP: ${identities.length} account(s) discovered — ${identities.map(id => id.username).join(', ')}\n`
-  );
-
-  // Lazily connect a remote MCP client per API key, with retry + auth diagnostics.
+  // Connect a remote MCP client for a given API key, with retry + auth diagnostics.
   const connect = async (apiKey: string): Promise<Client> => {
     const transport = new StreamableHTTPClientTransport(
       new URL(config.apiUrl),
@@ -503,13 +653,21 @@ async function main(): Promise<void> {
       { name: 'battlegrid-proxy', version: PACKAGE_VERSION },
       { capabilities: {} }
     );
-    await connectWithRetry(client, transport, config.apiUrl);
+    await connectWithRetry(client, transport, config.apiUrl, apiKey);
     return client;
   };
 
   let proxy: ProxyServer;
   try {
-    proxy = await createProxyServer({ identities, connect });
+    proxy = await createProxyServer({
+      // The operator's declared first key, chosen before discovery so an unreachable one fails
+      // loudly here instead of silently promoting the second.
+      primaryKey: config.apiKeys[0],
+      // Armed by configuration, so a later identity failure cannot stand the account guard down.
+      isMultiAccount: config.apiKeys.length > 1,
+      connect,
+      resolveIdentities: () => discoverIdentities(config.apiKeys, config.apiUrl),
+    });
   } catch (error) {
     process.stderr.write(`Error: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exit(1);
@@ -522,17 +680,40 @@ async function main(): Promise<void> {
     `BattleGrid MCP: announcing ${proxy.announced.name}@${proxy.announced.version} ` +
     `(server contract, read from the upstream handshake) — proxy ${PACKAGE_VERSION}\n`
   );
-  process.stderr.write(
-    `BattleGrid MCP: ${proxy.toolCount} tools, ${proxy.promptCount} prompts, ${proxy.resourceCount} resources\n`
-  );
 
-  // --- Start stdio transport ---
+  // --- Start stdio transport, BEFORE any catalog work ---
+  //
+  // Everything above is the single upstream handshake the relayed serverInfo requires. From here the
+  // process answers `initialize`; identity discovery and the three catalog calls happen behind it.
 
   const stdioTransport = new StdioServerTransport();
   await proxy.server.connect(stdioTransport);
 
   process.stderr.write('BattleGrid MCP server running on stdio\n');
+
+  // Warm the catalog so the first tools/list joins an in-flight resolution rather than starting one.
+  // Deliberately NOT awaited, and the rejection handler is the whole of the guarantee that a
+  // background failure cannot kill a process that has already answered `initialize`. The failure is
+  // reported and absorbed; the next request that needs the catalog retries it.
+  void proxy.warm().then(
+    (summary) => {
+      process.stderr.write(
+        `BattleGrid MCP: ${summary.accountNames.length} account(s) discovered — ${summary.accountNames.join(', ')}\n`
+      );
+      process.stderr.write(
+        `BattleGrid MCP: ${summary.toolCount} tools, ${summary.promptCount} prompts, ${summary.resourceCount} resources\n`
+      );
+    },
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(
+        `Warning: catalog warm-up failed (${message}). The proxy is connected; the next request ` +
+        'that needs the catalog will retry it.\n'
+      );
+    },
+  );
 }
+
 
 // Only run when executed directly (not when imported for testing)
 const isDirectExecution = process.argv[1] &&

@@ -375,7 +375,14 @@ async function setup(usernames: string[]): Promise<Harness> {
   const identities = identitiesFor(usernames);
   const connect = async (apiKey: string): Promise<Client> => makeUpstream(apiKey, calls);
 
-  const proxy = await createProxyServer({ identities, connect });
+  const proxy = await createProxyServer({
+    primaryKey: identities[0].apiKey,
+    // The CONFIGURED count — the path under test. Deriving this from resolved identities is the
+    // defect the guard exists to prevent, so the harness must not reintroduce it.
+    isMultiAccount: usernames.length > 1,
+    connect,
+    resolveIdentities: async () => identities,
+  });
 
   const client = new Client({ name: 'proxy-protocol-test', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

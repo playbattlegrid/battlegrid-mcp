@@ -48,8 +48,10 @@ const IDENTITIES: AccountIdentity[] = [
 /** Stands up the proxy over a fake upstream and returns the handshake a local client observes. */
 async function announcedToLocalClient(serverInfo: Implementation): Promise<Implementation | undefined> {
   const proxy = await createProxyServer({
-    identities: IDENTITIES,
+    primaryKey: IDENTITIES[0].apiKey,
+    isMultiAccount: IDENTITIES.length > 1,
     connect: async () => upstreamAnnouncing(serverInfo),
+    resolveIdentities: async () => IDENTITIES,
   });
 
   const client = new Client({ name: 'announced-version-test', version: '1.0.0' });
@@ -117,8 +119,10 @@ describe('announcedIdentityOf — fails closed', () => {
     // started anyway would announce something, and there is no honest value to announce.
     await expect(
       createProxyServer({
-        identities: IDENTITIES,
+        primaryKey: IDENTITIES[0].apiKey,
+        isMultiAccount: IDENTITIES.length > 1,
         connect: async () => upstreamAnnouncing(undefined),
+        resolveIdentities: async () => IDENTITIES,
       }),
     ).rejects.toThrow(/serverInfo/);
   });
