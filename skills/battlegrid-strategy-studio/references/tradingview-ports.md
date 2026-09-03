@@ -37,12 +37,12 @@ closes while stops, trailing, and time decay keep managing the position intraday
 
 | TradingView script | Verdict | Port anchor |
 |---|---|---|
-| Squeeze Momentum [LazyBear] / TTM Squeeze | **Direct port** — Keltner is native | `BB_UPPER spread KC_UPPER`, `BB_LOWER spread KC_LOWER`, `bollinger_squeeze` |
+| Squeeze Momentum [LazyBear] / TTM Squeeze | **Direct port** — `KC_SQUEEZE` reads the state itself | `KC_SQUEEZE`, `bollinger_squeeze` |
 | Supertrend / UT Bot Alerts | **Direct port** for the state; flip still substituted | `ST_LINE`, `ST_DIR`, `EMA5_13` for the flip, position-management trailing |
 | Chandelier Exit | Direct port of the *mechanism* | trailing from entry (`trailingTriggerR: 0`) |
 | MACD + 200 MA filter | Direct process port | `MACD_cross`, `dist_SMA200`, `macd_bull_cross` |
 | Golden / Death Cross | Direct process port | `SMA50_SMA200_spread` + `_trend` |
-| RSI-2 (Connors) | Named substitute (no RSI-2; RSI7 is the closest series) | `RSI7`, `dist_SMA200`, time decay |
+| RSI-2 (Connors) | **Direct port** — `RSI2` is native | `RSI2`, `dist_SMA200`, time decay |
 | VWAP reversion | Direct process port | `dist_VWAP`, `dist_VWAP_rank_far` |
 | Donchian / Turtle breakout | Process port (N-bar channel → swing structure) | `zone`, `dist_swingHi`, `sr_resistance_break` |
 | ICT/SMC: FVG + Order Blocks | Direct process port of the zone logic | `STRUCT_ZONES` columns + `structure_*` signals |
@@ -145,10 +145,11 @@ the book out of single-name traps. Rules: `ma_sma200_above` 3 required, `ma_ema_
 **Source process.** In an uptrend (close > 200 SMA), buy panic dips (RSI(2) < 10); exit fast
 (cross of the 5-period average / a few bars).
 
-**Port — named substitute.** The catalog carries `RSI14` and `RSI7` only, so there is no `RSI2`;
-`RSI7` is the fastest RSI series
-and `lte 10` on it is a rarer, deeper panic — state that trade-off rather than hiding it.
-`DIP_BUY` verdict UP = `dist_SMA200 gt 0` (ref a required `ABOVE_200`) AND `RSI7 lte 10`.
+**Port — direct.** `RSI2` is native as of contract 49.1, so this ports exactly and no substitution
+note is owed. `DIP_BUY` verdict UP = `dist_SMA200 gt 0` (ref a required `ABOVE_200`) AND
+`RSI2 lte 10`. Keep the literal `lte 10` as the gate: `RSI2 × classifyZone` exists and reads on the
+same Connors 10/90 bands, but a zone label is a fixed reading while the literal is a threshold the
+author can see and tune.
 Rules: `rsi_oversold` 3 required `{"threshold": 25}` (RSI14 gate tuned toward the fast-dip
 regime — read the signal schema first) · `ma_sma200_above` 2 required · `bollinger_lower_touch`
 1. The source's fast exit is time, not price: `timeDecayEnabled: true`, grace 180, interval
@@ -215,6 +216,19 @@ Williams %R (`WILLR14`), Stochastic RSI (`STOCH_RSI14`), Bollinger boundaries
 (`BB_UPPER`/`BB_LOWER`), ADX components (`DI_PLUS`/`DI_MINUS`). All arrived with contract 46.1 —
 every one of them was listed as inexpressible in this file before it.
 
+Contract 49.1 did it again with seven more: Connors RSI-2 (`RSI2`, and `RSI2 × classifyZone` on its
+own 10/90 bands), the TTM squeeze state (`KC_SQUEEZE`), the 9/21/50 EMAs (`EMA9`/`EMA21`/`EMA50`)
+and the prior-day levels (`PDH`/`PDL`). Two of those were standing absence claims in this file:
+RSI-2 was called a named substitute, and the prior-day levels were said to need a grammar form no
+metric could supply — true of the `distance` offset it cited, and never a reason a PUBLISHED level
+could not exist. Author the prior-day levels at `1d` and nowhere else: a level computed from the
+prior daily bar has no reading on a 15-minute one, and construction refuses it rather than
+resolving empty.
+
+Re-read the absence section against the vendored digest before trusting any row in it. That check
+is `skill-contract.test.ts`, and it is the only thing that catches a claim which raises no error
+and merely tells a paying author their strategy cannot be built.
+
 ## Not expressible — the catalog keys this needs
 
 The one section where a claim that the catalog LACKS something may live, and every row names the key
@@ -222,14 +236,14 @@ it denies so the claim stays checkable. A claim about the grammar's SHAPE (a cla
 column against a literal; `distance` rejects an `offset`) is permanent and belongs in prose above.
 A claim that a metric is absent belongs here, or nowhere.
 
+Only a bare backticked key counts as the claim — write the neighbour as a column code or an
+expression, never as a lone key, or the row denies a metric that is in fact served.
+
 | Script / primitive | Key the catalog would need | Nearest expressible neighbour |
 |---|---|---|
-| RSI-2 (Connors) | `RSI2` | `RSI7 lte 10` as a named fast-dip substitute |
-
-**PDH/PDL** stays inexpressible for a different reason, and the distinction matters: `distance`
-rejects an `offset` and a clause never compares two columns, so the *grammar* has no form for it.
-No metric would fix that. Use the daily swing structure (`zone_1d`, `dist_swingHi_1d`) and name the
-substitution.
+| Slow-baseline trend filters (100-period) | `SMA100` | `dist_SMA50` or `dist_SMA200`, whichever the source's horizon is nearer |
+| 200-period EXPONENTIAL baseline | `EMA200` | `dist_SMA200`. Deferred on measurement, not preference: at the platform's warmup floor an exponential 200 still carries 12.4% of its seed bar while a simple 200 is exact over the same window |
+| Prior-WEEK high/low | `PWH` / `PWL` | the prior-DAY levels at the daily anchor, or `zone_1w` structure |
 
 Never compile a "port" of these under the source's name without the substitution note — a
 player who asked for WaveTrend and silently got Stochastic has no way to learn otherwise.
