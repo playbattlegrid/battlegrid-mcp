@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v49.3
+## Contract history — v37 → v49.5
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -37,7 +37,7 @@ package.
 Nothing to migrate. This is the one direction that cannot break a client: a body the server used to
 refuse is now stored. Listed because a client that special-cased the refusal can delete that branch.
 
-- **An arming trigger no longer constrains its required conditions' clock** (49.2.0,
+- **An arming trigger no longer constrains its required conditions' clock** (49.4.0,
   `restore-arming-trigger-authoring`). `compile_strategy_plan`, `apply_strategy_plan` and
   `fork_strategy` accept a strategy whose entry trigger is `ON_CANDLE_CLOSE`, `STOP_THROUGH_LEVEL`
   or `ON_RETEST` **while a required condition reads the `LIVE` clock**. v48.1 announced that pairing
@@ -179,7 +179,7 @@ refuse is now stored. Listed because a client that special-cased the refusal can
 
 ### Reshaped output — the same call returns a different shape
 
-- **An entry void now names the gate that refused it** (49.3.0,
+- **An entry void now names the gate that refused it** (49.5.0,
   `fix-arming-trigger-clock-authority`), on `get_radar_activity_summary`. In the cause rollup, the
   `ENTRY_VOID` group's `gateCode` widens from always-`null` to `QualificationGateCode | null`: a
   conditions-side void carries the gate that blocked — `AGGREGATE_BELOW_MIN`,
