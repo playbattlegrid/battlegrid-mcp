@@ -24,13 +24,34 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v48.1
+## Contract history — v37 → v49.3
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
 and the documentation ships inside the tarball, so a note written but unpublished reaches nobody.
 Both halves are now closed by a rule keyed to the *served* contract rather than to a release of this
 package.
+
+### Accepted again — input that was rejected now compiles
+
+Nothing to migrate. This is the one direction that cannot break a client: a body the server used to
+refuse is now stored. Listed because a client that special-cased the refusal can delete that branch.
+
+- **An arming trigger no longer constrains its required conditions' clock** (49.2.0,
+  `restore-arming-trigger-authoring`). `compile_strategy_plan`, `apply_strategy_plan` and
+  `fork_strategy` accept a strategy whose entry trigger is `ON_CANDLE_CLOSE`, `STOP_THROUGH_LEVEL`
+  or `ON_RETEST` **while a required condition reads the `LIVE` clock**. v48.1 announced that pairing
+  as rejected, naming the offending condition key on `VALIDATION_ERROR`; that refusal is gone.
+
+  Why it was withdrawn, since the reasoning matters more than the rule: it ran against the whole
+  assembled strategy, so it refused *every* edit to a strategy in that shape — a rename, one report
+  column, one signal weight — plus restore and fork. For a strategy whose required conditions read
+  columns that can never carry a `CLOSE` clock (zone distances, perp/spot flow), there was no legal
+  shape to move to at all. And its premise — that the pairing can never fire — was measured before
+  the arming lifecycle was corrected, and no longer holds.
+
+  The underlying question, *should an entry that waits for a close be decided on a forming bar*, is
+  now settled where the decision is made rather than by refusing the author's declaration.
 
 ### Changed meaning, unchanged shape
 
@@ -157,6 +178,23 @@ package.
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **An entry void now names the gate that refused it** (49.3.0,
+  `fix-arming-trigger-clock-authority`), on `get_radar_activity_summary`. In the cause rollup, the
+  `ENTRY_VOID` group's `gateCode` widens from always-`null` to `QualificationGateCode | null`: a
+  conditions-side void carries the gate that blocked — `AGGREGATE_BELOW_MIN`,
+  `REQUIRED_COUNT_BELOW_MIN`, `REQUIRED_CONDITION_FALSE` — while a band void stays `null`, because
+  that void happens on a reading that qualified and has no failing gate to name.
+
+  A client that renders the field through the same enum the response already uses on four other
+  cause arms needs no change. One that treated it as a literal `null` — a strict decoder pinning the
+  type, or a branch keyed to its absence — sees a value it did not expect. That is the whole
+  migration.
+
+  Why it moved: the group previously collapsed every conditions-side void under one label. The
+  first 26 in production carried that label while two different gates had produced them, and none of
+  them was a required condition being false. The rollup ships counts rather than rows, so the gate
+  could not be recovered client-side.
 
 - **The normalized report section loses `timeframe`** (48.0.0, `remove-section-anchor-override`), on
   every tool that publishes a strategy: `get_strategy`, `fork_strategy`, `archive_strategy`,
