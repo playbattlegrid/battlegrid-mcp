@@ -82,8 +82,9 @@ wrong.
 
 ### A docs-only change still needs a version bump to reach npm
 
-`package.json`'s `files` is `["dist", "README.md", "LICENSE"]` — **README.md ships inside the
-tarball**, so npmjs.com renders the README of the last *published* version.
+`package.json`'s `files` is `["dist", "README.md", "LICENSE", "SKILL.md", "skills"]` — **README.md,
+SKILL.md and the whole published skill ship inside the tarball**, so npmjs.com renders the README of
+the last *published* version and every `npx` install gets that version's skill text.
 
 That makes a README-only merge a silent no-op as far as the registry is concerned: the change lands
 on `main`, the gate sees the current version already published, nothing publishes, and the npm page
@@ -93,13 +94,48 @@ keeps showing the old text. If the point of the change is that people read it on
 This is the one case where documenting a contract move *does* touch this package's version, and the
 distinction matters: the bump is for publishing **the documentation**, never for the contract.
 
+### Before opening the PR, confirm the release will actually happen
+
+The integrity check above proves the four values agree with **each other**. It cannot tell you the
+number is still *available*, and that is the failure this repository keeps repeating: branch off a
+base whose version is already on the registry, change something that ships, merge — and the gate
+sees the version published, does nothing, and reports **success**. CI is green end to end and
+nothing reaches npm. It has cost #45 and #48 a release, and would have cost #50 a third.
+
+What ships is narrower than `files` suggests, because `dist` is built rather than committed. The
+build emits exactly one file, so the shipped set from source is **`src/index.ts` alone** —
+`src/__tests__/` is excluded by `tsconfig.json` and `src/__fixtures__/` never reaches `dist`. A
+fixture-only re-vendor genuinely needs no bump, which is why this tests the DIFF and not just the
+version; a check that cried wolf on those would be ignored within a week.
+
+```bash
+SHIPPED=$(git diff --name-only origin/main...HEAD \
+  | grep -E '^(src/index\.ts|skills/|SKILL\.md|README\.md|LICENSE$)' || true)
+PKG=$(node -p "require('./package.json').version")
+
+if [ -z "$SHIPPED" ]; then
+  echo "Nothing that ships changed — $PKG may stay published; no bump needed."
+elif npm view "@battlegrid/mcp-server@$PKG" version >/dev/null 2>&1; then
+  echo "STRANDED — $PKG is already published and this branch changes shipped files:"
+  echo "$SHIPPED" | sed 's/^/  /'
+  echo "Merging would publish NOTHING. Bump before opening the PR."
+else
+  echo "OK — $PKG is unpublished and will carry:"
+  echo "$SHIPPED" | sed 's/^/  /'
+fi
+```
+
+Run it **before opening the PR**, not after merging. Once the release lands, the version is
+published and the check reads STRANDED for every branch — true, and useless.
+
 ### Release checklist
 
 1. Change the code or docs.
 2. Move all four version values together; run the integrity snippet above.
-3. `npm run build && npm test` (85 tests as of v31.2.0).
-4. Open a PR; merge it.
-5. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
+3. Run the reach check above. **STRANDED means bump now** — merging would publish nothing.
+4. `npm run build && npm test` (86 tests as of v31.2.3).
+5. Open a PR; merge it.
+6. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
 
 If a run fails for a reason outside the diff — an unreachable endpoint, a registry error — re-run it
 with `workflow_dispatch`. Never hand-publish: `npm` versions cannot be republished, and a
