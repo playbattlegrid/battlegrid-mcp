@@ -108,9 +108,14 @@ build emits exactly one file, so the shipped set from source is **`src/index.ts`
 fixture-only re-vendor genuinely needs no bump, which is why this tests the DIFF and not just the
 version; a check that cried wolf on those would be ignored within a week.
 
+`scripts/shipped-paths.mjs` owns that set. **Do not re-type it here or in the workflow** — this
+check and the publish gate are one rule asked at two altitudes, and written out twice they drift
+into the worst shape, where the checklist clears a branch the workflow then rejects. It derives
+what it can from `files`; `skill-package.test.ts` and `shipped-paths.test.ts` assert the one
+mapping it cannot (`dist` ← `src/index.ts`).
+
 ```bash
-SHIPPED=$(git diff --name-only origin/main...HEAD \
-  | grep -E '^(src/index\.ts|skills/|SKILL\.md|README\.md|LICENSE$)' || true)
+SHIPPED=$(git diff --name-only origin/main...HEAD | grep -E "$(node scripts/shipped-paths.mjs)" || true)
 PKG=$(node -p "require('./package.json').version")
 
 if [ -z "$SHIPPED" ]; then
@@ -133,7 +138,7 @@ published and the check reads STRANDED for every branch — true, and useless.
 1. Change the code or docs.
 2. Move all four version values together; run the integrity snippet above.
 3. Run the reach check above. **STRANDED means bump now** — merging would publish nothing.
-4. `npm run build && npm test` (86 tests as of v31.2.3).
+4. `npm run build && npm test` (90 tests as of v31.2.4).
 5. Open a PR; merge it.
 6. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
 

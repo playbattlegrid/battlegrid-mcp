@@ -51,7 +51,20 @@ jobs:
       # Three outcomes:
       #   release=true            — this version is not on the registry; publish it
       #   reconcile_tag=true      — already published but its tag is missing; create the tag only
-      #   neither                 — already published and tagged; nothing to do
+      #   neither                 — already published; nothing to publish
+      #
+      # The last outcome covers two situations this job used to report identically, both as a green
+      # run with one line in a log nobody reads:
+      #
+      #   LEGITIMATE  the push changed nothing that ships (docs for maintainers, a test, a fixture,
+      #               this workflow). Publishing nothing is correct.
+      #   STRANDED    the push changed tarball content at a version already on the registry. The
+      #               change does NOT reach npm and never will under this number. Cost #45 and #48
+      #               a release each; both looked like successful runs.
+      #
+      # Telling them apart needs the DIFF, not just the version, so the gate now reads it. `stranded`
+      # is decided here and enforced in the last step, so a run that also needs its tag reconciled
+      # still does that work before failing.
       - name: Decide whether this is a release
         id: gate
         run: |
@@ -60,9 +73,45 @@ jobs:
           echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
+          # What this push changed that reaches the tarball. `scripts/shipped-paths.mjs` is the one
+          # definition of that, shared with the pre-PR reach check in CLAUDE.md so the two cannot
+          # disagree. Skipped when there is no diff to read: workflow_dispatch carries no `before`
+          # (and is explicitly for re-running a failure outside the diff), and a `before` commit
+          # that is not in this clone cannot be compared against.
+          BEFORE="${{ github.event.before }}"
+          SHIPPED=""
+          DIFF_READ=false
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            DIFF_READ=true
+            SHIPPED="$(git diff --name-only "$BEFORE" "${{ github.sha }}" \
+              | grep -E "$(node scripts/shipped-paths.mjs)" || true)"
+          fi
+
           if npm view "@battlegrid/mcp-server@$PKG_VERSION" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
+            if [ -n "$SHIPPED" ]; then
+              echo "stranded=true" >> "$GITHUB_OUTPUT"
+              {
+                echo "### Stranded release — nothing published"
+                echo
+                echo "\`$PKG_VERSION\` is already on the registry, and this push changed files that ship:"
+                echo
+                echo "$SHIPPED" | sed 's/^/- \`/;s/$/\`/'
+                echo
+                echo "Those changes will never reach npm under this number. Bump the version and merge again."
+              } >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$DIFF_READ" = true ]; then
+              echo "stranded=false" >> "$GITHUB_OUTPUT"
+              echo "No-op: \`$PKG_VERSION\` is already published and this push changed nothing that ships." \
+                >> "$GITHUB_STEP_SUMMARY"
+            else
+              # No diff to read (workflow_dispatch, or a `before` this clone does not have). Say so
+              # rather than reporting a clean no-op that was never actually checked.
+              echo "stranded=false" >> "$GITHUB_OUTPUT"
+              echo "No-op: \`$PKG_VERSION\` is already published. No push diff available, so shipped-file changes were NOT checked." \
+                >> "$GITHUB_STEP_SUMMARY"
+            fi
             if [ -n "$(git tag --list "$RELEASE_TAG")" ]; then
-              echo "$PKG_VERSION is already published and tagged — nothing to do."
+              echo "$PKG_VERSION is already published and tagged — nothing to publish."
               echo "release=false" >> "$GITHUB_OUTPUT"
               echo "reconcile_tag=false" >> "$GITHUB_OUTPUT"
             else
@@ -77,6 +126,8 @@ jobs:
             echo "$PKG_VERSION is not on the registry — releasing."
             echo "release=true" >> "$GITHUB_OUTPUT"
             echo "reconcile_tag=false" >> "$GITHUB_OUTPUT"
+            echo "stranded=false" >> "$GITHUB_OUTPUT"
+            echo "Releasing \`$PKG_VERSION\`." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       # Enforce one immutable release identity. All three values that express this package's version
@@ -138,3 +189,17 @@ jobs:
           git tag -a "$RELEASE_TAG" -m "Publish @battlegrid/mcp-server ${{ steps.gate.outputs.version }}"
           git push origin "$RELEASE_TAG"
           echo "Tagged $RELEASE_TAG at $(git rev-parse HEAD)"
+
+      # LAST, deliberately. A stranded push may also be missing its tag, and that repair is still
+      # worth doing — so this fails the run after the reconcile step above rather than short-
+      # circuiting the job from the gate.
+      #
+      # It fails rather than warning because a warning on a green run is the same silence in a
+      # different colour: this workflow's whole premise is that nobody reads a run that says it
+      # succeeded. A red X on `main` is what actually gets repaired, and the repair is the one
+      # taken by hand three times now — bump the version, merge again.
+      - name: Fail a stranded release
+        if: steps.gate.outputs.stranded == 'true'
+        run: |
+          echo "::error::${{ steps.gate.outputs.version }} is already published and this push changed files that ship. Nothing reached npm. Bump the version and merge again."
+          exit 1
