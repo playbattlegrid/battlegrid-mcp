@@ -8,7 +8,10 @@
     "battlegrid-radar-deployment/SKILL.md": "d2a012b154e1e529db19529bd7c3d75d069f4e410d5804add51165f0f0902b2e",
     "battlegrid-strategy-authoring/SKILL.md": "93680b329c158b353fdc7e1ec9058dfd8ab69904cd7f1ae14cf411870c695bf1",
     "battlegrid-strategy-doctor/SKILL.md": "9ab3f79128ec81d3e90167c3f1ea4bd6f6b570290e5ebe2bf855195263c58239",
-    "battlegrid-strategy-examples/SKILL.md": "3e418df3590054b6da75435de79770ebdbdb7b88564534d9050ef209e0476a08",
+    "battlegrid-strategy-examples/SKILL.md": "0d6d9611d10bd7683c9bc5186d3db26f2fd4123a5b57330f827ff45cd9ef82c7",
+    "battlegrid-strategy-examples/references/playbooks.md": "35c543c090d00ba19e4bcf0a80502afac7a4954643fc535de0b24381c91ecbf4",
+    "battlegrid-strategy-examples/references/recipes.md": "53887daece17995543e7d3fe1bf2577fc41a6254c291acacde48d7de63853641",
+    "battlegrid-strategy-examples/references/tradingview-ports.md": "2f84758ba6ec015c7db3cf996f663971a7017eddbebe42d6ecba6386c7b78362",
     "battlegrid-trade-analysis/SKILL.md": "32573a67e55d735e6ee4e36b3b48c815694102704bc453c4d1c13db39551b3da"
   }
 }
