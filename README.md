@@ -874,22 +874,30 @@ Install the BattleGrid skills for AI agent instructions:
 npx skills add playbattlegrid/battlegrid-mcp
 ```
 
-Two skills ship from this repo, and both are inside the npm tarball (`SKILL.md`, `skills/`):
+Nine skills ship from this repo, all inside the npm tarball (`SKILL.md`, `skills/`).
 
-- **`battlegrid`** — connection, scopes, game play, and the strict compile → review → apply
-  strategy workflow.
-- **`battlegrid-strategy-studio`** — full-power strategy authoring, for agents that would
-  otherwise compile bare template strategies: custom report sections and system-generated header
-  grammar, benchmark sections, condition trees (verdict precedence, `required` enforcement
-  gates, `N_OF`/`NOT` groups, condition references), tiered signal weights and the
-  weighted-aggregate gate math, ATR trade levels, and post-entry position management. Its
-  `references/` carry five validated desk-grade playbooks (volatility-compression breakout,
-  crowded-positioning fade, benchmark-gated relative-strength rotation, HTF trend pullback,
-  perp/spot flow divergence at structure), copy-adaptable recipes, and process-for-process
-  ports of the most popular TradingView community scripts (Squeeze Momentum [LazyBear],
-  Supertrend/UT Bot, Chandelier Exit, MACD + 200 MA, golden cross, RSI-2, VWAP reversion,
-  Donchian/Turtle, ICT FVG/order blocks) with honest named substitutions where the grammar
-  lacks a primitive. Shapes are binding; vocabulary stays live-discovered.
+**`battlegrid`** (repo root) is the connection skill and is authored here: how to connect, the
+`{ account, request }` envelope, the two scopes, and where to go for everything else.
+
+The eight `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
+same instructions BattleGrid's own in-app Commander runs on, which is why they name the same tools
+you reach over MCP:
+
+| Skill | Teaches |
+|---|---|
+| `battlegrid-agent-management` | Commission and govern intelligence agents: interview and create one against a committed strategy and an approved model, change configuration and risk limits, rebind, halt, resume, archive, and act on live positions |
+| `battlegrid-arena-play` | Enter Market Grid sessions: find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have an agent generate it, submit, then read results and the reasoning journal |
+| `battlegrid-market-analysis` | Read the current crypto market — regime, funding and open interest, leaders and laggards, a deep-dive on any named coin — and close with the levels worth watching |
+| `battlegrid-radar-deployment` | Put agents on standing duty: per-coin Radar policies that fire on confirmed regime flips, and per-preset Arena deployment policies, previewed before they are written and un-deployed with the blast radius stated |
+| `battlegrid-strategy-authoring` | Build a strategy from a plain-English idea: gather evidence, lock the spec, compile against the platform grammar, review exactly what will run, apply only on confirmation. Also fork, tune, restore, archive, preview |
+| `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
+| `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
+| `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
+
+> **`skills/battlegrid-*` is generated — do not edit it here.** It is written by
+> `server/scripts/export-mcp-skills.mjs` in `playbattlegrid/battlegrid-app` and arrives by pull
+> request; `skills/EXPORT.json` records a hash per file and `src/__tests__/skill-provenance.test.ts`
+> fails CI on a hand edit. Change the skill upstream and let the export lane bring it here.
 
 ## License
 

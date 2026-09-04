@@ -15,6 +15,49 @@ every "the server changed" question therefore needs **nothing here**.
 Before adding anything to this package, check whether it belongs in `battlegrid-app` instead. Tool
 schemas, contract semantics, and error vocabularies all live there.
 
+## `skills/battlegrid-*` is generated — never edit it here
+
+The eight `skills/battlegrid-*` directories, `skills/EXPORT.json`, and
+`src/__fixtures__/authoring-contract-digest.json` are **written by
+`battlegrid-app/server/scripts/export-mcp-skills.mjs`** and arrive by pull request from its
+`.github/workflows/mcp-skills-export.yml`. They are the same instructions BattleGrid's in-app
+Commander runs on, which is what makes them true about the tools this proxy forwards.
+
+**To change a published skill, change it upstream** in `battlegrid-app/server/src/skills/<name>/` and
+let the export lane bring it here. An edit made in this repository fails
+`src/__tests__/skill-provenance.test.ts` by filename, and would in any case be silently reverted by
+the next export.
+
+This is not a style rule. It replaces a real arrangement that cost three pull requests (#47, #48,
+#52) and shipped a fork: `skills/battlegrid-strategy-studio/` was hand-authored here, drifted from
+the server's own document, and needed a gate of its own to notice. One author, one gate.
+
+| Path | Owner |
+|---|---|
+| `SKILL.md` (repo root) | **this repository** — connection, the `{ account, request }` envelope, scopes, and pointers into the exported skills. There is no upstream source for it. |
+| `skills/battlegrid-*/` | the export lane |
+| `skills/EXPORT.json` | the export lane (sha256 per exported file) |
+| `src/__fixtures__/authoring-contract-digest.json` | the export lane (vendored beside the documents it gates) |
+| everything else | this repository |
+
+Three tests divide the work and should not be merged:
+
+- `skill-package.test.ts` — **packaging.** Frontmatter fence, `name` equals directory, `files`
+  coverage, the four version values. (The name rule is why the export namespaces each skill to
+  `battlegrid-<name>` on the way out.)
+- `skill-provenance.test.ts` — **arrival.** Every file hashes as `EXPORT.json` records it, nothing
+  unlisted sits under an exported directory, and the digest fixture's contract version matches the
+  manifest's.
+- `skill-contract.test.ts` — **consistency.** The exported `battlegrid-strategy-examples/SKILL.md`
+  states the axes and domains the vendored digest carries. Its upstream twin
+  (`authoring-recipe-contract.test.ts`) gates the same bytes; this one is the arrival check on the
+  exported pair, not a second opinion about it.
+
+**The export lane bumps the version itself** when it commits, but only if the version on `main` is
+already on the registry — an unpublished version means a pending release is carrying it, and a
+second bump would strand that number. So an export pull request usually arrives already bumped; do
+not bump it again.
+
 ## Releasing — read this before touching a version
 
 ### A version change on `main` IS the release
@@ -138,7 +181,7 @@ published and the check reads STRANDED for every branch — true, and useless.
 1. Change the code or docs.
 2. Move all four version values together; run the integrity snippet above.
 3. Run the reach check above. **STRANDED means bump now** — merging would publish nothing.
-4. `npm run build && npm test` (90 tests as of v31.2.4).
+4. `npm run build && npm test`.
 5. Open a PR; merge it.
 6. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
 
@@ -150,11 +193,16 @@ hand-publish with no tag is the exact silence this workflow was built to remove.
 
 ```
 src/index.ts           the entire proxy
-src/__tests__/         announced-version, identity, skill-contract, skill-package,
-                       startup-ordering, strategy-authoring-proxy, validate-env
+src/__tests__/         announced-version, identity, shipped-paths, skill-contract,
+                       skill-package, skill-provenance, startup-ordering,
+                       strategy-authoring-proxy, validate-env
+src/__fixtures__/      the vendored authoring-contract digest (generated — see above)
 AGENTS.md              discovery file for external agents — how to CONNECT
 README.md              user docs + contract history; SHIPS in the tarball
-SKILL.md               the published agent skill
+SKILL.md               the published connection skill, authored here
+skills/battlegrid-*/   the eight exported skills (generated — see above)
+skills/EXPORT.json     the export's hash manifest (generated)
+scripts/               shipped-paths.mjs — the one definition of "changes the tarball"
 site/                  the GitHub Pages site (CNAME + index.html)
 .github/workflows/     ci.yml, publish.yml, static.yml
 ```
