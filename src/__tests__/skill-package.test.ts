@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url';
  * from the published files, so a skill missing from `files`, a frontmatter without its required
  * fields, or a name that no longer matches its directory ships a broken install. These checks
  * run against the repo exactly as `npm pack` would read it.
+ *
+ * PACKAGING ONLY. Whether an exported skill is the one `battlegrid-app` wrote is
+ * `skill-provenance.test.ts`; whether it states the live authoring contract is
+ * `skill-contract.test.ts`. The name-matches-directory rule below is why the export namespaces each
+ * skill to `battlegrid-<name>` on the way out.
  */
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -60,13 +65,24 @@ describe('skill package', () => {
     }
   });
 
-  it('the strategy-studio skill ships the references its SKILL.md points at', () => {
-    const studioDir = join(repoRoot, 'skills', 'battlegrid-strategy-studio');
-    const body = readFileSync(join(studioDir, 'SKILL.md'), 'utf8');
-    const referenced = [...body.matchAll(/references\/[a-z0-9-]+\.md/g)].map((match) => match[0]);
-    expect(referenced.length).toBeGreaterThan(0);
-    for (const reference of new Set(referenced)) {
-      expect(existsSync(join(studioDir, reference)), `${reference} is named but not shipped`).toBe(true);
+  it('every skill ships the references its SKILL.md points at', () => {
+    // Generalised from a single named skill when the hand-authored studio fork was retired: the
+    // assertion is worth keeping for whichever exported skill next carries a `references/` file,
+    // and naming one directory would have quietly stopped checking anything the day it moved.
+    const skillsDir = join(repoRoot, 'skills');
+    for (const directory of readdirSync(skillsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)) {
+      const skillDir = join(skillsDir, directory);
+      const body = readFileSync(join(skillDir, 'SKILL.md'), 'utf8');
+      for (const reference of new Set(
+        [...body.matchAll(/references\/[a-z0-9-]+\.md/g)].map((match) => match[0]),
+      )) {
+        expect(
+          existsSync(join(skillDir, reference)),
+          `${directory}/${reference} is named but not shipped`,
+        ).toBe(true);
+      }
     }
   });
 

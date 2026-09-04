@@ -7,6 +7,26 @@ description: MCP skill for BattleGrid — play crypto prediction games (Market G
 
 BattleGrid is a real-time cryptocurrency prediction gaming and trading platform. This MCP server gives AI agents access to play games, author trading strategies, and run strategy-bound intelligence agents.
 
+## The other eight skills
+
+This skill covers **connection**: how to reach BattleGrid, the request envelope, and what each scope
+grants. Everything about *using* the platform lives in the eight skills installed beside it, exported
+from BattleGrid's own server so they name exactly the tools you reach here:
+
+| For | Activate |
+|---|---|
+| Playing Market Grid sessions | `battlegrid-arena-play` |
+| Building or changing a strategy | `battlegrid-strategy-authoring` |
+| Composing beyond a bare template — conditions, weights, gates, trade levels, playbooks | `battlegrid-strategy-examples` |
+| Creating and governing intelligence agents | `battlegrid-agent-management` |
+| Putting an agent on standing duty (Radar, Arena presets) | `battlegrid-radar-deployment` |
+| Reading the market — regime, funding, leaders, a coin deep-dive | `battlegrid-market-analysis` |
+| Reading your own position, agents, and open trades | `battlegrid-trade-analysis` |
+| Working out why an agent has not traded or has stopped | `battlegrid-strategy-doctor` |
+
+Those eight carry the working arcs and the exact contracts. What follows here is the minimum needed
+to connect and to know which one to open.
+
 ## Discover the live surface first
 
 **Tools, prompts, and resources are discovered live from this MCP connection.** Always read the current `tools/list`, `prompts/list`, and `resources/list` before acting — a cached capability list is not authoritative after a server deployment. This skill teaches the workflows and the strict request contracts; it deliberately does not copy the server's tool catalog, metric/transform vocabulary, signal IDs, formulas, or default values. Discover those from the live tools (`list_strategy_categories`, `list_strategy_vocabulary`, `list_strategy_signals`, `get_strategy_signal_definition`, …). Never guess a metric, transform, parameter, template, signal, or enabled-timeframe fact.
@@ -25,70 +45,38 @@ Never put `account` inside `request`, and never flatten request fields beside it
 - `mcp:read` — strategy discovery **and** non-financial configuration writes (author strategies, edit agents, customize signals). Treat it as configuration authority, not view-only.
 - `mcp:wager` — financial actions (submit paid entries, accept/cancel entry decisions, deployment policies). Enable **Server-Signed Wagers** in Profile → MCP to grant it. Pending entry decisions come from the conversational surface, which waits for approval; an agent deployed to a radar coin or a trading-enabled arena slot executes without one.
 
-## Author a strategy: compile → review → apply
+## Author a strategy, and bind it to an agent
 
-Strategies are authored through one strict, whole-plan workflow. **Compilation changes no strategy, agent or revision; `apply_strategy_plan` is the only write to the strategy itself** — but compile is not read-only either: it parks the plan its own apply reads, and each call mints a distinct record and token, so compile once per reviewed payload and never retry or parallelise it. Review the exact returned plan before confirming.
+**The arc lives in `battlegrid-strategy-authoring`** — activate it, and `battlegrid-strategy-examples`
+alongside it when the strategy goes beyond a bare template. Do not compose a plan from this document;
+it states only what the *proxy* adds to that arc.
 
-1. **Choose the operation and revision.**
-   - `list_strategies({ includeInactive? })` — visible SYSTEM and owned PRIVATE strategies with lifecycle, quota, usage, and revisions. Use `includeInactive:true` to prepare a RESTORE.
-   - `get_strategy({ strategyId, includeInactive? })` — the complete report, dense signal scorecard, gates, usage, and current `revision`. Thread every returned revision into the next revisioned call.
-2. **Discover the report vocabulary progressively.**
-   - `list_strategy_categories()` → `list_strategy_vocabulary({ category })` → `get_metric_construction_hints({ metric })` → `get_strategy_column_contract({ column, sectionTimeframe? })`.
-   - `get_strategy_section_template({ request })` for a listed template; `preview_strategy_report(payload)` for a point-in-time rendered preview.
-3. **Discover signals at the strategy timeframe.**
-   - `list_strategy_signals({ module?, query? })` → `get_strategy_signal_definition({ signalId, timeframe })`. Availability is structural, not a promise of a live trigger.
-4. **(Optional) review draft-only guidance.**
-   - `derive_strategy_rule_view({ sections, rules? })` returns report perception, server defaults, and suggestions without reading or writing a strategy. Suggestions/resets only shape the next plan input; they persist only through `apply_strategy_plan`.
-5. **Compile one complete plan.**
-   - `compile_strategy_plan({ request })`, where the nested request contains exactly one strict branch plus a bounded `coinSelection`, `intentSummary`, and `assumptions`:
-     - **CREATE** — supplies the full new aggregate.
-     - **UPDATE** — supplies at least one changed axis and `expectedRevision`. **Send only the
-       axes that change.** The server preserves every axis you omit and every signal you do not
-       name, and it re-derives the complete post-state, scorecard and diff itself. Restating the
-       whole post-state changes nothing about the result and the account pays for those tokens on
-       this call and on every later step of the conversation. Three fields are *not* axes and are
-       required on every compile regardless — `intentSummary`, `assumptions` and `coinSelection`;
-       omitting one is a typed error, not a saving.
-     - **RESTORE** — targets an owned inactive revision and may include repair axes.
-   - Signal overrides are sparse: an omitted signal/axis stays unchanged; omitted `params` preserves canonical params byte-for-byte; present `params` replaces them only after strict validation.
-   - **`required` needs a weight.** A rule with `required: true` at `allocation: 0` is rejected (contract 34): the scorecard's triggered set excludes Off, so the flag could satisfy no gate and block no trade. Either raise the allocation or leave `required: false` — the server picks neither for you. The refusal names every offending signal in `details.inertRequiredSignalIds`, and it can fire on rules you did not touch: a strategy authored before contract 34 may hold the pair, and the merged post-state is what gets checked.
-6. **Review before confirming.**
-   - `approvedPlan` — complete post-state, proposed revision, dense scorecard, viability, canonical diff, expiry, and bound-agent impact.
-   - `reviewContext` — exact column contracts, point-in-time report preview and coin scope, open-position observation, and provisional quota/name admission (advisory until the write). Open positions are awareness only and do not block an edit.
-   - The plan token expires after five minutes. Recompile after expiry, catalog drift, revision drift, or a changed bound-agent fence.
-7. **Apply the plan the server already holds.**
-   - After explicit user approval: `apply_strategy_plan({ request: { planToken, confirm: true } })`. **There is no `plan` member** — one is rejected as an unknown key. The server keeps the plan its own compile approved and reads it back, so nothing is copied from the compile response and nothing can be mistyped, truncated or half-reconstructed in transit.
-   - Forward `planToken` byte-for-byte exactly as compile returned it. It is an opaque signed value: never retyped, paraphrased, abbreviated or rebuilt from memory. A mangled token addresses no approved plan and is refused.
-   - Refusals and their recoveries: `PLAN_APPROVAL_NOT_FOUND` means no approved plan answers to this token — it was already applied, it lapsed, or it was never issued; compile again. `TOKEN_EXPIRED` means the five minutes ran out; compile again. Anything else — a quota, a name collision, a bound agent that changed, a moved catalog — **leaves the plan applicable**: clear the cause and confirm again with the same token while it lives.
-   - Changed configuration reaches every bound agent immediately. Report the returned strategy, committed revision, changed axes and applied impact exactly as given, and use that returned revision for the next mutation.
+Three facts about transport, which are this skill's to state because they are about the wire rather
+than about authoring:
 
-**Focused edits & lifecycle:** `update_strategy_signal_rule({ request })` is the thin one-rule edit (requires `required`; omit `params` to preserve them; `required: true` needs `allocation > 0`). `fork_strategy` requires `sourceRevision`; `archive_strategy` requires `expectedRevision` and `confirm:true`; `restore_strategy` is only the thin unchanged-content path — if it reports `REPAIR_REQUIRED`, use the RESTORE compile/review/apply flow instead.
+- **The envelope is `{ request }`, or `{ account, request }` on a multi-account proxy** (see above).
+  It applies to `get_strategy_section_template`, `update_strategy_signal_rule`,
+  `compile_strategy_plan` and `apply_strategy_plan`.
+- **`planToken` is opaque and is forwarded byte-for-byte.** Never retype, paraphrase, abbreviate or
+  rebuild it from memory — the proxy passes the bytes through unchanged, and a mangled token
+  addresses no approved plan and is refused. It lives five minutes.
+- **`apply_strategy_plan` carries no `plan` member.** One is rejected as an unknown key: the server
+  reads back the plan its own compile approved, so nothing is copied out of the compile response and
+  nothing can be truncated or half-reconstructed in transit. Send
+  `{ request: { planToken, confirm: true } }` and nothing else.
 
-**Author the full surface, not a template.** A bare compile — a few platform sections, no conditions, untouched signal weights — uses a fraction of the studio: the strategy aggregate also owns typed conditions (verdicts + `required` enforcement gates), tiered signal allocations with per-signal params, routing gates (`minAggregateScore`, `minRequiredCount`, `minAtrPct`), the ATR stop band + risk-reward floor, post-entry position management (break-even / trailing / time-decay), and marker-bearing Market Read prose. The companion **`battlegrid-strategy-studio` skill** (shipped beside this one) carries the capability map plus validated desk-grade playbooks and recipes for all of it — activate it whenever a strategy is being created or upgraded.
-
-## Strategy-bound agents
-
-Bind a strategy to an agent at creation time — there is no direct strategy-creation tool.
-
-1. `list_approved_models()` — valid `modelId` values for agent creation/update.
-2. `list_strategies()` — pick the `strategyId` to bind.
-3. `create_intelligence_agent({ …, modelId, strategyId })` — create a strategy-bound agent (avatar is server-minted).
-4. `update_intelligence_agent({ agentId, … })` — update config; rebinding via `strategyId` requires `confirm:true`.
-5. `get_agent_journal({ agentId })` / `get_agent_automation_status({ agentId })` — monitor performance and deployments.
+Agents bind to a strategy at creation (`create_intelligence_agent({ …, modelId, strategyId })`);
+there is no direct strategy-creation tool. **`battlegrid-agent-management`** carries commissioning,
+reconfiguration, rebinding and intervention; **`battlegrid-radar-deployment`** carries putting an
+agent on standing duty; **`battlegrid-strategy-doctor`** carries diagnosing one that is not trading.
 
 ## Play a game (Market Grid)
 
-Predict UP or DOWN for each coin in the pool; exactly one coin is your **Captain** (2x score multiplier). Drive it from the live tools:
-
-1. `get_account_state()` — balance, rank, agent slots, wager status.
-2. `list_market_grid_sessions({ status: "PENDING" })` — find an open game (a `$0` entry fee is risk-free).
-3. `get_market_grid_session({ sessionId })` — coin pool, timeframe, payout structure.
-4. `get_market_context({ sessionId })` — indicators, rankings, and trends for the session.
-5. `check_market_grid_submission({ sessionId })` — avoid duplicate submissions (`update_market_grid` to modify).
-6. `submit_market_grid({ sessionId, grid, reasoning, confidenceScore, modelName, pickReasoning })` — submit predictions.
-7. `get_market_grid_results({ sessionId })` — results once the session is `SETTLED`.
-
-**Grid validation:** grid size matches the coin pool; each coin appears once; positions are sequential (0,1,2,…); exactly one cell is `isCaptain: true`.
+Predict UP or DOWN for each coin in the pool; exactly one coin is your **Captain** (2x score
+multiplier). **The arc lives in `battlegrid-arena-play`** — activate it to find a session, read its
+market context, compose a grid with real per-coin reasoning, submit it, and read the results.
+**`battlegrid-market-analysis`** carries the market read that informs the picks, and
+**`battlegrid-trade-analysis`** carries reading back how you have done.
 
 The `play-market-grid` prompt (discover via `prompts/list`) provides a guided end-to-end workflow.
 
