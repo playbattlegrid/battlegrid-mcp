@@ -223,6 +223,22 @@ with the player:
 - **Tuning a single rule** — how many agents are bound, and that the change reaches every one of
   them immediately.
 
+**Your `ask_user` is the explanation, not the mechanism.** For single-rule tuning the server
+independently requires `confirm:true` whenever the strategy has bound agents, so stating the radius
+and calling anyway is refused, not committed. Send `confirm:true` only on a turn where the player
+made an explicit confirming pick — never because you judged the edit safe. Free text typed while a
+confirmation is open is not consent: answer it, then present the same confirmation again.
+
+**Send only the fields you were asked to change.** `allocation`, `required` and `params` are each
+optional and each preserves on omission. "Raise volume_surge to Critical" is
+`{ signalId, allocation: 3 }` — nothing else. Do not read the current rule merely to restate a value
+you are not changing, and never supply `required` unless the player asked about the Required flag.
+Restating a remembered value is how a scoring signal silently becomes a mandatory trade gate.
+
+**Report the change from the response.** The success payload carries `ruleChanges` with the server's
+own `before` and `after` for the edited signal. State those. Never describe the prior value from
+memory or from an earlier read — the response is the only record that cannot be stale.
+
 ## When apply is refused
 
 Each of these is a specific typed code. Read it and take the cheapest correct step — never retry
@@ -241,6 +257,12 @@ the same call blindly.
   moved, a shifted catalog. The approved plan **survives** these: clear the cause and confirm again
   with the same token while it still lives. Recompiling works too, but costs the player a second
   review they did not need.
+- **A single-rule tuning refused for missing confirmation** — the strategy has bound agents and the
+  server will not write without `confirm:true`. The refusal names the count. Present *that* count to
+  the player and re-issue the identical call only after an explicit confirming pick. **Never add
+  `confirm:true` and retry on your own judgement** — the refusal exists precisely because the
+  decision is not yours, and a retry that supplies it unasked is the defect this rule was written
+  for. Nothing was written, so there is no partial state to reconcile.
 - **`TOKEN_BINDING_MISMATCH` while the token is still fresh** — there is nothing left to mis-copy,
   so this is real drift: a bound agent moved, the catalog changed, or the signing key rotated. Do
   not resubmit. Recompile, re-present, re-confirm.

@@ -70,6 +70,18 @@ the keys `get_strategy` returned** for the sections you are keeping. Either way 
 one. To section-qualify a duplicated header, read the key from a preview's `conditionColumns` or
 from the qualified candidates a `CONDITION_COLUMN_AMBIGUOUS` refusal offers.
 
+**Event columns print only on their event.** `MACD_cross` and `EMA5_13` (Bullish/Bearish) carry a
+value on the crossing bar and are null on every other one, which reads as UNRESOLVED. Use an event
+column as a TRIGGER inside a carrier, and pair it with a persistent state — a spread sign,
+`MAalign` — for regime. A condition that treats an event column as a standing state is unresolved on
+nearly every bar, which is a gate that never gates.
+
+**`PDH` and `PDL` are anchored to `1d`.** They are catalogued price levels, so `dist_PDH gte 0`
+composes directly — but bind them `{abs: '1d'}`, which is the only reference the save path accepts on
+them, and read them from any anchor that way. (`distance` still rejects an `offset`, and a clause
+still compares a column against a literal; neither of those shapes is what a previous-day level
+needed.)
+
 ## Conditions
 
 `{ conditionKey, name, definition, verdict, required, exit, clock, closes }` — all eight
@@ -108,6 +120,17 @@ opposes — UP exits SHORTs, DOWN exits LONGs, a NEITHER or `null` verdict exits
 under `clock: "CLOSE"`: a LIVE reading is the forming bar, and an exit fired on one is an
 intrabar exit. Orthogonal to `required` — the two act on disjoint lifecycles, pre-entry versus
 open — so a condition may carry both, either, or neither.
+
+**A state column is not a flip event.** `ST_DIR` reads the same on every bar of a trend, so
+`ST_DIR is "bullish"` is a regime filter and never an entry signal. The flip needs an event column
+beside it — an `EMA5_13` cross, or a `ST_DIR` trajectory whose `_trend` changes. The same distinction
+applies to every persisting classification: `MAalign`, `ADX_state`, `zone`.
+
+**Name the anchor when a metric is calibrated for one.** `KC_SQUEEZE is "on"` reads *on* about 57% of
+1h crypto bars even at canonical parameters — Bollinger σ is close-to-close while ATR captures
+intrabar range, so σ/ATR runs low here — against about 19% at 15m. It is a selective filter at 15m and
+below and close to useless at 1h. A metric whose selectivity depends on the anchor is stated with the
+anchor, or the author gates on something that admits most bars.
 
 ## Entry
 
@@ -218,167 +241,6 @@ BE 0.8R, no trail, timeDecay ON (120/60, 10→40, stale 25) · swing breakout (4
 RR 2, BE 1R, trail 1.2R/giveback 35 · swing trend (4h) 1.0–2.5 ATR, RR 2, BE 1R, trail
 1.5R/giveback 45–55, no timeDecay.
 
-## Playbooks (validated compositions)
-
-*Validated* is a gate, not a claim: every playbook below is compiled against the live catalog by
-`strategy-playbooks.compile.test.ts`, which fails the build if one stops assembling or if a header
-its conditions name stops resolving. Edit a playbook and the gate re-checks it; move the grammar
-underneath one and the gate catches that too.
-
-### 1 · Volatility Compression Breakout — 4h swing
-
-Custom `Squeeze Scan` (no `sectionKey` — this is a CREATE): `BB_WIDTH_PCT value` + `rank lo`, `ADX value`,
-`RVOL value`, `BB_PCT_B value`, `CLOSE_CHANGE value`, `NOTIONAL_VOLUME_1D value`; plus platform
-`includeStructureZones`. (No `includeBollingerBands`: it renders `bbWidthPct` and
-`bbWidthPct_rank_lo` a second time, which makes both of `SQUEEZE_ON`'s clauses ambiguous, and the
-custom section already carries them.) Conditions: `LIQUID_FLOOR` (required —
-`vol24hUsd gte 25000000`); `SQUEEZE_ON` building block (`bbWidthPct_rank_lo lte 10` AND
-`ADX lt 20`); `BREAK_UP` verdict UP (ref SQUEEZE_ON + `closeChg gt 0` + `RVOL gte 1.5` +
-`pctB gte 0.85`); `BREAK_DOWN` verdict DOWN (mirror with `pctB lte 0.15`). Rules:
-`bollinger_squeeze` 3 required · `volume_surge` 2 required `{"multiplier":1.5}` ·
-`volatility_atr_expanding` 2 · `sr_resistance_break` 2 · `sr_support_break` 2 ·
-`bollinger_upper_touch` 1 · `bollinger_lower_touch` 1 · `trend_adx_ranging` 1. Gates
-0.55 / 2 / 0.8. Levels 0.75–1.75 ATR, RR 2. PM: BE 1R; trail 1.2R giveback 35 buffer 0.3.
-Market Read: "Trade only expansions out of compression: {SQUEEZE_ON} must read TRUE… skip
-anything failing {LIQUID_FLOOR}."
-
-### 2 · Crowded-Positioning Fade — 1h intraday
-
-Custom `Positioning`: `FUNDING_RATE value`→`rate`, `aggregate w24`→`rate_mean24`,
-`FUNDING_ANN value`→`ann`, `OI_CHG value`→`oiChg`, `OI_PX_REGIME value`→`oiRegime` (vocab:
-new longs / new shorts / short covering / long liquidation), `MARK spread ORACLE`→
-`mark_oracle_spread`, `RSI14 value`, `CHG_24H value`→`chg24h`; plus `includeCvd`. Conditions:
-`NO_LIQUIDATION_TAPE` required NOT-veto (`NOT [oiRegime is "long liquidation"]`);
-`CROWDED_LONGS` building block (`ann gte 25` + `oiChg gte 3` + `oiRegime is "new longs"`);
-`FADE_SHORT` verdict DOWN (ref + `RSI14 gte 65` + `chg24h gte 5`); mirrored `SQUEEZED_SHORTS`
-/ `SQUEEZE_LONG` verdict UP. Rules: `funding_extreme_positive`/`_negative` 3 required
-`{"thresholdPct":0.001}` · `oi_surge` 2 `{"thresholdPct":0.03}` · `rsi_overbought` 2
-`{"threshold":65}` · `rsi_oversold` 2 `{"threshold":35}` · `cvd_bear_divergence` 2 ·
-`cvd_bull_divergence` 2 · `mfi_overbought` 1 · `mfi_oversold` 1. Gates 0.6 / 1 / 0.5. Levels
-1.0–2.5 ATR, RR 1.5. PM: BE 0.8R, no trail, timeDecay ON (120/60, 10→40, stale 25).
-
-### 3 · Relative-Strength Rotation with a Benchmark Gate — 4h cross-sectional
-
-Custom `Leadership`: `ROC12 rank hi` + `rank lo`, `RVOL rank hi`,
-`EMA5 spread EMA13 × trajectory w4`, `NOTIONAL_VOLUME_1D value`. **Rank `ROC12`, not
-`CLOSE_CHANGE`:** `closeChg` is the one magnitude-only rankable code, so `hi`/`lo` on it are
-refused, and its legal `far` ordering sorts by |change| — which would put the session's biggest
-losers in a "leaders" cohort. Custom `BTC Regime` with
-`"benchmarkTicker": "BTC"`: `MA_ALIGN value`→`MAalign`, `ADX value`, `REGIME_TREND value` —
-every row reads BTC. Conditions: `BTC_RISK_ON` building block (`MAalign is "bullish"` +
-`ADX gte 20` — both read bare, since only this section renders them); `BTC_RISK_OFF`
-(`MAalign is "bearish"`); `LEADER` (`roc12_rank_hi lte 5` + `RVOL_rank_hi lte 10` +
-`vol24hUsd gte 100000000`); `ROTATE_IN` verdict UP (`ALL[ref BTC_RISK_ON, ref LEADER]`);
-`ROTATE_OUT` verdict DOWN (`ALL[ref BTC_RISK_OFF, roc12_rank_lo lte 5]`). Rules:
-`comparison_sector_momentum` 3 · `rel_roc_positive`/`_negative` 2 · `ma_ema_aligned_bull`/
-`_bear` 2 required · `rel_ppo_bull_cross`/`_bear_cross` 1 · `volume_surge` 1. Gates
-0.5 / 1 / 0.6. Levels 1–2 ATR, RR 1.8. PM: BE 1R; trail 1R giveback 45. Ranked cohort ≥ 40 —
-rank conditions need a cohort wider than their thresholds.
-
-### 4 · HTF Trend Pullback — 1h, multi-timeframe confluence
-
-Platform `includeMtfConfluence` (`MAalign_ltf/…/_htf`, `RSI14_*_zone`, `ADX_*_state` vocab
-weak/developing/trending/extreme), `includeMovingAverages` (`dist_EMA20`, …), `includeRsi`
-(`RSI14_now`, `RSI14_zone`). These three render `MAalign` and `RSI14_zone` twice between them, so
-every condition below reads a suffixed form — never bare `MAalign` or bare `RSI14_zone`, which
-would be ambiguous. Conditions: `HTF_UP` building block (`MAalign_htf is "bullish"` +
-`ADX_htf_state in ["trending","extreme"]`); `HTF_DOWN` mirror; `TREND_PRESENT` **required**
-`ANY[ref HTF_UP, ref HTF_DOWN]` — chop blocks compose-trade entirely, before billing;
-`PULLBACK_LONG` verdict UP (ref HTF_UP + `RSI14_now between 35 55` +
-`dist_EMA20 between -3 0.5`); `PULLBACK_SHORT` verdict DOWN (mirror, 45–65 / −0.5–3). Rules:
-`mtf_pullback_long`/`_short` 3 required · `htf_ma_aligned_bull`/`_bear` 2 required ·
-`htf_trend_adx_trending` 2 · `ma_ema_aligned_bull`/`_bear` 1 · `rsi_oversold` 1
-`{"threshold":40}`. Gates 0.6 / 2 / 0.7 (a pullback signal AND an HTF alignment). Levels
-1–2.5 ATR, RR 2. PM: BE 1R; trail 1.5R giveback 30 buffer 0.3.
-
-### 5 · Perp/Spot Flow Divergence at Structure — 15m scalp
-
-Platform `includePerpSpotFlow` (`perpSpotFlow` vocab: confirmed_bull / confirmed_bear /
-perp_led_fragile / spot_led_accumulation / neutral), `includeStructureZones`
-(`zones_htf_support_dist` signed %, support below price is negative; `_age_h`), custom `Tape`
-(`BUY_PRESSURE value`→`buyPres` 0–1, `RVOL value`, `CLOSE_CHANGE value`). Conditions:
-`SPOT_ACCUM` (`perpSpotFlow is "spot_led_accumulation"`); `NEAR_SUPPORT`
-(`zones_htf_support_dist between -2 0` + `zones_htf_support_age_h gte 12`); `DIP_BID` verdict
-UP — refs plus an `N_OF(2)` quorum over `buyPres gte 0.55` / `RVOL gte 1.2` / `closeChg gt 0`
-(quorum beats a brittle ALL); `FRAGILE_POP` verdict DOWN (`perp_led_fragile` +
-`zones_htf_resist_dist between 0 2` + `RVOL gte 1.3`). Rules:
-`flow_perp_spot_bull_divergence`/`_bear_divergence` 3 required · `cvd_bull_divergence`/
-`_bear_divergence` 2 · `sr_at_support`/`_at_resistance` 2 · `structure_ob_approach` 1 ·
-`volume_surge` 1. Gates 0.55 / 1 / 0.4. Levels 0.5–1.2 ATR, RR 1.5. PM: BE 0.7R; trail 0.9R
-giveback 30 buffer 0.15; timeDecay ON aggressive (45/15, 15→60, stale 30).
-
-## TradingView ports — familiar processes, studio vocabulary
-
-Players often ask for strategies by the name of a popular TradingView script. Port the
-**process** (regime filter → setup state → trigger → stop engine), and where the catalog lacks
-the primitive, name the substitution in the spec-lock question — never present a substitute as
-the thing itself. Most TV strategies run on the daily chart: carry that with the
-daily-strategy pattern above (pinned-1d thesis at `offset: 1` on an intraday anchor), which
-binds decisions to daily closes while the studio keeps managing risk intraday. Event columns (`MACD_cross`, `EMA5_13`: Bullish/Bearish) print only on the
-crossing bar and are otherwise null → UNRESOLVED; use them as triggers inside a carrier and
-pair with a persistent state (spread sign, `MAalign`) for regime — as the source scripts do.
-
-- **Squeeze Momentum [LazyBear] / TTM Squeeze** → `KC_SQUEEZE is "on"` is the native one-condition
-  read: the Bollinger pair sitting inside the Keltner channel, at the script's own multiplier.
-  The four boundaries stay addressable, so `BB_UPPER spread KC_UPPER` and
-  `BB_LOWER spread KC_LOWER` still express the same reading at a threshold you choose. Release
-  direction from the MACD trajectory, `bollinger_squeeze` Critical-required.
-  **Name the anchor when you port it:** on crypto the squeeze reads *on* about 57% of 1h bars even
-  at canonical parameters — σ/ATR runs low here because Bollinger σ is close-to-close while ATR
-  captures intrabar range — against about 19% at 15m. It is a selective filter at 15m and below,
-  not at 1h. (`bbWidthPct_rank_lo` + `ADX lt 20` remains
-  a serviceable board-relative compression proxy, but it is no longer the only option.)
-- **Supertrend / UT Bot / Chandelier Exit** → `ST_LINE` and `ST_DIR` are native, so the regime
-  half is a direct port: `ST_DIR is "bullish"` as the persistent state, `dist_ST_LINE` for
-  distance to the plotted stop. The plotted trailing line is still best executed by the studio's
-  own stop engine — `trailingTriggerR: 0` (trail from entry), giveback ~30–40 (tight factor) or
-  45–55 (loose/chandelier) — because a trailing stop is a position-management mechanism, not a
-  column. **`ST_DIR` is a persisting state, not a flip event**: it reads the same on every bar of
-  a trend, so the FLIP still needs an event column beside it (`EMA5_13` cross, or a `ST_DIR`
-  trajectory whose `_trend` changes). Name that as a substitution.
-- **MACD + 200 MA filter** → `ABOVE_200` building block (`dist_SMA200 gt 0`) referenced by a
-  carrier with `MACD_cross is "Bullish"`; rules `macd_bull/bear_cross` 3 required +
-  `ma_sma200_above/below` 2 required; swing-trend geometry.
-- **Golden / Death Cross** → `SMA50 spread SMA200 × trajectory` gives state and freshness:
-  `SMA50_SMA200_spread_now gt 0` AND `_trend is "rising"`; optional breadth gate on
-  `mktBreadth_crypto gte 0` — every published scope resolves, not only `all`, because the leg reads
-  the `(timeframe, scope)` pairs a condition names; position-persona geometry. `SMA50 × SMA200` is
-  the canonical definition and stays the default port; `EMA50` is available as the crypto variant
-  when a player asks for it by name.
-- **RSI-2 (Connors)** → `RSI2` is native, so this ports exactly: `RSI2 lte 10` gated by required
-  `ABOVE_200`; the source's fast exit is time — timeDecay ON (180/60, 15→50, stale 20);
-  `rsi_oversold` 3 required with a tuned threshold. Keep the literal `lte 10` as the GATE:
-  `RSI2 × classifyZone` exists and reads on the same Connors bands, but a zone label is a fixed
-  reading while the literal is a threshold the author can see and tune. Use the zone as a report
-  column, never as the substitute for the gate.
-- **VWAP reversion** → `dist_VWAP` band + `dist_VWAP_rank_far lte 5` for board-relative
-  stretch; required `NOT [ADX_state in ["trending","extreme"]]` veto; scalp geometry +
-  aggressive timeDecay (VWAP anchors daily at 00:00 UTC).
-- **Donchian / Turtle breakout** → `zone is "breakout high"` + `dist_swingHi gte 0` +
-  `RVOL gte 1.5`; `sr_resistance_break` 3 required; turtle exits = trend preset (trail from
-  1R, giveback 50). Mirror with `"breakdown low"`. **Daily-breakout variant on any anchor:**
-  pin the structure at 1d — `zone_1d is "breakout high"`, `dist_swingHi_1d gte 0` (validated).
-  **Literal previous-day levels are native**: `PDH` and `PDL` are catalogued price levels, so
-  `dist_PDH gte 0` composes directly. They are ANCHORED to `1d` — bind `{abs: '1d'}`, which is the
-  only reference the save path accepts on them, and read them from any anchor that way. `distance`
-  still rejects an `offset` and a clause still compares a column against a literal; neither of
-  those shapes is what a previous-day level needed.
-- **ICT / SMC (FVG + order blocks)** → `STRUCT_ZONES` is the native zone engine:
-  `zones_htf_support_type` (`bullish FVG`/`bullish order block`), `zones_htf_support_dist
-  between -1.5 0`, `_age_h gte 12`, HTF bias required via `MAalign_htf`; rules
-  `structure_fvg_approach`/`structure_ob_approach` required (their `proximityPct` is the
-  in-zone dial). Liquidity sweeps, displacement, killzones and event *sequencing* are shapes the
-  grammar does not have — a clause compares one column against a literal, so an ordered sequence
-  of events cannot be stated at all. That is a grammar limit, not a missing metric; name it as
-  one.
-- **Now native, formerly substituted** — WaveTrend (`WT1`/`WT2`), QQE (`QQE_RSI_MA`/`QQE_STOP`),
-  Hull (`HMA20`), Ichimoku (`ICHI_CONV`/`ICHI_BASE`/`ICHI_SPAN_A`/`ICHI_SPAN_B`/`ICHI_LAG`),
-  Parabolic SAR (`PSAR`), Keltner (`KC_UPPER`/`KC_MID`/`KC_LOWER`), daily pivots
-  (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), Williams %R (`WILLR14`), Stochastic RSI
-  (`STOCH_RSI14`), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 9/21/50 EMAs
-  (`EMA9`/`EMA21`/`EMA50`), and literal previous-day levels (`PDH`/`PDL`). Port these directly —
-  do not offer a substitute for a primitive the catalog serves.
-
 ## Not expressible — the catalog keys this needs
 
 The one place a claim that the catalog LACKS something may live, and every row names the key it
@@ -390,12 +252,19 @@ permanent. A claim that a metric is absent belongs here, or nowhere.
 |---|---|---|
 | 100-period SMA | `SMA100` | the shipped 50- or 200-period simple average, whichever the thesis leans on |
 
-## Using a playbook
+## Where the worked material lives
 
-Discover → confirm headers (`get_strategy_column_contract`, or one `preview_strategy_report`
-whose `conditionColumns` lists every addressable header with operators and vocabulary) →
-calibrate literals against the previewed live values → compile once → review the compiled
-scorecard, condition outcomes, verdict tally, and `marketReadMarkers` (fix `unknown` /
-`ambiguous` markers) → apply per the strategy-authoring flow. Coin selection is call context,
-not strategy state: explicit tickers for focused work, `ranked` (with an optional category) for
-scanning books.
+This skill's body is the contract — the axes, the header grammar, how conditions and weights behave,
+and the absence section above. The worked material is disclosed on demand, so it costs nothing until
+you ask for it. Read a reference with `read_skill_reference` when you reach the work it covers:
+
+- **`references/recipes.md`** — copy-adaptable column objects and condition fragments: cross
+  detection, board-relative ranks, cross-venue basis, crowd positioning, coin selection, and the
+  discovery fields worth reading before you compose.
+- **`references/playbooks.md`** — five validated desk-grade compositions end to end, and how to
+  adapt one rather than copy it.
+- **`references/tradingview-ports.md`** — per-script port recipes for the popular TradingView
+  strategies, each naming its substitutions where the catalog lacks a primitive.
+
+Every rule about how a column *behaves* is in this body, not in a reference. If a reference seems to
+state one, the body is the authority.
