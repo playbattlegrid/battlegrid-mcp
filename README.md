@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v49.5
+## Contract history — v37 → v51
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -32,10 +32,42 @@ and the documentation ships inside the tarball, so a note written but unpublishe
 Both halves are now closed by a rule keyed to the *served* contract rather than to a release of this
 package.
 
+**50.0.0 and 51.0.0 arrived late, and the reason is worth naming.** The re-vendoring errand that
+used to carry these notes is now a generated export
+(`battlegrid-app/server/scripts/export-mcp-skills.mjs`), and it owns three paths — `skills/`,
+`skills/EXPORT.json`, and the vendored digest. It deliberately does not touch this file. So the
+digest kept arriving on time while the note stopped travelling with it, and this section sat at
+v49.5 against a served contract of 51.0.0. Nothing a client could observe was wrong; what was
+missing was the sentence telling them so. **A contract move still needs a human-authored entry
+here, and the export lane will not remind you.**
+
 ### Accepted again — input that was rejected now compiles
 
 Nothing to migrate. This is the one direction that cannot break a client: a body the server used to
 refuse is now stored. Listed because a client that special-cased the refusal can delete that branch.
+
+- **A signal rule patch no longer forces you to restate `allocation` and `required`** (51.0.0,
+  `fix-signal-rule-patch-semantics`). On `update_strategy_signal_rule`, and on the `rules` element
+  of `compile_strategy_plan`, both fields become optional and join `params` under ONE omission
+  rule: **an omitted mutable field preserves the stored value for that signal.** "Raise this
+  signal's weight" is now expressible.
+
+  ```jsonc
+  { "strategyId": "…", "expectedRevision": 7, "signalId": "volume_surge",
+    "allocation": 3 }               // `required` and `params` keep exactly what is stored
+  ```
+
+  **Every existing client keeps working** — a complete payload is still a valid patch — so this is
+  listed for what you can now STOP sending. Before it, both fields were mandatory on every rule
+  surface, so a caller that had not first read the current rule had to invent a value it was never
+  asked about. That is not hypothetical: revision 5 of a production strategy flipped `required`
+  false → true unasked while moving a weight 2 → 3, turning a scoring signal into a **mandatory
+  gate** — which changes whether the agent takes trades at all.
+
+  One boundary on the newly legal ground, and it breaks nothing: a patch carrying **no** mutable
+  field is refused — *"A rule patch must change something: supply at least one of allocation,
+  required or params."* — rather than minting a no-op revision. Under 50.0.0 that request could not
+  be formed at all, so nothing that used to work is now refused.
 
 - **An arming trigger no longer constrains its required conditions' clock** (49.4.0,
   `restore-arming-trigger-authoring`). `compile_strategy_plan`, `apply_strategy_plan` and
@@ -55,6 +87,14 @@ refuse is now stored. Listed because a client that special-cased the refusal can
 
 ### Changed meaning, unchanged shape
 
+- **`blocksScanGate` reads `true` for a class it did not** (50.0.0, `own-scan-served-set-once`), on
+  `preview_radar_resolution`. Blocking is now derived from the lane's **served set** rather than
+  switched over the reach reason, so a `FEED`-reason refusal on an operand no reader in the lane
+  serves BLOCKS instead of deferring. No field changes shape, and a client that already renders the
+  key renders the new answer — but a client that treated `blocksScanGate: false` as "this will
+  resolve once data arrives" now sees a deployment that will not fire. Nothing in the payload tells
+  you this moved.
+
 - **Three tools serve different values for identical input** (47.3.0, `derive-scan-fetch-from-report`).
   The radar scan leg now derives its timeframe fetch from the strategy's **report** rather than the
   on-duty agent's three perception rungs, so a required condition addressing an absolute timeframe
@@ -71,6 +111,44 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
+
+- **`update_strategy_signal_rule` requires `confirm: true` when the strategy has bound agents**
+  (51.0.0, `fix-signal-rule-patch-semantics`). The write re-materializes scoring configuration onto
+  every bound agent immediately — including agents holding open USDC positions — and until now
+  nothing on the server asked. A rule edit on a strategy with one or more bound agents is refused
+  without the flag, and the message names the count. An edit on a strategy with **nothing bound is
+  unaffected**, and so is every path through the web editor.
+
+  **Send `confirm: true`.** That is the whole migration, and `confirm` is published on the input
+  schema — but nothing in the schema says WHEN it becomes mandatory, because the condition is the
+  bound-agent count rather than the shape of your body. The refusal rides the existing
+  `VALIDATION_ERROR` code, so a client that omits it discovers the rule at the refusal.
+
+  Why it moved to the server: the guard existed, but only as served prose the calling model could
+  decline — and did, twice in production on 2026-08-24. `archive_strategy` and
+  `rebind_intelligence_agent` have taken a server-enforced `confirm` all along; single-rule tuning
+  was the outlier among its own siblings, and it is the one that writes to scoring.
+
+- **A radar deployment is refused when its strategy reads a session-field scalar** (50.0.0,
+  `own-scan-served-set-once`). `upsert_radar_deployment` refuses a deployment whose slot agents'
+  bound strategy carries a condition reading one of five SESSION-FIELD scalars — `fieldPlayers`,
+  `fieldUpBias`, `fieldBiasDir`, `captConc`, `picksSpread` — with
+  `CONDITION_OPERAND_UNSERVED_IN_LANE`. A body accepted under 49.5.0 is refused under 50.0.0
+  without one byte of it changing.
+
+  **Why a refusal and not a warning.** Those five describe a game SESSION, and radar runs outside a
+  session at BOTH its stages — so such a condition can never resolve there. The deployment formed
+  no fire edge and the agent did nothing on that coin, silently, forever. The refusal converts a
+  permanent silence into an error at the moment you author it.
+
+  **Migrate** by moving the clause to a scalar radar reads — the Market Breadth or Reference Pairs
+  families, which are market-wide reads with no session dimension — or by binding the strategy to
+  an arena agent instead. The error carries both halves: `allowedDomain` enumerates every servable
+  header, and the message names the sections.
+
+  **Strategy authoring is untouched by this bump.** The same strategy is legal, and reads those
+  scalars correctly, on an arena agent — which is why the refusal is on the DEPLOYMENT and not on
+  `compile_strategy_plan` / `apply_strategy_plan`.
 
 - **A benchmark-bound section no longer accepts crowd metrics or rank transforms** (49.0.0,
   `fix-benchmark-legality-save-path`). On a custom section carrying a non-null `benchmarkTicker`, a
@@ -178,6 +256,22 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **`update_strategy_signal_rule` gains its own response envelope** (51.0.0,
+  `fix-signal-rule-patch-semantics`). It no longer shares `{ strategy }` with its siblings. The
+  response is `{ strategy, ruleChanges }`, where `ruleChanges` is the server's own before/after
+  pair for the edited signal — `[{ signalId, before, after }]`, each side a full rule object. It is
+  `null` when the mutation changed no rule, **never `[]`**.
+
+  **Report the change from that pair, not from memory.** The planner always computed the diff and
+  the tool discarded it, so a caller narrating what it just did had only its own recollection of
+  the before-value. One production edit shipped a wrong receipt on top of a wrong write that way,
+  and the write was unreconstructable from the audit trail afterwards.
+
+  Additive, but published on a `.strict()` shape — a decoder pinned to the old two-key object
+  rejects the new key. `fork_strategy`, `archive_strategy` and `restore_strategy` keep the shared
+  `StrategyResponseSchema` and publish exactly what they did; it was deliberately NOT widened for
+  them, so this reshape reaches one tool only.
 
 - **An entry void now names the gate that refused it** (49.5.0,
   `fix-arming-trigger-clock-authority`), on `get_radar_activity_summary`. In the cause rollup, the
