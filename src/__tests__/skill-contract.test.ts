@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,11 +59,41 @@ const digest: ContractDigest = JSON.parse(
   readFileSync(join(repoRoot, 'src', '__fixtures__', 'authoring-contract-digest.json'), 'utf8'),
 ) as ContractDigest;
 
+const EXPORTED_SKILL = join(repoRoot, 'skills', 'battlegrid-strategy-examples');
+
 /** The exported document that states the authoring contract. */
-const skill = readFileSync(
-  join(repoRoot, 'skills', 'battlegrid-strategy-examples', 'SKILL.md'),
-  'utf8',
-);
+const skill = readFileSync(join(EXPORTED_SKILL, 'SKILL.md'), 'utf8');
+
+/**
+ * A skill's WHOLE SHIPPED TEXT — its SKILL.md plus every reference it declares.
+ *
+ * WHY THE ABSENCE SCAN READS THIS AND THE AXIS CHECKS DO NOT. The contract statement lives in the
+ * body by design, so the axis and domain checks below stay pointed at `skill`. A vocabulary-absence
+ * claim, though, can be written anywhere in the shipped text, and the exporting repository has begun
+ * splitting worked material out of SKILL.md into `references/` (stage-3 disclosure — a skill's
+ * playbooks and TradingView ports are consulted once and should not sit pinned in an agent's
+ * context). A body-only scan would keep passing while its coverage silently shrank.
+ *
+ * That is not a hypothetical for THIS document. The phrase `not addressable` is in the list below
+ * for one recorded reason: a metric-absence claim shipped to npm from section 8 of the
+ * TradingView-ports document, written with unbackticked keys so the key check could not see it and
+ * with a synonym the phrase list did not carry. That is exactly the document now moving into
+ * `references/`.
+ *
+ * A NO-OP UNTIL REFERENCES ARRIVE, deliberately: the export currently ships one file per skill, so
+ * this returns the body unchanged today and widens by itself the moment the exporter sends more.
+ * Written now because it must be in place BEFORE the first export that carries a reference — after
+ * would mean a window in which the gate had quietly narrowed.
+ */
+function shippedText(): string {
+  const directory = join(EXPORTED_SKILL, 'references');
+  const references = existsSync(directory)
+    ? readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => readFileSync(join(directory, entry.name), 'utf8'))
+    : [];
+  return [skill, ...references].join('\n');
+}
 
 /** Where each documented axis states its contract, in the exported document. */
 const AXIS_HEADING: Readonly<Record<string, string>> = {
@@ -180,6 +210,8 @@ describe('published skill states the live authoring contract', () => {
 });
 
 describe('published skill states no unverifiable vocabulary absence', () => {
+  // The declared section stays in the SKILL.md — it is the one anchor this gate locates by name, and
+  // a gate that had to find its anchor across a file set would gain a failure mode for no benefit.
   const claimed = [...sectionBody(skill, ABSENCE_HEADING).matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map(
     (match) => match[1],
   );
@@ -197,8 +229,10 @@ describe('published skill states no unverifiable vocabulary absence', () => {
   });
 
   it.each(ABSENCE_PHRASES)('carries no unnameable "%s" claim outside that section', (phrase) => {
+    // The WHOLE shipped text, not the body: moving prose into `references/` must not move it out of
+    // this gate. See `shippedText`.
     const declared = normalized(sectionBody(skill, ABSENCE_HEADING));
-    const outside = normalized(skill).split(declared);
+    const outside = normalized(shippedText()).split(declared);
     expect(outside.filter((part) => part.includes(phrase))).toEqual([]);
   });
 });
@@ -218,6 +252,43 @@ describe('the contract check fails on the drift it was written for', () => {
     const served = new Set(digest.metricKeys);
     const rows = [...'| Keltner | `KC_UPPER` |'.matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map((m) => m[1]);
     expect(rows.filter((key) => served.has(key))).toEqual(['KC_UPPER']);
+  });
+
+  it('sees a claim planted in a REFERENCE file, not only in the body', () => {
+    // The regression this widening exists for, and it has already happened once — a metric-absence
+    // claim reached npm from the TradingView-ports document, which is the document stage-3
+    // disclosure moves into `references/`.
+    //
+    // Driven from a SYNTHETIC shipped text rather than the real one, because the export currently
+    // ships no reference files: a test that only exercised the widening once references existed
+    // would be dormant in exactly the window the widening was written for.
+    const declared = normalized(sectionBody(skill, ABSENCE_HEADING));
+    const withReference = `${skill}\n# Ports\n\nKeltner is not in the catalog, so substitute.`;
+
+    const bodyOnly = normalized(skill).split(declared);
+    expect(bodyOnly.filter((part) => part.includes('not in the catalog'))).toEqual([]);
+
+    const wholeText = normalized(withReference).split(declared);
+    expect(
+      wholeText.filter((part) => part.includes('not in the catalog')),
+      'a body-only scan reads this as clean while the false claim ships',
+    ).not.toEqual([]);
+  });
+
+  it('reads every reference file the export ships, not just the first', () => {
+    // Pins the enumeration itself. A `shippedText` that read one file, or stopped at a
+    // non-`.md` entry, would narrow the gate silently — the failure mode being fixed here.
+    const text = shippedText();
+    expect(text.startsWith(skill)).toBe(true);
+
+    const directory = join(EXPORTED_SKILL, 'references');
+    const shipped = existsSync(directory)
+      ? readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile())
+      : [];
+    for (const entry of shipped) {
+      const contents = readFileSync(join(directory, entry.name), 'utf8');
+      expect(text.includes(contents), `${entry.name} is shipped but not scanned`).toBe(true);
+    }
   });
 
   it('sees a wrapped claim a line-based scan would miss', () => {
