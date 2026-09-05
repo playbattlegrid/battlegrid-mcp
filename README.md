@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v52
+## Contract history — v37 → v53
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -111,6 +111,21 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
+
+- **A condition naming a `swingHi` / `swingLo` header is refused — the indicator is a Donchian
+  channel** (53.0.0, `rename-donchian-channel`). The rolling-window extremes indicator computed the
+  highest high and lowest low of the trailing 20 closed bars — a Donchian channel — under a swing
+  point's name, and the name asserted a property the value does not have (a swing high survives being
+  broken; a channel edge re-anchors the instant it is). Every layer of the vocabulary moves at once,
+  with no alias: a clause on `compile_strategy_plan`, `apply_strategy_plan` or `fork_strategy` naming
+  a header on the old stems — `dist_swingLo`, `dist_swingHi_4h`, `dist_swingLo_rank_near`, any
+  timeframe- or rank-suffixed form — is refused as `CONDITION_COLUMN_UNKNOWN` where 52.0.0 accepted
+  it. The same shapes exist on the `donchianHi` / `donchianLo` stems, which
+  `get_strategy_column_contract` lists with the labels *20-bar high* / *20-bar low*. Every value is
+  the same number under its new name.
+
+  **Rename the stems** (`swingHi` → `donchianHi`, `swingLo` → `donchianLo`, suffixes unchanged) in
+  every condition and Market Read marker you author. That is the whole migration for what you send.
 
 - **`entry.levelSource` is refused — the level is derived, never authored** (52.0.0,
   `derive-entry-level`). The strict `entry` object on `compile_strategy_plan`, `apply_strategy_plan`
@@ -258,6 +273,11 @@ refuse is now stored. Listed because a client that special-cased the refusal can
 
 ### Removed — no alias exists
 
+- **`SWING_LOW` / `SWING_HIGH` leave the stop and take-profit method enums, and the four S/R
+  indicator keys leave the signal vocabulary** (53.0.0, `rename-donchian-channel`). `DONCHIAN_LOWER`
+  / `DONCHIAN_UPPER` and `donchian_upper` / `donchian_lower` / `prev_donchian_upper` /
+  `prev_donchian_lower` carry the same values; nothing answers to the old names.
+
 - **`get_coin_market_context` is REMOVED** (40.0.0, `retire-get-coin-market-context`). Calling it
   returns an unknown-tool error. There is deliberately **no alias**: a silent redirect would hide a
   payload shape change from a client that never asked for one. Use `get_market_context`.
@@ -270,6 +290,19 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **Report headers, glosses and signal indicator keys are renamed for the Donchian channel**
+  (53.0.0, `rename-donchian-channel`). Every report surface — `preview_strategy_report`,
+  `get_strategy_section_template`, the agent prompt previews — renders `donchianHi` / `donchianLo`
+  and their `dist_…` / `…_rank_near` forms where it rendered `swingHi` / `swingLo`, with the labels
+  *20-bar high* / *20-bar low* and glosses that say what the number is (the highest high / lowest low
+  of the last 20 closed bars — the channel's edges). Signal definitions
+  (`get_strategy_signal_definition`, `list_strategy_signals`) and signal-log `indicatorValues`
+  carry `donchian_upper` / `donchian_lower` / `prev_donchian_upper` / `prev_donchian_lower` for the
+  four S/R signals. Signal ids, the `SUPPORT_RESISTANCE` module and its display names are unchanged.
+
+  **Read the new keys.** A reader keyed on `swing_high` / `swing_low` finds nothing; the values are
+  the same numbers under the new keys.
 
 - **The stored entry discipline no longer names a level source** (52.0.0, `derive-entry-level`).
   `StrategyDTO.entry` (`get_strategy`, `list_strategies`, the `fork_strategy` / `archive_strategy` /
@@ -339,6 +372,11 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   `get_radar_activity_summary` is added. A client reading the curve off a later page finds it absent.
 
 ### Widened enum — new members your own copy rejects
+
+- **The stop and take-profit method enums gain `DONCHIAN_LOWER` / `DONCHIAN_UPPER`** (53.0.0,
+  `rename-donchian-channel`), replacing `SWING_LOW` / `SWING_HIGH` on the signal-pipeline detail
+  schemas — trade-setup options, R:R-rejected pairs and candidate levels. A copy of either enum that
+  rejects unknown members must add the two new ones; the two old ones never appear again.
 
 - **`TradeExecutionFailureReason` gains `LEVEL_NOT_RESTABLE`** (52.0.0, `derive-entry-level`): a
   level entry refused at placement because its resting price sat on the wrong side of the exchange
