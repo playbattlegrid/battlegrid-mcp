@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v51
+## Contract history — v37 → v52
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -111,6 +111,21 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
+
+- **`entry.levelSource` is refused — the level is derived, never authored** (52.0.0,
+  `derive-entry-level`). The strict `entry` object on `compile_strategy_plan`, `apply_strategy_plan`
+  and `fork_strategy` is six keys — `trigger`, `confirmTf`, `closes`, `bandAtrMultiple`,
+  `levelOffsetAtrMultiple`, `validForBars` — and a body carrying `levelSource` is refused naming
+  the key where 51.0.0 accepted it. `STOP_THROUGH_LEVEL` rests a stop past the swing channel's
+  CURRENT edge in the trade's direction (the 20-bar high for a long, the 20-bar low for a short);
+  `ON_RETEST` rests a limit in front of the edge a close most recently BROKE. Your two dials are the
+  unsigned distance from that edge (`levelOffsetAtrMultiple`, 0–2 ATR; a long adds, a short
+  subtracts) and the bar validity (`validForBars`, 1–24). A meaningful `validForBars` under
+  `AT_SIGNAL` or `ON_CANDLE_CLOSE` is now refused as `PARAMETER_NOT_HONOURED` like the other level
+  dials.
+
+  **Drop the key.** That is the whole migration for what you send; the six-key example below is
+  the current shape.
 
 - **`update_strategy_signal_rule` requires `confirm: true` when the strategy has bound agents**
   (51.0.0, `fix-signal-rule-patch-semantics`). The write re-materializes scoring configuration onto
@@ -201,11 +216,11 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   that clause into its own LIVE condition and `conditionRef` it. `exit: true` is legal only under
   `clock: "CLOSE"` — an exit fired on a forming bar is an intrabar exit.
 
-- **A strategy requires a seven-key `entry` object** (44.0.0 for four keys, 47.0.0 for three more —
-  `add-entry-on-close`, `add-level-trigger-execution`). Required on every CREATE, on
-  `compile_strategy_plan`, `apply_strategy_plan` and `update_intelligence_agent`. A client sending
-  44.0.0's four-key object is refused under 47 with `entry.levelSource: Required` without one byte of
-  it changing.
+- **A strategy requires a six-key `entry` object** (44.0.0 for four keys, 47.0.0 for three more —
+  `add-entry-on-close`, `add-level-trigger-execution` — and 52.0.0 removed `levelSource`,
+  `derive-entry-level`). Required on every CREATE, on `compile_strategy_plan`, `apply_strategy_plan`
+  and `update_intelligence_agent`. A client sending 44.0.0's four-key object is refused with
+  `entry.levelOffsetAtrMultiple: Required` without one byte of it changing.
 
   ```jsonc
   "entry": {
@@ -213,14 +228,13 @@ refuse is now stored. Listed because a client that special-cased the refusal can
     "confirmTf": "4h",               // the strategy timeframe or the rung below it — nothing else
     "closes": 1,                     // 1–5; must be 1 unless ON_CANDLE_CLOSE
     "bandAtrMultiple": 1.0,          // > 0, and <= the platform's entry-deviation gate
-    "levelSource": "SWING_HIGH",     // | SWING_LOW | BOLLINGER_UPPER | BOLLINGER_LOWER
-    "levelOffsetAtrMultiple": 0,     // 0–2, UNSIGNED; must be 0 unless a level trigger
-    "validForBars": 4                // 1–24 of the strategy's own bars
+    "levelOffsetAtrMultiple": 0,     // 0–2, UNSIGNED distance from the derived edge; 0 unless a level trigger
+    "validForBars": 4                // 1–24 of the strategy's own bars; 4 unless a level trigger
   }
   ```
 
   `AT_SIGNAL` with those values is byte-identical to pre-44 behaviour. The legality matrix runs one
-  way: all seven keys are always present, so a MEANINGFUL value under a trigger that ignores it is
+  way: all six keys are always present, so a MEANINGFUL value under a trigger that ignores it is
   refused rather than accepted-and-dropped — a dial never silently does nothing.
 
 - **A `strategyTimeframe` the platform does not ingest is refused** (39.0.0,
@@ -256,6 +270,15 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **The stored entry discipline no longer names a level source** (52.0.0, `derive-entry-level`).
+  `StrategyDTO.entry` (`get_strategy`, `list_strategies`, the `fork_strategy` / `archive_strategy` /
+  `restore_strategy` envelopes) and the apply envelope's `postState.entry` lose `levelSource`.
+  `TradeOutcomeDTO.entryDiscipline` (`get_trade_outcome_by_decision`, `list_trade_outcomes`) loses
+  it and gains `levelOffsetAtrMultiple: number | null` — the offset in force at the fire, `null` on
+  rows written before its column existed. A reader that rendered the level source renders the
+  geometry from `trigger` and the outcome's `direction` instead: which edge and which order shape
+  are a pure function of those two fields, so no stored copy is served.
 
 - **`update_strategy_signal_rule` gains its own response envelope** (51.0.0,
   `fix-signal-rule-patch-semantics`). It no longer shares `{ strategy }` with its siblings. The
@@ -316,6 +339,13 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   `get_radar_activity_summary` is added. A client reading the curve off a later page finds it absent.
 
 ### Widened enum — new members your own copy rejects
+
+- **`TradeExecutionFailureReason` gains `LEVEL_NOT_RESTABLE`** (52.0.0, `derive-entry-level`): a
+  level entry refused at placement because its resting price sat on the wrong side of the exchange
+  mid — a buy stop at or below it, a buy limit at or above it, and the mirror for a sell. It appears
+  on the `list_signal_logs` failure-reason filter input and on the signal-pipeline execution
+  summary's `failureReason`, with origin `CLIENT_GATE`. There is no distance limit: a level far from
+  the mark rests until its bar validity expires.
 
 - **The authorable metric vocabulary widens by 29 keys** (46.1.0, `add-indicator-catalog-coverage`):
   Keltner (`KC_UPPER`/`KC_MID`/`KC_LOWER`), Supertrend (`ST_LINE`/`ST_DIR`), Hull (`HMA20`),
