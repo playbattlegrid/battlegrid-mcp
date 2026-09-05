@@ -86,6 +86,21 @@ describe('skill package', () => {
     }
   });
 
+  it('root SKILL.md names every exported skill directory', () => {
+    // The root skill is the proxy-authored pointer into the exports (its table is the only place an
+    // agent learns which skill to open), so an exported directory it does not name is unreachable.
+    const rootSkill = readFileSync(join(repoRoot, 'SKILL.md'), 'utf8');
+    const skillsDir = join(repoRoot, 'skills');
+    const exported = readdirSync(skillsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith('battlegrid-'))
+      .map((entry) => entry.name);
+
+    expect(exported.length).toBeGreaterThan(0);
+    for (const directory of exported) {
+      expect(rootSkill, `root SKILL.md must name ${directory}`).toContain(`\`${directory}\``);
+    }
+  });
+
   it('all four release version values agree (the publish gate fails closed on a mismatch)', () => {
     const lock = JSON.parse(readFileSync(join(repoRoot, 'package-lock.json'), 'utf8')) as {
       version: string;

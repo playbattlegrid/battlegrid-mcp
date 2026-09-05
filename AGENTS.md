@@ -78,8 +78,9 @@ Nine skills ship from this repo (and inside the npm tarball, under `SKILL.md` + 
 | `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
 | `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
 | `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
+| `battlegrid-trade-proposal` | Find and stage a trade for one of your agents: check what is already held, scan every active coin against the agent's own gates, propose on one through the agent's own conversational turn, present the outcome with its conviction, and approve or decline only on your word |
 
-The eight `skills/battlegrid-*` are exported from BattleGrid's server repository, so they describe
+The nine `skills/battlegrid-*` are exported from BattleGrid's server repository, so they describe
 the same tools this proxy forwards. They are generated files: they are never edited in this
 repository, and `skill-provenance.test.ts` fails CI on a hand edit.
 
