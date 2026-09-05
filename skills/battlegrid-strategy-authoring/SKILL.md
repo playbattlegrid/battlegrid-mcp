@@ -100,11 +100,11 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   yourself on a CREATE is refused with a hint telling you to omit `sectionKey` on CREATE; on an
   UPDATE, send back the key the compile returned. This is the one composition field whose right
   answer is "leave it out".
-- **The `entry` axis is required on every CREATE**, all seven keys, no defaults — `trigger`,
-  `confirmTf`, `closes`, `bandAtrMultiple`, `levelSource`, `levelOffsetAtrMultiple`,
-  `validForBars`. It decides when (and for the level triggers, where) an entry is taken. The
-  `strategy-examples` skill carries the vocabulary and the one-directional legality matrix; a
-  CREATE without it is refused outright.
+- **The `entry` axis is required on every CREATE**, all six keys, no defaults — `trigger`,
+  `confirmTf`, `closes`, `bandAtrMultiple`, `levelOffsetAtrMultiple`, `validForBars`. It decides
+  when an entry is taken; for the level triggers the level itself is derived from the trigger and
+  the trade's direction, never named. The `strategy-examples` skill carries the vocabulary and the
+  one-directional legality matrix; a CREATE without it is refused outright.
 - `get_strategy_column_contract` → `outputs[].conditionOperators`. An empty array means that
   rendered header has no comparison semantics and cannot appear in a condition clause at all.
   Legality is per rendered header, not per column: a trajectory's slot header and its `_trend`

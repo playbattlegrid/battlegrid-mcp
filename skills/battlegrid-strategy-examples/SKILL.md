@@ -134,9 +134,10 @@ anchor, or the author gates on something that admits most bars.
 
 ## Entry
 
-`{ trigger, confirmTf, closes, bandAtrMultiple, levelSource, levelOffsetAtrMultiple,
-validForBars }` — all seven required on every CREATE, no defaults. This axis is replaced WHOLE
-on save, so an omitted key would silently revert an author's discipline rather than be refused.
+`{ trigger, confirmTf, closes, bandAtrMultiple, levelOffsetAtrMultiple, validForBars }` — all six
+required on every CREATE, no defaults. This axis is replaced WHOLE on save, so an omitted key would
+silently revert an author's discipline rather than be refused. There is no level-source key: the
+level a level trigger rests at is DERIVED from the trigger and the trade's direction, never named.
 
 **The trigger decides WHEN, and for two of them WHERE, an entry is taken.**
 
@@ -144,11 +145,14 @@ on save, so an omitted key would silently revert an author's discipline rather t
   the tape, keeping the platform's flat wall-clock entry window. Today's behaviour.
 - `ON_CANDLE_CLOSE` — the flip ARMS the pair; the entry is taken only after a close on
   `confirmTf` that still reads the conditions true and has not displaced beyond the band.
-- `STOP_THROUGH_LEVEL` — a TRIGGER order rests at the authored level ± offset and the exchange
-  book is the watcher; the entry is taken when price trades through, not when the platform
-  notices.
-- `ON_RETEST` — a LIMIT order rests at the broken level, waiting for a return to it. Not filling
-  is a correct outcome, not a failure.
+- `STOP_THROUGH_LEVEL` — a TRIGGER order rests past the swing channel's CURRENT edge in the
+  trade's direction (the 20-bar high for a long, the 20-bar low for a short) by the offset, and
+  the exchange book is the watcher; the entry is taken when price trades through, not when the
+  platform notices.
+- `ON_RETEST` — a LIMIT order rests in front of the edge a close most recently BROKE (the
+  channel's break memory: the broken high for a long, the broken low for a short) by the offset,
+  waiting for a return to it. Not filling is a correct outcome, not a failure; no unrecovered
+  break in memory means no setup, never a fallback level.
 
 `confirmTf` is the bar whose close confirms. Exactly two values are legal: the strategy's own
 timeframe and the rung below it — one only, when the strategy sits on the ladder floor. It is
@@ -161,17 +165,20 @@ ATR against the armed verdict. Strictly greater than zero — zero is not "no fi
 that voids on any adverse move — and at or below the platform's own entry-deviation gate, since
 a wider band cannot refuse anything the platform will not refuse anyway.
 
-`levelSource` is one of `SWING_HIGH`, `SWING_LOW`, `BOLLINGER_UPPER`, `BOLLINGER_LOWER`,
-resolved once at decision time. `levelOffsetAtrMultiple` (0–2) is an UNSIGNED magnitude — the
-direction is implied by the trigger and the verdict, so a signed value would invert the
-trigger's meaning. `validForBars` (1–24) denominates validity in the strategy's OWN bars rather
-than minutes, because a 1h setup waiting for a retest has not failed after fifteen minutes.
+`levelOffsetAtrMultiple` (0–2) is an UNSIGNED distance from the derived edge in ATR multiples — a
+long adds it, a short subtracts it, so a breakout stop rests past its edge and a pullback limit
+rests in front of its edge, and a signed value would invert the trigger's meaning. `validForBars`
+(1–24) denominates validity in the strategy's OWN bars rather than minutes, because a 1h setup
+waiting for a retest has not failed after fifteen minutes. The resting price must sit on the
+correct side of the mark when the order is placed — a buy stop above it, a buy limit below it, the
+mirror for a sell — or the entry is refused rather than filled at the market; there is no limit on
+how far from the mark a level may rest.
 
-**The legality matrix runs one way.** All seven keys are always present, so the question is
-never "is it set" but "is it set to something that MEANS anything under this trigger".
-`closes` ≠ 1 is refused under any trigger but `ON_CANDLE_CLOSE`; `levelOffsetAtrMultiple` ≠ 0 is
-refused under a non-level trigger. Leave a dial at its inert value rather than setting one the
-platform will ignore.
+**The legality matrix runs one way.** All six keys are always present, so the question is never
+"is it set" but "is it set to something that MEANS anything under this trigger". `closes` ≠ 1 is
+refused under any trigger but `ON_CANDLE_CLOSE`; `levelOffsetAtrMultiple` ≠ 0 and `validForBars`
+≠ 4 are refused under a non-level trigger. Leave a dial at its inert value rather than setting one
+the platform will ignore.
 
 ## Report sections
 

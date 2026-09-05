@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "51.0.0"
+    "contractVersion": "52.0.0"
   },
   "axes": {
     "create": [
@@ -40,7 +40,6 @@
       "closes",
       "confirmTf",
       "levelOffsetAtrMultiple",
-      "levelSource",
       "trigger",
       "validForBars"
     ],
@@ -101,12 +100,6 @@
       "ON_RETEST",
       "STOP_THROUGH_LEVEL"
     ],
-    "entryLevelSource": [
-      "BOLLINGER_LOWER",
-      "BOLLINGER_UPPER",
-      "SWING_HIGH",
-      "SWING_LOW"
-    ],
     "conditionClock": [
       "CLOSE",
       "LIVE"
@@ -119,7 +112,9 @@
   },
   "bounds": {
     "conditionMaxCloses": 5,
-    "entryMaxCloses": 5
+    "entryMaxCloses": 5,
+    "entryMaxLevelOffsetAtrMultiple": 2,
+    "entryMaxValidForBars": 24
   },
   "metricKeys": [
     "ADX",
