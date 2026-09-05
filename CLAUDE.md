@@ -17,7 +17,7 @@ schemas, contract semantics, and error vocabularies all live there.
 
 ## `skills/battlegrid-*` is generated — never edit it here
 
-The eight `skills/battlegrid-*` directories, `skills/EXPORT.json`, and
+The nine `skills/battlegrid-*` directories, `skills/EXPORT.json`, and
 `src/__fixtures__/authoring-contract-digest.json` are **written by
 `battlegrid-app/server/scripts/export-mcp-skills.mjs`** and arrive by pull request from its
 `.github/workflows/mcp-skills-export.yml`. They are the same instructions BattleGrid's in-app
@@ -200,7 +200,7 @@ src/__fixtures__/      the vendored authoring-contract digest (generated — see
 AGENTS.md              discovery file for external agents — how to CONNECT
 README.md              user docs + contract history; SHIPS in the tarball
 SKILL.md               the published connection skill, authored here
-skills/battlegrid-*/   the eight exported skills (generated — see above)
+skills/battlegrid-*/   the nine exported skills (generated — see above)
 skills/EXPORT.json     the export's hash manifest (generated)
 scripts/               shipped-paths.mjs — the one definition of "changes the tarball"
 site/                  the GitHub Pages site (CNAME + index.html)

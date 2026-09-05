@@ -145,7 +145,7 @@ level a level trigger rests at is DERIVED from the trigger and the trade's direc
   the tape, keeping the platform's flat wall-clock entry window. Today's behaviour.
 - `ON_CANDLE_CLOSE` — the flip ARMS the pair; the entry is taken only after a close on
   `confirmTf` that still reads the conditions true and has not displaced beyond the band.
-- `STOP_THROUGH_LEVEL` — a TRIGGER order rests past the Donchian channel's CURRENT edge in the
+- `STOP_THROUGH_LEVEL` — a TRIGGER order rests past the swing channel's CURRENT edge in the
   trade's direction (the 20-bar high for a long, the 20-bar low for a short) by the offset, and
   the exchange book is the watcher; the entry is taken when price trades through, not when the
   platform notices.
