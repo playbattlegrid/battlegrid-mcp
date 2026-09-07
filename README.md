@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v52
+## Contract history — v37 → v53
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -111,6 +111,21 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
+
+- **A condition naming a `swingHi` / `swingLo` header is refused — the indicator is a Donchian
+  channel** (53.0.0, `rename-donchian-channel`). The rolling-window extremes indicator computed the
+  highest high and lowest low of the trailing 20 closed bars — a Donchian channel — under a swing
+  point's name, and the name asserted a property the value does not have (a swing high survives being
+  broken; a channel edge re-anchors the instant it is). Every layer of the vocabulary moves at once,
+  with no alias: a clause on `compile_strategy_plan`, `apply_strategy_plan` or `fork_strategy` naming
+  a header on the old stems — `dist_swingLo`, `dist_swingHi_4h`, `dist_swingLo_rank_near`, any
+  timeframe- or rank-suffixed form — is refused as `CONDITION_COLUMN_UNKNOWN` where 52.0.0 accepted
+  it. The same shapes exist on the `donchianHi` / `donchianLo` stems, which
+  `get_strategy_column_contract` lists with the labels *20-bar high* / *20-bar low*. Every value is
+  the same number under its new name.
+
+  **Rename the stems** (`swingHi` → `donchianHi`, `swingLo` → `donchianLo`, suffixes unchanged) in
+  every condition and Market Read marker you author. That is the whole migration for what you send.
 
 - **`entry.levelSource` is refused — the level is derived, never authored** (52.0.0,
   `derive-entry-level`). The strict `entry` object on `compile_strategy_plan`, `apply_strategy_plan`
@@ -258,6 +273,11 @@ refuse is now stored. Listed because a client that special-cased the refusal can
 
 ### Removed — no alias exists
 
+- **`SWING_LOW` / `SWING_HIGH` leave the stop and take-profit method enums, and the four S/R
+  indicator keys leave the signal vocabulary** (53.0.0, `rename-donchian-channel`). `DONCHIAN_LOWER`
+  / `DONCHIAN_UPPER` and `donchian_upper` / `donchian_lower` / `prev_donchian_upper` /
+  `prev_donchian_lower` carry the same values; nothing answers to the old names.
+
 - **`get_coin_market_context` is REMOVED** (40.0.0, `retire-get-coin-market-context`). Calling it
   returns an unknown-tool error. There is deliberately **no alias**: a silent redirect would hide a
   payload shape change from a client that never asked for one. Use `get_market_context`.
@@ -270,6 +290,19 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **Report headers, glosses and signal indicator keys are renamed for the Donchian channel**
+  (53.0.0, `rename-donchian-channel`). Every report surface — `preview_strategy_report`,
+  `get_strategy_section_template`, the agent prompt previews — renders `donchianHi` / `donchianLo`
+  and their `dist_…` / `…_rank_near` forms where it rendered `swingHi` / `swingLo`, with the labels
+  *20-bar high* / *20-bar low* and glosses that say what the number is (the highest high / lowest low
+  of the last 20 closed bars — the channel's edges). Signal definitions
+  (`get_strategy_signal_definition`, `list_strategy_signals`) and signal-log `indicatorValues`
+  carry `donchian_upper` / `donchian_lower` / `prev_donchian_upper` / `prev_donchian_lower` for the
+  four S/R signals. Signal ids, the `SUPPORT_RESISTANCE` module and its display names are unchanged.
+
+  **Read the new keys.** A reader keyed on `swing_high` / `swing_low` finds nothing; the values are
+  the same numbers under the new keys.
 
 - **The stored entry discipline no longer names a level source** (52.0.0, `derive-entry-level`).
   `StrategyDTO.entry` (`get_strategy`, `list_strategies`, the `fork_strategy` / `archive_strategy` /
@@ -339,6 +372,11 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   `get_radar_activity_summary` is added. A client reading the curve off a later page finds it absent.
 
 ### Widened enum — new members your own copy rejects
+
+- **The stop and take-profit method enums gain `DONCHIAN_LOWER` / `DONCHIAN_UPPER`** (53.0.0,
+  `rename-donchian-channel`), replacing `SWING_LOW` / `SWING_HIGH` on the signal-pipeline detail
+  schemas — trade-setup options, R:R-rejected pairs and candidate levels. A copy of either enum that
+  rejects unknown members must add the two new ones; the two old ones never appear again.
 
 - **`TradeExecutionFailureReason` gains `LEVEL_NOT_RESTABLE`** (52.0.0, `derive-entry-level`): a
   level entry refused at placement because its resting price sat on the wrong side of the exchange
@@ -668,33 +706,45 @@ The v3 authoring contract below is unchanged and still current:
 
 ## Quick Start
 
-### Single account (stdio transport)
-
-```bash
-BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
-```
-
-### Multiple accounts (stdio transport)
-
-```bash
-BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key npx @battlegrid/mcp-server
-```
-
-When multiple keys are provided, the server discovers each account's identity and injects a required `account` parameter into every tool so the AI agent can choose which account to act as.
-
-### Remote server (streamable-http transport)
+### Remote server, OAuth — start here
 
 ```
 https://mcp.battlegrid.trade/mcp
 ```
 
-No npm install required — connect directly from any MCP client that supports streamable-http.
+Give that URL to your MCP client over its streamable-http (remote) transport and authorize: the
+client registers itself by Dynamic Client Registration, BattleGrid's consent page opens in your
+browser, and you sign in and click **Authorize**. No npm install, no API key. The grant is listed —
+and revocable — under **Profile → MCP → OAuth Sessions**.
+
+### API key and the stdio proxy — the fallback
+
+Reach for a key when your client has no remote transport at all, when your agent runs headless or in
+CI and cannot open a browser to consent, or when one process drives several BattleGrid accounts. It
+is fully supported for each of those, and nothing about it is deprecated.
+
+**Single account (stdio transport):**
+
+```bash
+BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
+```
+
+**Multiple accounts (stdio transport):**
+
+```bash
+BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key npx @battlegrid/mcp-server
+```
+
+When multiple keys are provided, the server discovers each account's identity and injects a required `account` parameter into every tool so the AI agent can choose which account to act as. OAuth has no equivalent — one grant authorizes one account.
 
 ## Configuration
 
 ### Claude Desktop
 
-**Single account:**
+**OAuth (no key):** Settings → **Connectors** → **Add custom connector**. Paste
+`https://mcp.battlegrid.trade/mcp`, save, and authorize on the consent page Claude opens.
+
+**API key (fallback) — single account:**
 
 ```json
 {
@@ -710,7 +760,7 @@ No npm install required — connect directly from any MCP client that supports s
 }
 ```
 
-**Multiple accounts:**
+**API key (fallback) — multiple accounts:**
 
 ```json
 {
@@ -728,21 +778,43 @@ No npm install required — connect directly from any MCP client that supports s
 
 ### Claude Code
 
+**OAuth (no key):**
+
 ```bash
-claude mcp add battlegrid -- npx @battlegrid/mcp-server
+claude mcp add --transport http battlegrid https://mcp.battlegrid.trade/mcp
 ```
 
-Set your API key(s):
+Then start `claude`, run `/mcp`, select **battlegrid** and choose **Authenticate** — the consent page
+opens in your browser and the entry reads connected once you authorize.
+
+**API key (fallback):**
 
 ```bash
 # Single account
-export BATTLEGRID_API_KEY=bg_live_xxx
+claude mcp add battlegrid -e BATTLEGRID_API_KEY=bg_live_xxx -- npx @battlegrid/mcp-server
 
 # Multiple accounts
-export BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key
+claude mcp add battlegrid -e BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key -- npx @battlegrid/mcp-server
 ```
 
 ### Cursor
+
+**OAuth (no key):** Settings → **MCP** → **Add new global MCP server** opens `~/.cursor/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "battlegrid": {
+      "url": "https://mcp.battlegrid.trade/mcp"
+    }
+  }
+}
+```
+
+Back in Settings → MCP, click **Needs login** on `battlegrid` and authorize on BattleGrid's consent
+page; the entry turns green once its tools load.
+
+**API key (fallback):** the same file, with the stdio proxy in place of the remote entry.
 
 ```json
 {
@@ -770,12 +842,16 @@ ChatGPT Desktop connects via **OAuth 2.1** — no npm package or API key needed.
 4. ChatGPT discovers OAuth endpoints, registers as a client (Dynamic Client Registration), and opens BattleGrid's consent page
 5. Log in to BattleGrid and click **Authorize**
 
-| | Claude Desktop / Cursor | ChatGPT Desktop |
+Authentication is a property of the **path**, not of the client — every client above reaches
+BattleGrid either way, so pick the row that matches your runtime rather than your client:
+
+| | Remote + OAuth | API key |
 |---|---|---|
-| **Transport** | stdio proxy (`@battlegrid/mcp-server`) | Direct HTTPS |
-| **Auth** | API key (`bg_live_*`) | OAuth 2.1 (Bearer token) |
-| **Setup** | npm package + env vars | URL + OAuth consent |
-| **Multi-account** | `BATTLEGRID_API_KEYS` env var | One OAuth grant per account |
+| **Transport** | streamable-http, direct to `mcp.battlegrid.trade` | stdio proxy (`@battlegrid/mcp-server`), or the same URL with a Bearer header |
+| **Auth** | OAuth 2.1 with Dynamic Client Registration | API key (`bg_live_*`) as a Bearer token |
+| **Setup** | paste the URL, authorize in the browser | npm package + env vars |
+| **Needs a browser** | yes, once, to consent | no — works headless and in CI |
+| **Multi-account** | one grant per account | `BATTLEGRID_API_KEYS`, several accounts through one proxy |
 
 ## Account management
 
@@ -1003,7 +1079,7 @@ Nine skills ship from this repo, all inside the npm tarball (`SKILL.md`, `skills
 **`battlegrid`** (repo root) is the connection skill and is authored here: how to connect, the
 `{ account, request }` envelope, the two scopes, and where to go for everything else.
 
-The eight `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
+The nine `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
 same instructions BattleGrid's own in-app Commander runs on, which is why they name the same tools
 you reach over MCP:
 
@@ -1017,6 +1093,7 @@ you reach over MCP:
 | `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
 | `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
 | `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
+| `battlegrid-trade-proposal` | Find and stage a trade for one of your agents: check what is already held, scan every active coin against the agent's own gates, propose on one through the agent's own conversational turn, present the outcome with its conviction, and approve or decline only on your word |
 
 > **`skills/battlegrid-*` is generated — do not edit it here.** It is written by
 > `server/scripts/export-mcp-skills.mjs` in `playbattlegrid/battlegrid-app` and arrives by pull

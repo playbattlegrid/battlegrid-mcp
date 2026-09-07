@@ -17,28 +17,36 @@ Machine-readable agent discovery file for `@battlegrid/mcp-server` (thin stdio p
 
 | Field | Value |
 |-------|-------|
-| Method | API Key (stdio) / OAuth 2.1 (remote, ChatGPT Desktop) |
-| Format | `bg_live_*` |
-| Header | `Authorization: Bearer <API_KEY>` |
-| Obtain | https://battlegrid.trade → Profile → MCP tab |
+| Method | OAuth 2.1 with Dynamic Client Registration (default, remote) / API key (fallback — headless, no remote transport, or multi-account). Authentication is a property of the PATH, not of the client. |
+| Format | `bg_live_*` (API key path only) |
+| Header | `Authorization: Bearer <API_KEY>` (API key path only; OAuth carries its own token) |
+| Obtain | OAuth needs nothing to obtain — authorize in the browser. For a key: https://battlegrid.trade → Profile → MCP tab |
 | Scopes | `mcp:read` (discovery + non-financial config writes), `mcp:wager` (financial actions) |
 
 ## Connection
 
-### Option A: npm / stdio
+### Option A: Remote / streamable-http over OAuth — the default
 
-```bash
-# Single account
-BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
-# Multiple accounts
-BATTLEGRID_API_KEYS=bg_live_aaa,bg_live_bbb npx @battlegrid/mcp-server
+```
+URL: https://mcp.battlegrid.trade/mcp
 ```
 
-### Option B: Remote / streamable-http
+Register the URL on a streamable-http transport and authorize: the client registers itself by Dynamic Client Registration and BattleGrid's consent page opens in the browser. No npm package, no API key. Grants are listed and revocable under Profile → MCP → OAuth Sessions.
+
+### Option B: API key — headless, no remote transport, or multi-account
+
+Use a key when the runtime cannot open a browser to consent, when the client speaks stdio only, or when one process drives several BattleGrid accounts (OAuth grants one account each).
 
 ```
 URL: https://mcp.battlegrid.trade/mcp
 Header: Authorization: Bearer bg_live_xxx
+```
+
+```bash
+# npm / stdio, single account
+BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
+# npm / stdio, multiple accounts
+BATTLEGRID_API_KEYS=bg_live_aaa,bg_live_bbb npx @battlegrid/mcp-server
 ```
 
 ## Capabilities — discovered live
@@ -78,8 +86,9 @@ Nine skills ship from this repo (and inside the npm tarball, under `SKILL.md` + 
 | `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
 | `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
 | `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
+| `battlegrid-trade-proposal` | Find and stage a trade for one of your agents: check what is already held, scan every active coin against the agent's own gates, propose on one through the agent's own conversational turn, present the outcome with its conviction, and approve or decline only on your word |
 
-The eight `skills/battlegrid-*` are exported from BattleGrid's server repository, so they describe
+The nine `skills/battlegrid-*` are exported from BattleGrid's server repository, so they describe
 the same tools this proxy forwards. They are generated files: they are never edited in this
 repository, and `skill-provenance.test.ts` fails CI on a hand edit.
 
