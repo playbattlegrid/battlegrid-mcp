@@ -64,8 +64,9 @@ describe('shipped-paths', () => {
       'README.md',
       'LICENSE',
       'SKILL.md',
-      'skills/battlegrid-strategy-studio/SKILL.md',
-      'skills/battlegrid-strategy-studio/references/recipes.md',
+      'skills/EXPORT.json',
+      'skills/battlegrid-strategy-examples/SKILL.md',
+      'skills/battlegrid-arena-play/SKILL.md',
     ]) {
       expect(regex.test(path), `${path} ships and must match`).toBe(true);
     }
