@@ -60,10 +60,10 @@ rules about the columns themselves, not about porting — they live in the skill
 - **VWAP reversion** → `dist_VWAP` band + `dist_VWAP_rank_far lte 5` for board-relative
   stretch; required `NOT [ADX_state in ["trending","extreme"]]` veto; scalp geometry +
   aggressive timeDecay (VWAP anchors daily at 00:00 UTC).
-- **Donchian / Turtle breakout** → `zone is "breakout high"` + `dist_swingHi gte 0` +
+- **Donchian / Turtle breakout** → `zone is "breakout high"` + `dist_donchianHi gte 0` +
   `RVOL gte 1.5`; `sr_resistance_break` 3 required; turtle exits = trend preset (trail from
   1R, giveback 50). Mirror with `"breakdown low"`. **Daily-breakout variant on any anchor:**
-  pin the structure at 1d — `zone_1d is "breakout high"`, `dist_swingHi_1d gte 0` (validated).
+  pin the structure at 1d — `zone_1d is "breakout high"`, `dist_donchianHi_1d gte 0` (validated).
   **Literal previous-day levels are native**: `dist_PDH gte 0` composes directly. Their `{abs: '1d'}`
   binding is stated in `## Header grammar` in the skill body.
 - **ICT / SMC (FVG + order blocks)** → `STRUCT_ZONES` is the native zone engine:

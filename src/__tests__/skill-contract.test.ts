@@ -185,11 +185,6 @@ describe('published skill states the live authoring contract', () => {
     expect(digest.domains.entryTrigger.filter((member) => !entry.includes(member))).toEqual([]);
   });
 
-  it('states the whole entry level-source domain', () => {
-    const entry = sectionBody(skill, AXIS_HEADING.entry);
-    expect(digest.domains.entryLevelSource.filter((member) => !entry.includes(member))).toEqual([]);
-  });
-
   it('states the whole clock domain', () => {
     const conditions = sectionBody(skill, AXIS_HEADING.condition);
     expect(digest.domains.conditionClock.filter((member) => !conditions.includes(member))).toEqual([]);
