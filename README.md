@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v48.1
+## Contract history — v37 → v53
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -32,7 +32,68 @@ and the documentation ships inside the tarball, so a note written but unpublishe
 Both halves are now closed by a rule keyed to the *served* contract rather than to a release of this
 package.
 
+**50.0.0 and 51.0.0 arrived late, and the reason is worth naming.** The re-vendoring errand that
+used to carry these notes is now a generated export
+(`battlegrid-app/server/scripts/export-mcp-skills.mjs`), and it owns three paths — `skills/`,
+`skills/EXPORT.json`, and the vendored digest. It deliberately does not touch this file. So the
+digest kept arriving on time while the note stopped travelling with it, and this section sat at
+v49.5 against a served contract of 51.0.0. Nothing a client could observe was wrong; what was
+missing was the sentence telling them so. **A contract move still needs a human-authored entry
+here, and the export lane will not remind you.**
+
+### Accepted again — input that was rejected now compiles
+
+Nothing to migrate. This is the one direction that cannot break a client: a body the server used to
+refuse is now stored. Listed because a client that special-cased the refusal can delete that branch.
+
+- **A signal rule patch no longer forces you to restate `allocation` and `required`** (51.0.0,
+  `fix-signal-rule-patch-semantics`). On `update_strategy_signal_rule`, and on the `rules` element
+  of `compile_strategy_plan`, both fields become optional and join `params` under ONE omission
+  rule: **an omitted mutable field preserves the stored value for that signal.** "Raise this
+  signal's weight" is now expressible.
+
+  ```jsonc
+  { "strategyId": "…", "expectedRevision": 7, "signalId": "volume_surge",
+    "allocation": 3 }               // `required` and `params` keep exactly what is stored
+  ```
+
+  **Every existing client keeps working** — a complete payload is still a valid patch — so this is
+  listed for what you can now STOP sending. Before it, both fields were mandatory on every rule
+  surface, so a caller that had not first read the current rule had to invent a value it was never
+  asked about. That is not hypothetical: revision 5 of a production strategy flipped `required`
+  false → true unasked while moving a weight 2 → 3, turning a scoring signal into a **mandatory
+  gate** — which changes whether the agent takes trades at all.
+
+  One boundary on the newly legal ground, and it breaks nothing: a patch carrying **no** mutable
+  field is refused — *"A rule patch must change something: supply at least one of allocation,
+  required or params."* — rather than minting a no-op revision. Under 50.0.0 that request could not
+  be formed at all, so nothing that used to work is now refused.
+
+- **An arming trigger no longer constrains its required conditions' clock** (49.4.0,
+  `restore-arming-trigger-authoring`). `compile_strategy_plan`, `apply_strategy_plan` and
+  `fork_strategy` accept a strategy whose entry trigger is `ON_CANDLE_CLOSE`, `STOP_THROUGH_LEVEL`
+  or `ON_RETEST` **while a required condition reads the `LIVE` clock**. v48.1 announced that pairing
+  as rejected, naming the offending condition key on `VALIDATION_ERROR`; that refusal is gone.
+
+  Why it was withdrawn, since the reasoning matters more than the rule: it ran against the whole
+  assembled strategy, so it refused *every* edit to a strategy in that shape — a rename, one report
+  column, one signal weight — plus restore and fork. For a strategy whose required conditions read
+  columns that can never carry a `CLOSE` clock (zone distances, perp/spot flow), there was no legal
+  shape to move to at all. And its premise — that the pairing can never fire — was measured before
+  the arming lifecycle was corrected, and no longer holds.
+
+  The underlying question, *should an entry that waits for a close be decided on a forming bar*, is
+  now settled where the decision is made rather than by refusing the author's declaration.
+
 ### Changed meaning, unchanged shape
+
+- **`blocksScanGate` reads `true` for a class it did not** (50.0.0, `own-scan-served-set-once`), on
+  `preview_radar_resolution`. Blocking is now derived from the lane's **served set** rather than
+  switched over the reach reason, so a `FEED`-reason refusal on an operand no reader in the lane
+  serves BLOCKS instead of deferring. No field changes shape, and a client that already renders the
+  key renders the new answer — but a client that treated `blocksScanGate: false` as "this will
+  resolve once data arrives" now sees a deployment that will not fire. Nothing in the payload tells
+  you this moved.
 
 - **Three tools serve different values for identical input** (47.3.0, `derive-scan-fetch-from-report`).
   The radar scan leg now derives its timeframe fetch from the strategy's **report** rather than the
@@ -50,6 +111,74 @@ package.
   no fetch can discharge. Nothing in the payload tells you this moved.
 
 ### Rejected input — something you author is no longer accepted
+
+- **A condition naming a `swingHi` / `swingLo` header is refused — the indicator is a Donchian
+  channel** (53.0.0, `rename-donchian-channel`). The rolling-window extremes indicator computed the
+  highest high and lowest low of the trailing 20 closed bars — a Donchian channel — under a swing
+  point's name, and the name asserted a property the value does not have (a swing high survives being
+  broken; a channel edge re-anchors the instant it is). Every layer of the vocabulary moves at once,
+  with no alias: a clause on `compile_strategy_plan`, `apply_strategy_plan` or `fork_strategy` naming
+  a header on the old stems — `dist_swingLo`, `dist_swingHi_4h`, `dist_swingLo_rank_near`, any
+  timeframe- or rank-suffixed form — is refused as `CONDITION_COLUMN_UNKNOWN` where 52.0.0 accepted
+  it. The same shapes exist on the `donchianHi` / `donchianLo` stems, which
+  `get_strategy_column_contract` lists with the labels *20-bar high* / *20-bar low*. Every value is
+  the same number under its new name.
+
+  **Rename the stems** (`swingHi` → `donchianHi`, `swingLo` → `donchianLo`, suffixes unchanged) in
+  every condition and Market Read marker you author. That is the whole migration for what you send.
+
+- **`entry.levelSource` is refused — the level is derived, never authored** (52.0.0,
+  `derive-entry-level`). The strict `entry` object on `compile_strategy_plan`, `apply_strategy_plan`
+  and `fork_strategy` is six keys — `trigger`, `confirmTf`, `closes`, `bandAtrMultiple`,
+  `levelOffsetAtrMultiple`, `validForBars` — and a body carrying `levelSource` is refused naming
+  the key where 51.0.0 accepted it. `STOP_THROUGH_LEVEL` rests a stop past the swing channel's
+  CURRENT edge in the trade's direction (the 20-bar high for a long, the 20-bar low for a short);
+  `ON_RETEST` rests a limit in front of the edge a close most recently BROKE. Your two dials are the
+  unsigned distance from that edge (`levelOffsetAtrMultiple`, 0–2 ATR; a long adds, a short
+  subtracts) and the bar validity (`validForBars`, 1–24). A meaningful `validForBars` under
+  `AT_SIGNAL` or `ON_CANDLE_CLOSE` is now refused as `PARAMETER_NOT_HONOURED` like the other level
+  dials.
+
+  **Drop the key.** That is the whole migration for what you send; the six-key example below is
+  the current shape.
+
+- **`update_strategy_signal_rule` requires `confirm: true` when the strategy has bound agents**
+  (51.0.0, `fix-signal-rule-patch-semantics`). The write re-materializes scoring configuration onto
+  every bound agent immediately — including agents holding open USDC positions — and until now
+  nothing on the server asked. A rule edit on a strategy with one or more bound agents is refused
+  without the flag, and the message names the count. An edit on a strategy with **nothing bound is
+  unaffected**, and so is every path through the web editor.
+
+  **Send `confirm: true`.** That is the whole migration, and `confirm` is published on the input
+  schema — but nothing in the schema says WHEN it becomes mandatory, because the condition is the
+  bound-agent count rather than the shape of your body. The refusal rides the existing
+  `VALIDATION_ERROR` code, so a client that omits it discovers the rule at the refusal.
+
+  Why it moved to the server: the guard existed, but only as served prose the calling model could
+  decline — and did, twice in production on 2026-08-24. `archive_strategy` and
+  `rebind_intelligence_agent` have taken a server-enforced `confirm` all along; single-rule tuning
+  was the outlier among its own siblings, and it is the one that writes to scoring.
+
+- **A radar deployment is refused when its strategy reads a session-field scalar** (50.0.0,
+  `own-scan-served-set-once`). `upsert_radar_deployment` refuses a deployment whose slot agents'
+  bound strategy carries a condition reading one of five SESSION-FIELD scalars — `fieldPlayers`,
+  `fieldUpBias`, `fieldBiasDir`, `captConc`, `picksSpread` — with
+  `CONDITION_OPERAND_UNSERVED_IN_LANE`. A body accepted under 49.5.0 is refused under 50.0.0
+  without one byte of it changing.
+
+  **Why a refusal and not a warning.** Those five describe a game SESSION, and radar runs outside a
+  session at BOTH its stages — so such a condition can never resolve there. The deployment formed
+  no fire edge and the agent did nothing on that coin, silently, forever. The refusal converts a
+  permanent silence into an error at the moment you author it.
+
+  **Migrate** by moving the clause to a scalar radar reads — the Market Breadth or Reference Pairs
+  families, which are market-wide reads with no session dimension — or by binding the strategy to
+  an arena agent instead. The error carries both halves: `allowedDomain` enumerates every servable
+  header, and the message names the sections.
+
+  **Strategy authoring is untouched by this bump.** The same strategy is legal, and reads those
+  scalars correctly, on an arena agent — which is why the refusal is on the DEPLOYMENT and not on
+  `compile_strategy_plan` / `apply_strategy_plan`.
 
 - **A benchmark-bound section no longer accepts crowd metrics or rank transforms** (49.0.0,
   `fix-benchmark-legality-save-path`). On a custom section carrying a non-null `benchmarkTicker`, a
@@ -102,11 +231,11 @@ package.
   that clause into its own LIVE condition and `conditionRef` it. `exit: true` is legal only under
   `clock: "CLOSE"` — an exit fired on a forming bar is an intrabar exit.
 
-- **A strategy requires a seven-key `entry` object** (44.0.0 for four keys, 47.0.0 for three more —
-  `add-entry-on-close`, `add-level-trigger-execution`). Required on every CREATE, on
-  `compile_strategy_plan`, `apply_strategy_plan` and `update_intelligence_agent`. A client sending
-  44.0.0's four-key object is refused under 47 with `entry.levelSource: Required` without one byte of
-  it changing.
+- **A strategy requires a six-key `entry` object** (44.0.0 for four keys, 47.0.0 for three more —
+  `add-entry-on-close`, `add-level-trigger-execution` — and 52.0.0 removed `levelSource`,
+  `derive-entry-level`). Required on every CREATE, on `compile_strategy_plan`, `apply_strategy_plan`
+  and `update_intelligence_agent`. A client sending 44.0.0's four-key object is refused with
+  `entry.levelOffsetAtrMultiple: Required` without one byte of it changing.
 
   ```jsonc
   "entry": {
@@ -114,14 +243,13 @@ package.
     "confirmTf": "4h",               // the strategy timeframe or the rung below it — nothing else
     "closes": 1,                     // 1–5; must be 1 unless ON_CANDLE_CLOSE
     "bandAtrMultiple": 1.0,          // > 0, and <= the platform's entry-deviation gate
-    "levelSource": "SWING_HIGH",     // | SWING_LOW | BOLLINGER_UPPER | BOLLINGER_LOWER
-    "levelOffsetAtrMultiple": 0,     // 0–2, UNSIGNED; must be 0 unless a level trigger
-    "validForBars": 4                // 1–24 of the strategy's own bars
+    "levelOffsetAtrMultiple": 0,     // 0–2, UNSIGNED distance from the derived edge; 0 unless a level trigger
+    "validForBars": 4                // 1–24 of the strategy's own bars; 4 unless a level trigger
   }
   ```
 
   `AT_SIGNAL` with those values is byte-identical to pre-44 behaviour. The legality matrix runs one
-  way: all seven keys are always present, so a MEANINGFUL value under a trigger that ignores it is
+  way: all six keys are always present, so a MEANINGFUL value under a trigger that ignores it is
   refused rather than accepted-and-dropped — a dial never silently does nothing.
 
 - **A `strategyTimeframe` the platform does not ingest is refused** (39.0.0,
@@ -145,6 +273,11 @@ package.
 
 ### Removed — no alias exists
 
+- **`SWING_LOW` / `SWING_HIGH` leave the stop and take-profit method enums, and the four S/R
+  indicator keys leave the signal vocabulary** (53.0.0, `rename-donchian-channel`). `DONCHIAN_LOWER`
+  / `DONCHIAN_UPPER` and `donchian_upper` / `donchian_lower` / `prev_donchian_upper` /
+  `prev_donchian_lower` carry the same values; nothing answers to the old names.
+
 - **`get_coin_market_context` is REMOVED** (40.0.0, `retire-get-coin-market-context`). Calling it
   returns an unknown-tool error. There is deliberately **no alias**: a silent redirect would hide a
   payload shape change from a client that never asked for one. Use `get_market_context`.
@@ -157,6 +290,61 @@ package.
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **Report headers, glosses and signal indicator keys are renamed for the Donchian channel**
+  (53.0.0, `rename-donchian-channel`). Every report surface — `preview_strategy_report`,
+  `get_strategy_section_template`, the agent prompt previews — renders `donchianHi` / `donchianLo`
+  and their `dist_…` / `…_rank_near` forms where it rendered `swingHi` / `swingLo`, with the labels
+  *20-bar high* / *20-bar low* and glosses that say what the number is (the highest high / lowest low
+  of the last 20 closed bars — the channel's edges). Signal definitions
+  (`get_strategy_signal_definition`, `list_strategy_signals`) and signal-log `indicatorValues`
+  carry `donchian_upper` / `donchian_lower` / `prev_donchian_upper` / `prev_donchian_lower` for the
+  four S/R signals. Signal ids, the `SUPPORT_RESISTANCE` module and its display names are unchanged.
+
+  **Read the new keys.** A reader keyed on `swing_high` / `swing_low` finds nothing; the values are
+  the same numbers under the new keys.
+
+- **The stored entry discipline no longer names a level source** (52.0.0, `derive-entry-level`).
+  `StrategyDTO.entry` (`get_strategy`, `list_strategies`, the `fork_strategy` / `archive_strategy` /
+  `restore_strategy` envelopes) and the apply envelope's `postState.entry` lose `levelSource`.
+  `TradeOutcomeDTO.entryDiscipline` (`get_trade_outcome_by_decision`, `list_trade_outcomes`) loses
+  it and gains `levelOffsetAtrMultiple: number | null` — the offset in force at the fire, `null` on
+  rows written before its column existed. A reader that rendered the level source renders the
+  geometry from `trigger` and the outcome's `direction` instead: which edge and which order shape
+  are a pure function of those two fields, so no stored copy is served.
+
+- **`update_strategy_signal_rule` gains its own response envelope** (51.0.0,
+  `fix-signal-rule-patch-semantics`). It no longer shares `{ strategy }` with its siblings. The
+  response is `{ strategy, ruleChanges }`, where `ruleChanges` is the server's own before/after
+  pair for the edited signal — `[{ signalId, before, after }]`, each side a full rule object. It is
+  `null` when the mutation changed no rule, **never `[]`**.
+
+  **Report the change from that pair, not from memory.** The planner always computed the diff and
+  the tool discarded it, so a caller narrating what it just did had only its own recollection of
+  the before-value. One production edit shipped a wrong receipt on top of a wrong write that way,
+  and the write was unreconstructable from the audit trail afterwards.
+
+  Additive, but published on a `.strict()` shape — a decoder pinned to the old two-key object
+  rejects the new key. `fork_strategy`, `archive_strategy` and `restore_strategy` keep the shared
+  `StrategyResponseSchema` and publish exactly what they did; it was deliberately NOT widened for
+  them, so this reshape reaches one tool only.
+
+- **An entry void now names the gate that refused it** (49.5.0,
+  `fix-arming-trigger-clock-authority`), on `get_radar_activity_summary`. In the cause rollup, the
+  `ENTRY_VOID` group's `gateCode` widens from always-`null` to `QualificationGateCode | null`: a
+  conditions-side void carries the gate that blocked — `AGGREGATE_BELOW_MIN`,
+  `REQUIRED_COUNT_BELOW_MIN`, `REQUIRED_CONDITION_FALSE` — while a band void stays `null`, because
+  that void happens on a reading that qualified and has no failing gate to name.
+
+  A client that renders the field through the same enum the response already uses on four other
+  cause arms needs no change. One that treated it as a literal `null` — a strict decoder pinning the
+  type, or a branch keyed to its absence — sees a value it did not expect. That is the whole
+  migration.
+
+  Why it moved: the group previously collapsed every conditions-side void under one label. The
+  first 26 in production carried that label while two different gates had produced them, and none of
+  them was a required condition being false. The rollup ships counts rather than rows, so the gate
+  could not be recovered client-side.
 
 - **The normalized report section loses `timeframe`** (48.0.0, `remove-section-anchor-override`), on
   every tool that publishes a strategy: `get_strategy`, `fork_strategy`, `archive_strategy`,
@@ -184,6 +372,18 @@ package.
   `get_radar_activity_summary` is added. A client reading the curve off a later page finds it absent.
 
 ### Widened enum — new members your own copy rejects
+
+- **The stop and take-profit method enums gain `DONCHIAN_LOWER` / `DONCHIAN_UPPER`** (53.0.0,
+  `rename-donchian-channel`), replacing `SWING_LOW` / `SWING_HIGH` on the signal-pipeline detail
+  schemas — trade-setup options, R:R-rejected pairs and candidate levels. A copy of either enum that
+  rejects unknown members must add the two new ones; the two old ones never appear again.
+
+- **`TradeExecutionFailureReason` gains `LEVEL_NOT_RESTABLE`** (52.0.0, `derive-entry-level`): a
+  level entry refused at placement because its resting price sat on the wrong side of the exchange
+  mid — a buy stop at or below it, a buy limit at or above it, and the mirror for a sell. It appears
+  on the `list_signal_logs` failure-reason filter input and on the signal-pipeline execution
+  summary's `failureReason`, with origin `CLIENT_GATE`. There is no distance limit: a level far from
+  the mark rests until its bar validity expires.
 
 - **The authorable metric vocabulary widens by 29 keys** (46.1.0, `add-indicator-catalog-coverage`):
   Keltner (`KC_UPPER`/`KC_MID`/`KC_LOWER`), Supertrend (`ST_LINE`/`ST_DIR`), Hull (`HMA20`),
@@ -506,33 +706,45 @@ The v3 authoring contract below is unchanged and still current:
 
 ## Quick Start
 
-### Single account (stdio transport)
-
-```bash
-BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
-```
-
-### Multiple accounts (stdio transport)
-
-```bash
-BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key npx @battlegrid/mcp-server
-```
-
-When multiple keys are provided, the server discovers each account's identity and injects a required `account` parameter into every tool so the AI agent can choose which account to act as.
-
-### Remote server (streamable-http transport)
+### Remote server, OAuth — start here
 
 ```
 https://mcp.battlegrid.trade/mcp
 ```
 
-No npm install required — connect directly from any MCP client that supports streamable-http.
+Give that URL to your MCP client over its streamable-http (remote) transport and authorize: the
+client registers itself by Dynamic Client Registration, BattleGrid's consent page opens in your
+browser, and you sign in and click **Authorize**. No npm install, no API key. The grant is listed —
+and revocable — under **Profile → MCP → OAuth Sessions**.
+
+### API key and the stdio proxy — the fallback
+
+Reach for a key when your client has no remote transport at all, when your agent runs headless or in
+CI and cannot open a browser to consent, or when one process drives several BattleGrid accounts. It
+is fully supported for each of those, and nothing about it is deprecated.
+
+**Single account (stdio transport):**
+
+```bash
+BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
+```
+
+**Multiple accounts (stdio transport):**
+
+```bash
+BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key npx @battlegrid/mcp-server
+```
+
+When multiple keys are provided, the server discovers each account's identity and injects a required `account` parameter into every tool so the AI agent can choose which account to act as. OAuth has no equivalent — one grant authorizes one account.
 
 ## Configuration
 
 ### Claude Desktop
 
-**Single account:**
+**OAuth (no key):** Settings → **Connectors** → **Add custom connector**. Paste
+`https://mcp.battlegrid.trade/mcp`, save, and authorize on the consent page Claude opens.
+
+**API key (fallback) — single account:**
 
 ```json
 {
@@ -548,7 +760,7 @@ No npm install required — connect directly from any MCP client that supports s
 }
 ```
 
-**Multiple accounts:**
+**API key (fallback) — multiple accounts:**
 
 ```json
 {
@@ -566,21 +778,43 @@ No npm install required — connect directly from any MCP client that supports s
 
 ### Claude Code
 
+**OAuth (no key):**
+
 ```bash
-claude mcp add battlegrid -- npx @battlegrid/mcp-server
+claude mcp add --transport http battlegrid https://mcp.battlegrid.trade/mcp
 ```
 
-Set your API key(s):
+Then start `claude`, run `/mcp`, select **battlegrid** and choose **Authenticate** — the consent page
+opens in your browser and the entry reads connected once you authorize.
+
+**API key (fallback):**
 
 ```bash
 # Single account
-export BATTLEGRID_API_KEY=bg_live_xxx
+claude mcp add battlegrid -e BATTLEGRID_API_KEY=bg_live_xxx -- npx @battlegrid/mcp-server
 
 # Multiple accounts
-export BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key
+claude mcp add battlegrid -e BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key -- npx @battlegrid/mcp-server
 ```
 
 ### Cursor
+
+**OAuth (no key):** Settings → **MCP** → **Add new global MCP server** opens `~/.cursor/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "battlegrid": {
+      "url": "https://mcp.battlegrid.trade/mcp"
+    }
+  }
+}
+```
+
+Back in Settings → MCP, click **Needs login** on `battlegrid` and authorize on BattleGrid's consent
+page; the entry turns green once its tools load.
+
+**API key (fallback):** the same file, with the stdio proxy in place of the remote entry.
 
 ```json
 {
@@ -608,12 +842,16 @@ ChatGPT Desktop connects via **OAuth 2.1** — no npm package or API key needed.
 4. ChatGPT discovers OAuth endpoints, registers as a client (Dynamic Client Registration), and opens BattleGrid's consent page
 5. Log in to BattleGrid and click **Authorize**
 
-| | Claude Desktop / Cursor | ChatGPT Desktop |
+Authentication is a property of the **path**, not of the client — every client above reaches
+BattleGrid either way, so pick the row that matches your runtime rather than your client:
+
+| | Remote + OAuth | API key |
 |---|---|---|
-| **Transport** | stdio proxy (`@battlegrid/mcp-server`) | Direct HTTPS |
-| **Auth** | API key (`bg_live_*`) | OAuth 2.1 (Bearer token) |
-| **Setup** | npm package + env vars | URL + OAuth consent |
-| **Multi-account** | `BATTLEGRID_API_KEYS` env var | One OAuth grant per account |
+| **Transport** | streamable-http, direct to `mcp.battlegrid.trade` | stdio proxy (`@battlegrid/mcp-server`), or the same URL with a Bearer header |
+| **Auth** | OAuth 2.1 with Dynamic Client Registration | API key (`bg_live_*`) as a Bearer token |
+| **Setup** | paste the URL, authorize in the browser | npm package + env vars |
+| **Needs a browser** | yes, once, to consent | no — works headless and in CI |
+| **Multi-account** | one grant per account | `BATTLEGRID_API_KEYS`, several accounts through one proxy |
 
 ## Account management
 
@@ -836,22 +1074,31 @@ Install the BattleGrid skills for AI agent instructions:
 npx skills add playbattlegrid/battlegrid-mcp
 ```
 
-Two skills ship from this repo, and both are inside the npm tarball (`SKILL.md`, `skills/`):
+Nine skills ship from this repo, all inside the npm tarball (`SKILL.md`, `skills/`).
 
-- **`battlegrid`** — connection, scopes, game play, and the strict compile → review → apply
-  strategy workflow.
-- **`battlegrid-strategy-studio`** — full-power strategy authoring, for agents that would
-  otherwise compile bare template strategies: custom report sections and system-generated header
-  grammar, benchmark sections, condition trees (verdict precedence, `required` enforcement
-  gates, `N_OF`/`NOT` groups, condition references), tiered signal weights and the
-  weighted-aggregate gate math, ATR trade levels, and post-entry position management. Its
-  `references/` carry five validated desk-grade playbooks (volatility-compression breakout,
-  crowded-positioning fade, benchmark-gated relative-strength rotation, HTF trend pullback,
-  perp/spot flow divergence at structure), copy-adaptable recipes, and process-for-process
-  ports of the most popular TradingView community scripts (Squeeze Momentum [LazyBear],
-  Supertrend/UT Bot, Chandelier Exit, MACD + 200 MA, golden cross, RSI-2, VWAP reversion,
-  Donchian/Turtle, ICT FVG/order blocks) with honest named substitutions where the grammar
-  lacks a primitive. Shapes are binding; vocabulary stays live-discovered.
+**`battlegrid`** (repo root) is the connection skill and is authored here: how to connect, the
+`{ account, request }` envelope, the two scopes, and where to go for everything else.
+
+The nine `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
+same instructions BattleGrid's own in-app Commander runs on, which is why they name the same tools
+you reach over MCP:
+
+| Skill | Teaches |
+|---|---|
+| `battlegrid-agent-management` | Commission and govern intelligence agents: interview and create one against a committed strategy and an approved model, change configuration and risk limits, rebind, halt, resume, archive, and act on live positions |
+| `battlegrid-arena-play` | Enter Market Grid sessions: find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have an agent generate it, submit, then read results and the reasoning journal |
+| `battlegrid-market-analysis` | Read the current crypto market — regime, funding and open interest, leaders and laggards, a deep-dive on any named coin — and close with the levels worth watching |
+| `battlegrid-radar-deployment` | Put agents on standing duty: per-coin Radar policies that fire on confirmed regime flips, and per-preset Arena deployment policies, previewed before they are written and un-deployed with the blast radius stated |
+| `battlegrid-strategy-authoring` | Build a strategy from a plain-English idea: gather evidence, lock the spec, compile against the platform grammar, review exactly what will run, apply only on confirmation. Also fork, tune, restore, archive, preview |
+| `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
+| `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
+| `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
+| `battlegrid-trade-proposal` | Find and stage a trade for one of your agents: check what is already held, scan every active coin against the agent's own gates, propose on one through the agent's own conversational turn, present the outcome with its conviction, and approve or decline only on your word |
+
+> **`skills/battlegrid-*` is generated — do not edit it here.** It is written by
+> `server/scripts/export-mcp-skills.mjs` in `playbattlegrid/battlegrid-app` and arrives by pull
+> request; `skills/EXPORT.json` records a hash per file and `src/__tests__/skill-provenance.test.ts`
+> fails CI on a hand edit. Change the skill upstream and let the export lane bring it here.
 
 ## License
 
