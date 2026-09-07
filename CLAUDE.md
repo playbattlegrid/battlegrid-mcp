@@ -15,6 +15,49 @@ every "the server changed" question therefore needs **nothing here**.
 Before adding anything to this package, check whether it belongs in `battlegrid-app` instead. Tool
 schemas, contract semantics, and error vocabularies all live there.
 
+## `skills/battlegrid-*` is generated — never edit it here
+
+The nine `skills/battlegrid-*` directories, `skills/EXPORT.json`, and
+`src/__fixtures__/authoring-contract-digest.json` are **written by
+`battlegrid-app/server/scripts/export-mcp-skills.mjs`** and arrive by pull request from its
+`.github/workflows/mcp-skills-export.yml`. They are the same instructions BattleGrid's in-app
+Commander runs on, which is what makes them true about the tools this proxy forwards.
+
+**To change a published skill, change it upstream** in `battlegrid-app/server/src/skills/<name>/` and
+let the export lane bring it here. An edit made in this repository fails
+`src/__tests__/skill-provenance.test.ts` by filename, and would in any case be silently reverted by
+the next export.
+
+This is not a style rule. It replaces a real arrangement that cost three pull requests (#47, #48,
+#52) and shipped a fork: `skills/battlegrid-strategy-studio/` was hand-authored here, drifted from
+the server's own document, and needed a gate of its own to notice. One author, one gate.
+
+| Path | Owner |
+|---|---|
+| `SKILL.md` (repo root) | **this repository** — connection, the `{ account, request }` envelope, scopes, and pointers into the exported skills. There is no upstream source for it. |
+| `skills/battlegrid-*/` | the export lane |
+| `skills/EXPORT.json` | the export lane (sha256 per exported file) |
+| `src/__fixtures__/authoring-contract-digest.json` | the export lane (vendored beside the documents it gates) |
+| everything else | this repository |
+
+Three tests divide the work and should not be merged:
+
+- `skill-package.test.ts` — **packaging.** Frontmatter fence, `name` equals directory, `files`
+  coverage, the four version values. (The name rule is why the export namespaces each skill to
+  `battlegrid-<name>` on the way out.)
+- `skill-provenance.test.ts` — **arrival.** Every file hashes as `EXPORT.json` records it, nothing
+  unlisted sits under an exported directory, and the digest fixture's contract version matches the
+  manifest's.
+- `skill-contract.test.ts` — **consistency.** The exported `battlegrid-strategy-examples/SKILL.md`
+  states the axes and domains the vendored digest carries. Its upstream twin
+  (`authoring-recipe-contract.test.ts`) gates the same bytes; this one is the arrival check on the
+  exported pair, not a second opinion about it.
+
+**The export lane bumps the version itself** when it commits, but only if the version on `main` is
+already on the registry — an unpublished version means a pending release is carrying it, and a
+second bump would strand that number. So an export pull request usually arrives already bumped; do
+not bump it again.
+
 ## Releasing — read this before touching a version
 
 ### A version change on `main` IS the release
@@ -82,8 +125,9 @@ wrong.
 
 ### A docs-only change still needs a version bump to reach npm
 
-`package.json`'s `files` is `["dist", "README.md", "LICENSE"]` — **README.md ships inside the
-tarball**, so npmjs.com renders the README of the last *published* version.
+`package.json`'s `files` is `["dist", "README.md", "LICENSE", "SKILL.md", "skills"]` — **README.md,
+SKILL.md and the whole published skill ship inside the tarball**, so npmjs.com renders the README of
+the last *published* version and every `npx` install gets that version's skill text.
 
 That makes a README-only merge a silent no-op as far as the registry is concerned: the change lands
 on `main`, the gate sees the current version already published, nothing publishes, and the npm page
@@ -93,13 +137,53 @@ keeps showing the old text. If the point of the change is that people read it on
 This is the one case where documenting a contract move *does* touch this package's version, and the
 distinction matters: the bump is for publishing **the documentation**, never for the contract.
 
+### Before opening the PR, confirm the release will actually happen
+
+The integrity check above proves the four values agree with **each other**. It cannot tell you the
+number is still *available*, and that is the failure this repository keeps repeating: branch off a
+base whose version is already on the registry, change something that ships, merge — and the gate
+sees the version published, does nothing, and reports **success**. CI is green end to end and
+nothing reaches npm. It has cost #45 and #48 a release, and would have cost #50 a third.
+
+What ships is narrower than `files` suggests, because `dist` is built rather than committed. The
+build emits exactly one file, so the shipped set from source is **`src/index.ts` alone** —
+`src/__tests__/` is excluded by `tsconfig.json` and `src/__fixtures__/` never reaches `dist`. A
+fixture-only re-vendor genuinely needs no bump, which is why this tests the DIFF and not just the
+version; a check that cried wolf on those would be ignored within a week.
+
+`scripts/shipped-paths.mjs` owns that set. **Do not re-type it here or in the workflow** — this
+check and the publish gate are one rule asked at two altitudes, and written out twice they drift
+into the worst shape, where the checklist clears a branch the workflow then rejects. It derives
+what it can from `files`; `skill-package.test.ts` and `shipped-paths.test.ts` assert the one
+mapping it cannot (`dist` ← `src/index.ts`).
+
+```bash
+SHIPPED=$(git diff --name-only origin/main...HEAD | grep -E "$(node scripts/shipped-paths.mjs)" || true)
+PKG=$(node -p "require('./package.json').version")
+
+if [ -z "$SHIPPED" ]; then
+  echo "Nothing that ships changed — $PKG may stay published; no bump needed."
+elif npm view "@battlegrid/mcp-server@$PKG" version >/dev/null 2>&1; then
+  echo "STRANDED — $PKG is already published and this branch changes shipped files:"
+  echo "$SHIPPED" | sed 's/^/  /'
+  echo "Merging would publish NOTHING. Bump before opening the PR."
+else
+  echo "OK — $PKG is unpublished and will carry:"
+  echo "$SHIPPED" | sed 's/^/  /'
+fi
+```
+
+Run it **before opening the PR**, not after merging. Once the release lands, the version is
+published and the check reads STRANDED for every branch — true, and useless.
+
 ### Release checklist
 
 1. Change the code or docs.
 2. Move all four version values together; run the integrity snippet above.
-3. `npm run build && npm test` (85 tests as of v31.2.0).
-4. Open a PR; merge it.
-5. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
+3. Run the reach check above. **STRANDED means bump now** — merging would publish nothing.
+4. `npm run build && npm test`.
+5. Open a PR; merge it.
+6. The workflow publishes with OIDC provenance and tags `mcp-server@<version>` after success.
 
 If a run fails for a reason outside the diff — an unreachable endpoint, a registry error — re-run it
 with `workflow_dispatch`. Never hand-publish: `npm` versions cannot be republished, and a
@@ -109,11 +193,16 @@ hand-publish with no tag is the exact silence this workflow was built to remove.
 
 ```
 src/index.ts           the entire proxy
-src/__tests__/         announced-version, identity, skill-contract, skill-package,
-                       startup-ordering, strategy-authoring-proxy, validate-env
+src/__tests__/         announced-version, identity, shipped-paths, skill-contract,
+                       skill-package, skill-provenance, startup-ordering,
+                       strategy-authoring-proxy, validate-env
+src/__fixtures__/      the vendored authoring-contract digest (generated — see above)
 AGENTS.md              discovery file for external agents — how to CONNECT
 README.md              user docs + contract history; SHIPS in the tarball
-SKILL.md               the published agent skill
+SKILL.md               the published connection skill, authored here
+skills/battlegrid-*/   the nine exported skills (generated — see above)
+skills/EXPORT.json     the export's hash manifest (generated)
+scripts/               shipped-paths.mjs — the one definition of "changes the tarball"
 site/                  the GitHub Pages site (CNAME + index.html)
 .github/workflows/     ci.yml, publish.yml, static.yml
 ```
