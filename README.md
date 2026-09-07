@@ -413,6 +413,58 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   a stored result" and "the signal did not fire" are different states, and leaving the key off that
   arm makes conflating them a type error rather than a convention.
 
+### Additive in the same span
+
+- **Two tools join the catalog for the agent trade flow** (52.1.0, `add-mcp-agent-trade-flow`).
+  `scan_agent_coins` evaluates every active coin against one of your agents in a single call and
+  returns them server-ranked, on the same use case, buckets and ranking the app's own TRADE-tab scan
+  serves. `propose_entry_decision` runs the conversational trade turn headlessly for one (agent,
+  coin) and returns its terminal in the stream's own vocabulary: `type: recommendation` carrying the
+  PROPOSED `TradingEntryDecisionDTO` row that `get_entry_decision` and `list_pending_approvals`
+  already publish, `type: no_trade`, or `type: error` carrying the turn's `TradeConvError` verbatim.
+  Nothing narrows and no existing schema hash moves; the 12-ticker `get_agent_coin_qualification`
+  stays as the spot-check probe.
+
+  **`idempotencyKey` is REQUIRED on `propose_entry_decision`** — it is the turn's own key, and a
+  same-key retry replays the recorded terminal rather than paying for a second inference. That
+  includes a post-billing `LLM_FAILURE`, which is returned as a value for precisely that reason.
+  Pre-engine faults are typed errors instead: `RATE_LIMITED`, `NOT_FOUND`, `CONFLICT` for a same-key
+  call still in flight, and `SERVICE_UNAVAILABLE` when the surface is switched off. Both tools
+  refuse with `RATE_LIMITED` carrying `retryAfterSeconds` under the same per-(user, agent) limit the
+  app itself enforces, so a scan is never served stale or partial.
+
+- **`get_regime_snapshot` publishes the evidence behind the verdict** (47.1.0,
+  `publish-regime-classification-evidence`). The snapshot gains `evidence`: the quantities the
+  classifier read, the gates it tested them against, the signed margin to the gate deciding whether
+  the current label survives, and the two decision facts only the classifier holds — `gateState`
+  (`cleared` / `held` / `dropped`) and `directionSource` (`di` / `ema`). Nothing narrows; a client
+  that ignores the field is unaffected.
+
+  Read `gateState` before you trust a trend label: **`held` means the ADX hysteresis buffer is
+  carrying the PREVIOUS bar's label rather than this bar re-confirming it** — a materially weaker
+  claim wearing the same word, and one no client could previously detect. `directionSource: 'ema'`
+  is the same shape of warning: the direction came from the fallback that fires precisely when the
+  DI spread is indecisive. The margin is signed so **positive always means "the current label
+  survives by this much"**, in every gate state, so it is safe to branch on its sign.
+
+  `conviction` is a BRANCH DISCRIMINATOR, not a confidence: it encodes *which* rule in the priority
+  ladder matched, not how comfortably it matched. The margins carry comfort. A client reading
+  conviction as a strength score is reading it wrong, and always was — this release just makes the
+  alternative available.
+
+- **Thirteen metric keys join the catalog** (47.1.0) — the `regime` family gains `REGIME_STATE`,
+  `REGIME_CONVICTION`, `REGIME_RUN_BARS`, `REGIME_TREND_GATE`, `REGIME_TREND_MARGIN`,
+  `REGIME_TREND_SOURCE`, `REGIME_DI_SPREAD`, `REGIME_VOL_ATR_RATIO`, `REGIME_VOL_BBW_RATIO`,
+  `REGIME_MOM_BULL_VOTES`, `REGIME_MOM_BEAR_VOTES`, `REGIME_CRASH_MARGIN` and `REGIME_CRASH_LATCH`,
+  making the composite regime and its evidence addressable in a report column or condition for the
+  first time. Only a client that switches exhaustively on `MetricKey` needs new branches.
+
+  Not a contract change, but worth knowing if you author conditions: the report grammar's regime
+  metrics now resolve from the **confirmed close** on every path. They previously resolved from the
+  forming bar when a report was rendered and the confirmed close when the scan swept, so the same
+  condition could read differently in preview than in production. Same wire shape; same bar
+  everywhere now.
+
 ## Contract history — v12 → v36
 
 > **The number in this heading is a CONTRACT version, not this package's version.** The npm badge at the top
@@ -564,38 +616,6 @@ These are the server contract breaks between contract 12 and contract 36. Most o
 Nothing in the proxy changes. No configuration, no environment variable, no call-shape change on this package's own surface. If your client discovers tools live and reads results generically, `npm i @battlegrid/mcp-server@30` is the whole upgrade.
 
 ### Additive in the same span
-
-- **`get_regime_snapshot` publishes the evidence behind the verdict** (47.1.0,
-  `publish-regime-classification-evidence`). The snapshot gains `evidence`: the quantities the
-  classifier read, the gates it tested them against, the signed margin to the gate deciding whether
-  the current label survives, and the two decision facts only the classifier holds — `gateState`
-  (`cleared` / `held` / `dropped`) and `directionSource` (`di` / `ema`). Nothing narrows; a client
-  that ignores the field is unaffected.
-
-  Read `gateState` before you trust a trend label: **`held` means the ADX hysteresis buffer is
-  carrying the PREVIOUS bar's label rather than this bar re-confirming it** — a materially weaker
-  claim wearing the same word, and one no client could previously detect. `directionSource: 'ema'`
-  is the same shape of warning: the direction came from the fallback that fires precisely when the
-  DI spread is indecisive. The margin is signed so **positive always means "the current label
-  survives by this much"**, in every gate state, so it is safe to branch on its sign.
-
-  `conviction` is a BRANCH DISCRIMINATOR, not a confidence: it encodes *which* rule in the priority
-  ladder matched, not how comfortably it matched. The margins carry comfort. A client reading
-  conviction as a strength score is reading it wrong, and always was — this release just makes the
-  alternative available.
-
-- **Thirteen metric keys join the catalog** (47.1.0) — the `regime` family gains `REGIME_STATE`,
-  `REGIME_CONVICTION`, `REGIME_RUN_BARS`, `REGIME_TREND_GATE`, `REGIME_TREND_MARGIN`,
-  `REGIME_TREND_SOURCE`, `REGIME_DI_SPREAD`, `REGIME_VOL_ATR_RATIO`, `REGIME_VOL_BBW_RATIO`,
-  `REGIME_MOM_BULL_VOTES`, `REGIME_MOM_BEAR_VOTES`, `REGIME_CRASH_MARGIN` and `REGIME_CRASH_LATCH`,
-  making the composite regime and its evidence addressable in a report column or condition for the
-  first time. Only a client that switches exhaustively on `MetricKey` needs new branches.
-
-  Not a contract change, but worth knowing if you author conditions: the report grammar's regime
-  metrics now resolve from the **confirmed close** on every path. They previously resolved from the
-  forming bar when a report was rendered and the confirmed close when the scan swept, so the same
-  condition could read differently in preview than in production. Same wire shape; same bar
-  everywhere now.
 
 `27.1.0` exit-policy authoring input on `compile_strategy_plan` · `19.2.0` `get_account_state` account identity · `19.1.0` Standing Orders marker authoring · `18.4.0` `list_gate_blocks` summary groups · `18.3.0` radar maintenance pause · `18.1.0` protection geometry · `17.2.0` break-even/trailing status · `17.1.0` `get_signal_log` condition evaluation · `13.1.0` four owner-scoped read tools · `12.1.0` cross-venue spot price metrics · `11.1.0` discoverable rate limit.
 
