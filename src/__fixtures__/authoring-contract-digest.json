@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "52.0.0"
+    "contractVersion": "53.0.0"
   },
   "axes": {
     "create": [
@@ -151,6 +151,8 @@
     "CVD",
     "DI_MINUS",
     "DI_PLUS",
+    "DONCHIAN_LOWER",
+    "DONCHIAN_UPPER",
     "EMA13",
     "EMA20",
     "EMA21",
@@ -243,8 +245,6 @@
     "STRUCT_ZONES",
     "ST_DIR",
     "ST_LINE",
-    "SWING_HIGH",
-    "SWING_LOW",
     "TRADES",
     "VOLUME",
     "VOL_SMA20",
