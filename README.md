@@ -706,33 +706,45 @@ The v3 authoring contract below is unchanged and still current:
 
 ## Quick Start
 
-### Single account (stdio transport)
-
-```bash
-BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
-```
-
-### Multiple accounts (stdio transport)
-
-```bash
-BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key npx @battlegrid/mcp-server
-```
-
-When multiple keys are provided, the server discovers each account's identity and injects a required `account` parameter into every tool so the AI agent can choose which account to act as.
-
-### Remote server (streamable-http transport)
+### Remote server, OAuth — start here
 
 ```
 https://mcp.battlegrid.trade/mcp
 ```
 
-No npm install required — connect directly from any MCP client that supports streamable-http.
+Give that URL to your MCP client over its streamable-http (remote) transport and authorize: the
+client registers itself by Dynamic Client Registration, BattleGrid's consent page opens in your
+browser, and you sign in and click **Authorize**. No npm install, no API key. The grant is listed —
+and revocable — under **Profile → MCP → OAuth Sessions**.
+
+### API key and the stdio proxy — the fallback
+
+Reach for a key when your client has no remote transport at all, when your agent runs headless or in
+CI and cannot open a browser to consent, or when one process drives several BattleGrid accounts. It
+is fully supported for each of those, and nothing about it is deprecated.
+
+**Single account (stdio transport):**
+
+```bash
+BATTLEGRID_API_KEY=bg_live_xxx npx @battlegrid/mcp-server
+```
+
+**Multiple accounts (stdio transport):**
+
+```bash
+BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key npx @battlegrid/mcp-server
+```
+
+When multiple keys are provided, the server discovers each account's identity and injects a required `account` parameter into every tool so the AI agent can choose which account to act as. OAuth has no equivalent — one grant authorizes one account.
 
 ## Configuration
 
 ### Claude Desktop
 
-**Single account:**
+**OAuth (no key):** Settings → **Connectors** → **Add custom connector**. Paste
+`https://mcp.battlegrid.trade/mcp`, save, and authorize on the consent page Claude opens.
+
+**API key (fallback) — single account:**
 
 ```json
 {
@@ -748,7 +760,7 @@ No npm install required — connect directly from any MCP client that supports s
 }
 ```
 
-**Multiple accounts:**
+**API key (fallback) — multiple accounts:**
 
 ```json
 {
@@ -766,21 +778,43 @@ No npm install required — connect directly from any MCP client that supports s
 
 ### Claude Code
 
+**OAuth (no key):**
+
 ```bash
-claude mcp add battlegrid -- npx @battlegrid/mcp-server
+claude mcp add --transport http battlegrid https://mcp.battlegrid.trade/mcp
 ```
 
-Set your API key(s):
+Then start `claude`, run `/mcp`, select **battlegrid** and choose **Authenticate** — the consent page
+opens in your browser and the entry reads connected once you authorize.
+
+**API key (fallback):**
 
 ```bash
 # Single account
-export BATTLEGRID_API_KEY=bg_live_xxx
+claude mcp add battlegrid -e BATTLEGRID_API_KEY=bg_live_xxx -- npx @battlegrid/mcp-server
 
 # Multiple accounts
-export BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key
+claude mcp add battlegrid -e BATTLEGRID_API_KEYS=bg_live_alice_key,bg_live_bob_key -- npx @battlegrid/mcp-server
 ```
 
 ### Cursor
+
+**OAuth (no key):** Settings → **MCP** → **Add new global MCP server** opens `~/.cursor/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "battlegrid": {
+      "url": "https://mcp.battlegrid.trade/mcp"
+    }
+  }
+}
+```
+
+Back in Settings → MCP, click **Needs login** on `battlegrid` and authorize on BattleGrid's consent
+page; the entry turns green once its tools load.
+
+**API key (fallback):** the same file, with the stdio proxy in place of the remote entry.
 
 ```json
 {
@@ -808,12 +842,16 @@ ChatGPT Desktop connects via **OAuth 2.1** — no npm package or API key needed.
 4. ChatGPT discovers OAuth endpoints, registers as a client (Dynamic Client Registration), and opens BattleGrid's consent page
 5. Log in to BattleGrid and click **Authorize**
 
-| | Claude Desktop / Cursor | ChatGPT Desktop |
+Authentication is a property of the **path**, not of the client — every client above reaches
+BattleGrid either way, so pick the row that matches your runtime rather than your client:
+
+| | Remote + OAuth | API key |
 |---|---|---|
-| **Transport** | stdio proxy (`@battlegrid/mcp-server`) | Direct HTTPS |
-| **Auth** | API key (`bg_live_*`) | OAuth 2.1 (Bearer token) |
-| **Setup** | npm package + env vars | URL + OAuth consent |
-| **Multi-account** | `BATTLEGRID_API_KEYS` env var | One OAuth grant per account |
+| **Transport** | streamable-http, direct to `mcp.battlegrid.trade` | stdio proxy (`@battlegrid/mcp-server`), or the same URL with a Bearer header |
+| **Auth** | OAuth 2.1 with Dynamic Client Registration | API key (`bg_live_*`) as a Bearer token |
+| **Setup** | paste the URL, authorize in the browser | npm package + env vars |
+| **Needs a browser** | yes, once, to consent | no — works headless and in CI |
+| **Multi-account** | one grant per account | `BATTLEGRID_API_KEYS`, several accounts through one proxy |
 
 ## Account management
 
@@ -1041,7 +1079,7 @@ Nine skills ship from this repo, all inside the npm tarball (`SKILL.md`, `skills
 **`battlegrid`** (repo root) is the connection skill and is authored here: how to connect, the
 `{ account, request }` envelope, the two scopes, and where to go for everything else.
 
-The eight `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
+The nine `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
 same instructions BattleGrid's own in-app Commander runs on, which is why they name the same tools
 you reach over MCP:
 
@@ -1055,6 +1093,7 @@ you reach over MCP:
 | `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
 | `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
 | `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
+| `battlegrid-trade-proposal` | Find and stage a trade for one of your agents: check what is already held, scan every active coin against the agent's own gates, propose on one through the agent's own conversational turn, present the outcome with its conviction, and approve or decline only on your word |
 
 > **`skills/battlegrid-*` is generated — do not edit it here.** It is written by
 > `server/scripts/export-mcp-skills.mjs` in `playbattlegrid/battlegrid-app` and arrives by pull
