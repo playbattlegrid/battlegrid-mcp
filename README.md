@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v37 → v53
+## Contract history — v37 → v54
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
 oversight: since v31 a contract move needs no release here, so nothing forced a note to be written —
@@ -290,6 +290,45 @@ refuse is now stored. Listed because a client that special-cased the refusal can
   now finds the key absent rather than false.
 
 ### Reshaped output — the same call returns a different shape
+
+- **`scan_agent_coins` returns the ranking, not an explanation of every coin** (54.0.0,
+  `fix-mcp-scan-row-altitude`). The scan used to wrap the app's full per-coin qualification verdict
+  in every row — two directions with candidate-level construction and a stop-loss policy band, four
+  gates each with its own measurement, condition reach reasons, the ATR corridor. For a 78-coin
+  catalog that was **82,147 characters, ~1,053 per row**, which is past the tool-result cap of every
+  client we know of: the calling model received a file path instead of an answer, so the tool did not
+  deliver its result even when the scan succeeded.
+
+  `rows` is gone. Three ranked arrays replace it, and `rank` is **global across all three**, so
+  reading them in this order reproduces the server's own sequence:
+
+  ```
+  qualified[]   { rank, coinTicker, scorePercent, coinDataStopped }
+  rejected[]    { rank, coinTicker, scorePercent, firstFailReason, scoreShortfallPercent }
+  unscorable[]  { rank, coinTicker, coinDataStopped }
+  ```
+
+  Array membership now carries what the row `kind` discriminator and the `qualifies` flag used to,
+  and both are gone with them; `firstFailReason` is non-nullable on a rejected row, because a
+  non-qualifying verdict always names the gate that blocked it. Rows also lose `long`, `short`,
+  `gates`, `tradeableAtrRange`, `evaluatedAt`, `coinName`, `assetClass` and `category`.
+
+  Two things are new. The agent's `agentId`, `agentName`, `strategyTimeframe` and `minScorePercent`
+  move to an `agent` object carried **once** instead of on all 78 rows — `null` when the scan scored
+  nothing at all. And `scoreShortfallPercent` is server-computed: how far below the minimum the score
+  fell, non-null exactly when the aggregate score is what blocked, so you never subtract a published
+  threshold from a published reading yourself.
+
+  `scanStartedAt`, `coinsScanned` and `qualifiedCount` are unchanged, and so is every coin: same
+  rows, same order, same ranks, same verdicts, same rate buckets, same evaluator. Only the fields
+  moved — about 8.8 KB for the same 78-coin scan.
+
+  **Migration.** Read `qualified` / `rejected` / `unscorable` instead of `rows`, and take the agent's
+  thresholds from `agent` rather than from the first row. For a shortlisted coin's full per-direction
+  and per-gate detail, call `get_agent_coin_qualification` on up to 12 tickers — it carries every
+  dropped field and costs no second scan (the scan is rate-limited to 3 per agent and 10 per user a
+  minute; the probe is not).
+
 
 - **Report headers, glosses and signal indicator keys are renamed for the Donchian channel**
   (53.0.0, `rename-donchian-channel`). Every report surface — `preview_strategy_report`,
