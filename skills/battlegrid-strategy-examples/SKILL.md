@@ -91,10 +91,24 @@ required, no defaults. Clauses: numeric/rank headers take `lt|lte|gte|gt|between
 classification/direction headers take `is|in` with the served vocabulary. Groups:
 `ALL | ANY | NOT | N_OF` (with `n`), depth ≤ 2. `conditionRef` composes named conditions (no
 cycles; forward refs legal). `sectionKey: null` is sugar for a report-unique header only.
-Verdicts: first TRUE carrier **in declaration order** decides UP/DOWN/NEITHER — order carriers
-most-specific first; building blocks carry `null`. `required: true` = FALSE blocks compose-trade
-before billing. Evaluation is three-valued: UNRESOLVED never collapses to FALSE; forming-bar
-reads are provisional.
+Verdicts: resolution is taken over the DISTINCT verdicts of the carriers that read TRUE. One
+distinct verdict decides, and the first carrier in declaration order carrying it is named as the
+decider — so order breaks ties between carriers that AGREE. Carriers that DISAGREE resolve
+`NEITHER` and stand the coin aside; declaration order never picks a side between them. Building
+blocks carry `null`.
+
+**Two things block a trade, not one.** `required: true` = a FALSE reading blocks compose-trade
+before billing. And the RESOLVED verdict binds entry DIRECTION: `UP` admits long setups only,
+`DOWN` short only, and `NEITHER`/`UNRESOLVED` admit none — the refused side is absent from the
+setups block and from the `decide_trade` contract, not merely discouraged in them. A strategy that
+declares no verdict-carrying condition resolves `null` and constrains nothing.
+
+A verdict carrier must read a SETTLED bar wherever one is available to it — `clock: "CLOSE"`
+whenever every column it reads accepts a closed frame and every condition it references is itself
+`CLOSE`. Where no closed frame moves its operands (a published regime label, an open-interest
+regime), `LIVE` stays legal: there is no settled bar to take.
+
+Evaluation is three-valued: UNRESOLVED never collapses to FALSE; forming-bar reads are provisional.
 
 **The evidence clock.** `clock: "LIVE"` reads the forming bar; `clock: "CLOSE"` reads settled
 bars, and `closes` is how many consecutive closed bars must read TRUE (1–5) — always `1` under
