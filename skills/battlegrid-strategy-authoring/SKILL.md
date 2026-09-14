@@ -187,6 +187,12 @@ point-in-time reading, and you say so.
 
 ### 6. Confirm, then apply
 
+**In a conversation the Strategy Builder hosts, this section does not apply: compile and stop.**
+The compiled plan lands on the player's rail as unsaved changes and their Review & save is the one
+consent. Report that it is staged, name the axes, and present no apply confirmation — the server
+refuses `apply_strategy_plan` from such a conversation as a tool error, so calling it spends an op
+of your budget and commits nothing.
+
 One confirmation carrying the plan's own `confirmationSummary`, offering Apply / Revise / Cancel.
 
 On **Apply**, call `apply_strategy_plan` with two values and nothing else:
@@ -214,6 +220,12 @@ only authority on all of them; your job is to react to what it returns.
 
 `fork_strategy`, `update_strategy_signal_rule`, `restore_strategy`, `archive_strategy` and
 `preview_strategy_report` are part of this flow.
+
+**In a builder-hosted conversation, three of those are refused at execution** —
+`update_strategy_signal_rule`, `restore_strategy` and `archive_strategy`, alongside
+`apply_strategy_plan` — because each commits a revision of the open strategy around the player's
+save. `fork_strategy` stays available: it writes a DIFFERENT strategy, which is not the one the
+builder owns. `preview_strategy_report` and every read stay available.
 
 Before any destructive one, state the blast radius from the server's own fields and confirm it
 with the player:
