@@ -104,9 +104,12 @@ setups block and from the `decide_trade` contract, not merely discouraged in the
 declares no verdict-carrying condition resolves `null` and constrains nothing.
 
 A verdict carrier must read a SETTLED bar wherever one is available to it — `clock: "CLOSE"`
-whenever every column it reads accepts a closed frame and every condition it references is itself
-`CLOSE`. Where no closed frame moves its operands (a published regime label, an open-interest
-regime), `LIVE` stays legal: there is no settled bar to take.
+whenever every column in its CLOSURE accepts a closed frame. The closure is what it reads directly
+plus everything reached through `conditionRef`, transitively: a referenced condition contributes what
+IT reads, never the clock it happens to declare, so moving a clause into a building block and leaving
+that block `LIVE` does not make a settled bar unavailable to the carrier. Where no closed frame moves
+some operand in the closure (a published regime label, an open-interest regime, a published rolling
+change), `LIVE` stays legal at any depth: there is no settled bar to take.
 
 Evaluation is three-valued: UNRESOLVED never collapses to FALSE; forming-bar reads are provisional.
 
@@ -117,10 +120,13 @@ this coin's own candle series at offset 0. Frame-inert operands are refused
 (`CONDITION_CLOCK_OPERAND_ILLEGAL`): perp-payload scalars, published rolling changes, ranks, zone
 entities, MDS regime labels, enrichment metrics, session scalars, and any clause authored at a
 non-zero offset. A closed frame cannot move them, so "held for N closes" would describe reads
-that never happened. The remedy is a split, not a re-clock: move that clause into its own LIVE
-condition and `conditionRef` it. **Worked liquidity floor:** `LIQUID_FLOOR` is LIVE because
-`vol24hUsd` is a bundle scalar; the carrier that refs it may be CLOSE over its own candle-series
-clauses.
+that never happened. A frame-inert operand anywhere in a condition's closure simply keeps that
+condition on `LIVE`, and that is legal — splitting the clause into its own condition and
+`conditionRef`-ing it does NOT buy the referencing condition a CLOSE clock, because a `CLOSE`
+condition may not reference a `LIVE` one (`CONDITION_CLOCK_REFERENCE_ILLEGAL`) and availability walks
+into the referenced closure anyway. **Worked liquidity floor:** `LIQUID_FLOOR` is `LIVE` because
+`vol24hUsd` is a bundle scalar, and a condition that references it is `LIVE` too. Reach for a split to
+keep a condition's MEANING separable, not to change its clock.
 
 **The lane a strategy is deployed to.** Report-level scalars split by LANE, and the split is not a
 quality of the header — it is which reader runs. Market breadth and the reference pairs are ordinary
