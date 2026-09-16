@@ -26,8 +26,8 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 ## Contract history — v59
 
-One release train, three numbers, and the part to read first is that **`propose_entry_decision` no
-longer decides in the call**. v55 through v58 are not written up here; the canonical record for
+One release train, four numbers, and two parts to read first: **`propose_entry_decision` no longer
+decides in the call**, and **a closed trade's `tradeStatus` now follows its net P&L**. v55 through v58 are not written up here; the canonical record for
 every contract move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`, and the
 served version is what the handshake announces.
 
@@ -50,6 +50,15 @@ served version is what the handshake announces.
   re-authored. The three that remain are `ON_CANDLE_CLOSE`, `STOP_THROUGH_LEVEL` and `ON_RETEST`.
 
 ### Changed meaning, unchanged shape
+
+- **`tradeStatus` follows NET P&L on every closed trade** (59.3.0, `label-trade-outcome-by-pnl`).
+  No schema hash moves for this and the values you receive change anyway. It used to map the close
+  REASON onto a verdict — every `TAKE_PROFIT` was `WON`, every `STOP_LOSS` was `LOST`, and a
+  `MARKET_CLOSE` of either sign was the neutral `CLOSED` — so a stop that filled after a break-even
+  reprice was reported as a loss and a take-profit eaten by fees as a win. `LIQUIDATED` still
+  outranks the number, because a force-close is not a verdict about the trade; `CLOSED` now means
+  only that there is no outcome row to judge. A client that counted `WON` rows was counting
+  take-profits.
 
 - **A proposal is QUEUED, not decided** (59.2.0, `queue-manual-entry-for-close`). This is the entry in
   this section to act on. `propose_entry_decision` registers a request against the agent's next
@@ -84,6 +93,14 @@ served version is what the handshake announces.
   for the first time.
 
 ### Additive in the same span
+
+- **The exit names the leg that filled** (59.3.0, `label-trade-outcome-by-pnl`). `TradeOutcomeDTO`
+  and the pipeline outcome summary gain `exitRepriceSource`: the reprice that placed the protection
+  leg which actually closed the position — `BREAK_EVEN`, `TRAILING`, `TIME_DECAY`,
+  `MANUAL_OVERRIDE`, `UPDATED` — or null on every close no protection leg filled and on a leg that
+  was never repriced. It is the mechanism behind the verdict above, so read it beside `closeReason`
+  before calling a stopped-out trade a failure. The enum is the one `get_position_audit_history`
+  already publishes. Four output hashes move; no input schema does.
 
 - **Two tools join the catalog for the request lifecycle** (59.2.0, `queue-manual-entry-for-close`).
   `get_entry_request` (read scope) reads a request that is still pending and is `NOT_FOUND` once it
