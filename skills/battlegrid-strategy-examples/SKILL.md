@@ -156,36 +156,34 @@ anchor, or the author gates on something that admits most bars.
 
 ## Entry
 
-`{ trigger, confirmTf, closes, bandAtrMultiple, levelOffsetAtrMultiple, validForBars }` — all six
-required on every CREATE, no defaults. This axis is replaced WHOLE on save, so an omitted key would
-silently revert an author's discipline rather than be refused. There is no level-source key: the
-level a level trigger rests at is DERIVED from the trigger and the trade's direction, never named.
+`{ trigger, levelOffsetAtrMultiple, validForBars }` — all three required on every CREATE, no
+defaults. This axis is replaced WHOLE on save, so an omitted key would silently revert an author's
+discipline rather than be refused. There is no level-source key: the level a level trigger rests at
+is DERIVED from the trigger and the trade's direction, never named. There is no confirm-timeframe
+key either: the bar whose close decides an entry is the strategy's OWN timeframe.
 
-**The trigger decides WHEN, and for two of them WHERE, an entry is taken.**
+**Every trigger is decided at the close of the strategy's own bar — there are three, and the close
+is the only entry clock.** The newest settled bar is read on the closed basis — every `LIVE`-clocked
+condition resolves on that bar and the scorecard reads its close — and a reading that still qualifies
+fires at that close. A bar that does not qualify decides nothing and is not revisited. The fill lands
+at the next tick, and the platform refuses it if the market has already run past its own drift budget
+from that close. A fourth value, `AT_SIGNAL`, is readable on strategies authored before this contract
+and is REFUSED on every save; there is no live-reading entry to author.
 
-- `AT_SIGNAL` — fire the moment the radar observes the qualification flip, at whatever bar is on
-  the tape, keeping the platform's flat wall-clock entry window. Today's behaviour.
-- `ON_CANDLE_CLOSE` — the flip ARMS the pair; the entry is taken only after a close on
-  `confirmTf` that still reads the conditions true and has not displaced beyond the band.
-- `STOP_THROUGH_LEVEL` — a TRIGGER order rests past the Donchian channel's CURRENT edge in the
-  trade's direction (the 20-bar high for a long, the 20-bar low for a short) by the offset, and
-  the exchange book is the watcher; the entry is taken when price trades through, not when the
-  platform notices.
-- `ON_RETEST` — a LIMIT order rests in front of the edge a close most recently BROKE (the
-  channel's break memory: the broken high for a long, the broken low for a short) by the offset,
-  waiting for a return to it. Not filling is a correct outcome, not a failure; no unrecovered
-  break in memory means no setup, never a fallback level.
+- `ON_CANDLE_CLOSE` — the entry is taken AT the qualifying close, at market.
+- `STOP_THROUGH_LEVEL` — at the qualifying close a TRIGGER order rests past the Donchian channel's
+  CURRENT edge in the trade's direction (the 20-bar high for a long, the 20-bar low for a short) by
+  the offset, and the exchange book is the watcher; the entry is taken when price trades through,
+  not when the platform notices.
+- `ON_RETEST` — at the qualifying close a LIMIT order rests in front of the edge a close most
+  recently BROKE (the channel's break memory: the broken high for a long, the broken low for a
+  short) by the offset, waiting for a return to it. Not filling is a correct outcome, not a
+  failure; no unrecovered break in memory means no setup, never a fallback level.
 
-`confirmTf` is the bar whose close confirms. Exactly two values are legal: the strategy's own
-timeframe and the rung below it — one only, when the strategy sits on the ladder floor. It is
-NOT the authorable main-candle set; a rung further down names a bar nothing else in the strategy
-observes and makes the radar sweep on every one of its closes.
-
-`closes` (1–5) is how many consecutive confirming closes are required, and `bandAtrMultiple` is
-the veto width: the entry is VOIDED when the confirming close has moved at or beyond that many
-ATR against the armed verdict. Strictly greater than zero — zero is not "no filter" but a filter
-that voids on any adverse move — and at or below the platform's own entry-deviation gate, since
-a wider band cannot refuse anything the platform will not refuse anyway.
+**A multi-bar hold belongs to the CONDITION that needs it.** Declare `clock: CLOSE` with that
+condition's own `closes` — the entry axis counts no bars, and there is no displacement band: the
+platform's entry-deviation gate measures the live mark against the decided close and refuses a fill
+that drifted past the budget in either direction.
 
 `levelOffsetAtrMultiple` (0–2) is an UNSIGNED distance from the derived edge in ATR multiples — a
 long adds it, a short subtracts it, so a breakout stop rests past its edge and a pullback limit
@@ -196,11 +194,10 @@ correct side of the mark when the order is placed — a buy stop above it, a buy
 mirror for a sell — or the entry is refused rather than filled at the market; there is no limit on
 how far from the mark a level may rest.
 
-**The legality matrix runs one way.** All six keys are always present, so the question is never
-"is it set" but "is it set to something that MEANS anything under this trigger". `closes` ≠ 1 is
-refused under any trigger but `ON_CANDLE_CLOSE`; `levelOffsetAtrMultiple` ≠ 0 and `validForBars`
-≠ 4 are refused under a non-level trigger. Leave a dial at its inert value rather than setting one
-the platform will ignore.
+**The legality matrix runs one way.** All three keys are always present, so the question is never
+"is it set" but "is it set to something that MEANS anything under this trigger".
+`levelOffsetAtrMultiple` ≠ 0 and `validForBars` ≠ 4 are refused under a non-level trigger. Leave a
+dial at its inert value rather than setting one the platform will ignore.
 
 ## Report sections
 

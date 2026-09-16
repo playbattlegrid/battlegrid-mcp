@@ -24,6 +24,87 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v59
+
+One release train, three numbers, and the part to read first is that **`propose_entry_decision` no
+longer decides in the call**. v55 through v58 are not written up here; the canonical record for
+every contract move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`, and the
+served version is what the handshake announces.
+
+### Rejected input — something you author is no longer accepted
+
+- **The entry axis names no bar but the strategy's own, and three of its keys are gone** (59.0.0,
+  `decide-entry-on-strategy-close`). The authoring schemas are `.strict()`, so `compile_strategy_plan`,
+  `apply_strategy_plan`, `fork_strategy` and `restore_strategy` REFUSE a body carrying
+  `entry.confirmTf` (the deciding bar is the strategy's own timeframe, so a required input whose only
+  legal value was another field of the same strategy is absent rather than mirrored), `entry.closes`
+  and `entry.bandAtrMultiple` (a multi-bar hold is declared on the condition that needs it; the
+  displacement band is replaced by the platform's own entry-deviation gate, measured against the
+  decided close), and the whole `exit` object (the open-position exit lane judges one closed candle
+  of the position's strategy timeframe). Exactly one input hash moves, `compile_strategy_plan`'s.
+
+- **`entry.trigger: AT_SIGNAL` is retired for authoring** (59.0.0, `retire-at-signal-trigger`, riding
+  the same number). Refused on every authoring surface and on a RESTORE, which rebuilds a stored
+  revision through the same value object. The enum member stays READABLE on every strategy read and
+  on a fired decision's provenance, so a pre-retirement revision is still legible — it just cannot be
+  re-authored. The three that remain are `ON_CANDLE_CLOSE`, `STOP_THROUGH_LEVEL` and `ON_RETEST`.
+
+### Changed meaning, unchanged shape
+
+- **A proposal is QUEUED, not decided** (59.2.0, `queue-manual-entry-for-close`). This is the entry in
+  this section to act on. `propose_entry_decision` registers a request against the agent's next
+  strategy-bar close and returns immediately: no model runs, nothing is spent, and the call carries
+  `type: "queued"` with `request` — `requestId`, the bar (`barStart`), when the answer is due
+  (`decidesBy`) and the last instant that bar may still be decided (`windowEndsAt`). The answer
+  arrives later, in the agent's conversation and, when it proposes a trade, in
+  `list_pending_approvals`. A close that does not qualify, a window that passes with no sweep, and a
+  bar the agent's own radar deployment decided first are each recorded in the conversation instead.
+
+  `recommendation` and `no_trade` REMAIN in the union: the idempotency registrar replays results
+  recorded before this release for their TTL, so a client that dropped those members would fail on
+  its own retry. **A client written against 59.2 handles `queued` and `error`**; one that must also
+  replay handles all four.
+
+### Reshaped output — the same call returns a different shape
+
+- **The four retired entry keys leave every strategy read** (59.0.0) — `get_strategy`,
+  `list_strategies`, `fork_strategy` and both plan envelopes — and `confirmTimeframesByMainCandle`
+  leaves `list_strategy_vocabulary`, because there is no confirm set left to publish.
+
+- **`entryDiscipline.closes` and `.bandAtrMultiple` go `number` → `number | null`** (59.0.0) on
+  `get_trade_outcome_by_decision` and `list_trade_outcomes`. Null on every decision fired after this
+  release, which authors neither; a non-null pair dates the row to the arming era.
+
+### Widened enum — new members your own copy rejects
+
+- **`TradeConvErrorCode` gains `REQUEST_PENDING`** (59.2.0), on the SURFACE arm of
+  `propose_entry_decision`'s error: one pending request per user and coin, so a second is refused. A
+  coin already carrying a pending or live position is refused before anything is queued, as an
+  ENGINE-origin `OPEN_POSITION_CONFLICT` — a member that was already published, reaching this surface
+  for the first time.
+
+### Additive in the same span
+
+- **Two tools join the catalog for the request lifecycle** (59.2.0, `queue-manual-entry-for-close`).
+  `get_entry_request` (read scope) reads a request that is still pending and is `NOT_FOUND` once it
+  has been answered, cancelled or expired — the answer is in the conversation, not there.
+  `cancel_entry_request` (`mcp:wager`) withdraws one before its bar is decided. `toolCount` 115 → 117.
+
+- **Three radar reads publish the close decision** (59.1.0, `add-radar-close-decision-state`).
+  `get_radar_deployment`, `list_radar_deployments` and `preview_radar_resolution` carry one further
+  key on `resolvesNow`: `closeDecision`, non-null whenever an agent is on duty for the pair. It
+  carries the deciding `timeframe`, the `nextCloseAt` instant, a `state` of `WAITING` or `DEFERRED`
+  (a bar has closed and no sweep has decided it yet), and `last` — the bar, the instant, the outcome
+  (`FIRED` / `NOT_QUALIFIED` / `MISSED`), the gate and the closed reading's score against its
+  minimum — or null before the pair's first close decision.
+
+  **Read it first on a close-deciding pair.** The sibling `qualified` and `qualificationBlock` fields
+  are the per-minute DISPLAY reading there and decide nothing, so an agent ranking them reports
+  "qualified — watching for a setup" about a pair whose last three closes were each refused. Neither
+  field is removed or reshaped. A `NOT_QUALIFIED` outcome with a NULL gate beside a score at or above
+  the minimum is the consumed edge — the close qualified and the baseline was already spent — stated
+  by the server so no client compares the two numbers.
+
 ## Contract history — v37 → v54
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an
