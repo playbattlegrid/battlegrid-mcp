@@ -104,9 +104,9 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   `levelOffsetAtrMultiple`, `validForBars`. Every trigger is decided at the close of the strategy's
   OWN bar, so there is no confirm-timeframe key; for the level triggers the level itself is derived
   from the trigger and the trade's direction, never named. A multi-bar hold belongs to the condition
-  that needs it (`clock: CLOSE` with its own `closes`), not to this axis. The `strategy-examples`
-  skill carries the vocabulary and the one-directional legality matrix; a CREATE without it is
-  refused outright.
+  that needs it (its own `closes`, counted in completed strategy bars), not to this axis. The
+  `strategy-examples` skill carries the vocabulary, the hold's legality and the per-column
+  Confirmed / Developing read; a CREATE without it is refused outright.
 - `get_strategy_column_contract` → `outputs[].conditionOperators`. An empty array means that
   rendered header has no comparison semantics and cannot appear in a condition clause at all.
   Legality is per rendered header, not per column: a trajectory's slot header and its `_trend`
