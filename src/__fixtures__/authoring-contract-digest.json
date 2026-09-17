@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "60.3.0"
+    "contractVersion": "61.0.0"
   },
   "axes": {
     "create": [
@@ -41,7 +41,6 @@
       "validForBars"
     ],
     "condition": [
-      "clock",
       "closes",
       "conditionKey",
       "definition",
@@ -96,9 +95,9 @@
       "ON_RETEST",
       "STOP_THROUGH_LEVEL"
     ],
-    "conditionClock": [
-      "CLOSE",
-      "LIVE"
+    "columnBars": [
+      "all",
+      "closed"
     ],
     "conditionVerdict": [
       "DOWN",

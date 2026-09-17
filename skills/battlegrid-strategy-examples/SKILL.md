@@ -86,8 +86,9 @@ against a literal; neither of those shapes is what a previous-session level need
 
 ## Conditions
 
-`{ conditionKey, name, definition, verdict, required, exit, clock, closes }` — all eight
-required, no defaults. Clauses: numeric/rank headers take `lt|lte|gte|gt|between`;
+`{ conditionKey, name, definition, verdict, required, exit, closes }` — all seven
+required, no defaults. A `clock` key is REFUSED: the per-condition evidence clock was retired in
+contract `61.0.0`. Clauses: numeric/rank headers take `lt|lte|gte|gt|between`;
 classification/direction headers take `is|in` with the served vocabulary. Groups:
 `ALL | ANY | NOT | N_OF` (with `n`), depth ≤ 2. `conditionRef` composes named conditions (no
 cycles; forward refs legal). `sectionKey: null` is sugar for a report-unique header only.
@@ -103,30 +104,53 @@ before billing. And the RESOLVED verdict binds entry DIRECTION: `UP` admits long
 setups block and from the `decide_trade` contract, not merely discouraged in them. A strategy that
 declares no verdict-carrying condition resolves `null` and constrains nothing.
 
-A verdict carrier must read a SETTLED bar wherever one is available to it — `clock: "CLOSE"`
-whenever every column in its CLOSURE accepts a closed frame. The closure is what it reads directly
-plus everything reached through `conditionRef`, transitively: a referenced condition contributes what
-IT reads, never the clock it happens to declare, so moving a clause into a building block and leaving
-that block `LIVE` does not make a settled bar unavailable to the carrier. Where no closed frame moves
-some operand in the closure (a published regime label, an open-interest regime, a published rolling
-change), `LIVE` stays legal at any depth: there is no settled bar to take.
+A verdict carrier must read no DEVELOPING bar. A verdict is refused over any closure that reads a
+column selecting Developing above the strategy timeframe (`CONDITION_VERDICT_READ_ILLEGAL`). The
+closure is what the condition reads directly plus everything reached through `conditionRef`,
+transitively: a referenced condition contributes what IT reads, so moving the clause into a building
+block does not launder it. A closure whose candle columns all read Confirmed — or whose operands no
+bar moves at all, such as a published regime label, an open-interest regime or a published rolling
+change — admits a verdict at every decision, because a decision reads the completed strategy bar and
+a level is compared against that bar's close.
 
-Evaluation is three-valued: UNRESOLVED never collapses to FALSE; forming-bar reads are provisional.
+Evaluation is three-valued: UNRESOLVED never collapses to FALSE; a developing read is provisional,
+and so is any reading taken on the display lane's forming bar.
 
-**The evidence clock.** `clock: "LIVE"` reads the forming bar; `clock: "CLOSE"` reads settled
-bars, and `closes` is how many consecutive closed bars must read TRUE (1–5) — always `1` under
-LIVE, which has exactly one frame. A CLOSE clock is legal **only** over a header resolved from
-this coin's own candle series at offset 0. Frame-inert operands are refused
-(`CONDITION_CLOCK_OPERAND_ILLEGAL`): perp-payload scalars, published rolling changes, ranks, zone
-entities, MDS regime labels, enrichment metrics, session scalars, and any clause authored at a
-non-zero offset. A closed frame cannot move them, so "held for N closes" would describe reads
-that never happened. A frame-inert operand anywhere in a condition's closure simply keeps that
-condition on `LIVE`, and that is legal — splitting the clause into its own condition and
-`conditionRef`-ing it does NOT buy the referencing condition a CLOSE clock, because a `CLOSE`
-condition may not reference a `LIVE` one (`CONDITION_CLOCK_REFERENCE_ILLEGAL`) and availability walks
-into the referenced closure anyway. **Worked liquidity floor:** `LIQUID_FLOOR` is `LIVE` because
-`vol24hUsd` is a bundle scalar, and a condition that references it is `LIVE` too. Reach for a split to
-keep a condition's MEANING separable, not to change its clock.
+**Every condition is decided at the strategy bar's close.** There is no per-condition clock. Which
+bar a condition reads is decided by the surface asking — a decision (the radar's close decision, the
+compose that takes the trade, the exit sweep) reads completed strategy bars; a display read shows the
+forming one and decides nothing — and by each candle column's own Confirmed / Developing selector.
+
+**The hold count.** `closes` is how many consecutive COMPLETED strategy bars must read TRUE (1–5). A
+hold counts the same completed bars whichever surface asks, so a held condition reads them on the
+display lane too. Above `1` it is legal **only** where a completed bar changes the reading: over a
+header resolved from this coin's own candle series, at offset 0, at or above the strategy timeframe,
+read Confirmed. Everything else is refused (`CONDITION_HOLD_OPERAND_ILLEGAL`) — perp-payload scalars,
+published rolling changes, ranks, zone entities, MDS regime labels, enrichment metrics, session
+scalars, a non-zero offset, a column BELOW the strategy timeframe (the retained lower series cannot
+reach an earlier strategy close), and a developing read (the bar in progress exists on the newest
+frame only). A hold also needs a clause of the condition's OWN
+(`CONDITION_HOLD_ILLEGAL`): a referenced condition is resolved once and contributes the same answer
+to every frame, so a hold that moves with the bar only through a reference would count reads that
+never happened. **Worked liquidity floor:** `LIQUID_FLOOR` holds one close because `vol24hUsd` is a
+bundle scalar. Reach for a split to keep a condition's MEANING separable, not to buy it a hold.
+
+**Confirmed / Developing, per candle column.** Every transform whose home is the coin's candle series
+carries `bars`: `"closed"` is Confirmed — the newest bar completed at the strategy close — and
+`"all"` is Developing, the higher-timeframe bar still in progress at that close, which REPAINTS until
+it completes. Left unset the default is a rule, not a value: Confirmed for a column ABOVE the
+strategy timeframe, and at or below it the series as the frame carries it. At or below the strategy
+timeframe the choice therefore sets only what the live lane shows — no bar is in progress at the
+anchor's own close — so Developing there is legal and changes no decision. A condition reading a
+developing bar is single-frame: it holds one close, carries no verdict and cannot take the `exit`
+role. The resolved answer for a column is served on `effectiveParameters.bars`.
+
+**A higher-timeframe level is measured from the current strategy-bar price.** The distance to a `4h`
+Donchian band, and every candle label classifier (`MA_ALIGN`, `PRICE_ZONE`, `BB_TOUCH`), compares
+against the frame's current price — the strategy bar's close under a decision, the live mark on
+display — not against the higher-timeframe bar's own close, which is up to one higher-timeframe bar
+stale. A distance CHAINED into a series transform keeps every slot on its own bar's close, so one
+series carries one reference basis.
 
 **The lane a strategy is deployed to.** Report-level scalars split by LANE, and the split is not a
 quality of the header — it is which reader runs. Market breadth and the reference pairs are ordinary
@@ -138,10 +162,12 @@ can read instead. The refusal lands at DEPLOY rather than at save, because a str
 of its own: the same strategy is legal, and reads those scalars correctly, on an arena agent.
 
 **The exit role.** `exit: true` makes a settled TRUE reading close open positions its verdict
-opposes — UP exits SHORTs, DOWN exits LONGs, a NEITHER or `null` verdict exits both. Legal only
-under `clock: "CLOSE"`: a LIVE reading is the forming bar, and an exit fired on one is an
-intrabar exit. Orthogonal to `required` — the two act on disjoint lifecycles, pre-entry versus
-open — so a condition may carry both, either, or neither.
+opposes — UP exits SHORTs, DOWN exits LONGs, a NEITHER or `null` verdict exits both. Legal only over
+a closure every operand of which a completed bar MOVES (`CONDITION_EXIT_READ_ILLEGAL`), which rules
+out a developing read — a bar in progress is the forming bar, and an exit fired on one is an intrabar
+exit — and rules out a frame-inert operand, which could never fire. Orthogonal to `required` — the
+two act on disjoint lifecycles, pre-entry versus open — so a condition may carry both, either, or
+neither.
 
 **A state column is not a flip event.** `ST_DIR` reads the same on every bar of a trend, so
 `ST_DIR is "bullish"` is a regime filter and never an entry signal. The flip needs an event column
@@ -163,7 +189,7 @@ is DERIVED from the trigger and the trade's direction, never named. There is no 
 key either: the bar whose close decides an entry is the strategy's OWN timeframe.
 
 **Every trigger is decided at the close of the strategy's own bar — there are three, and the close
-is the only entry clock.** The newest settled bar is read on the closed basis — every `LIVE`-clocked
+is the only entry clock.** The newest completed bar is read on the closed basis — every one-close
 condition resolves on that bar and the scorecard reads its close — and a reading that still qualifies
 fires at that close. A bar that does not qualify decides nothing and is not revisited. The fill lands
 at the next tick, and the platform refuses it if the market has already run past its own drift budget
@@ -180,8 +206,8 @@ and is REFUSED on every save; there is no live-reading entry to author.
   short) by the offset, waiting for a return to it. Not filling is a correct outcome, not a
   failure; no unrecovered break in memory means no setup, never a fallback level.
 
-**A multi-bar hold belongs to the CONDITION that needs it.** Declare `clock: CLOSE` with that
-condition's own `closes` — the entry axis counts no bars, and there is no displacement band: the
+**A multi-bar hold belongs to the CONDITION that needs it.** Declare that condition's own `closes` —
+the entry axis counts no bars, and there is no displacement band: the
 platform's entry-deviation gate measures the live mark against the decided close and refuses a fill
 that drifted past the budget in either direction.
 
