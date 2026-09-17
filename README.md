@@ -24,6 +24,62 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v61
+
+One part to read first: **the per-condition evidence clock is gone**, and what replaced it is not a
+rename. Which bar a condition reads is now decided by the surface asking — a decision reads completed
+strategy bars, a display read shows the forming one — and by each candle column's own Confirmed /
+Developing selector. `closes` survives and changes meaning. The canonical record for every contract
+move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`; the served version is what
+the handshake announces.
+
+### Rejected input — something you author is no longer accepted
+
+- **A condition entry carrying `clock` is REFUSED** (61.0.0, `read-higher-timeframes-per-column`).
+  The authoring schemas are `.strict()`, so `compile_strategy_plan`, `apply_strategy_plan`,
+  `fork_strategy` and the HTTP save alike fail the body with the unknown-key error. There is no
+  replacement key to send: the decision instant belongs to the caller, not to the condition. Two
+  input hashes move, `compile_strategy_plan`'s and `preview_strategy_report`'s — the two tools that
+  accept a condition entry.
+
+- **`closes` stays mandatory and means something new.** It is now *held for N completed strategy
+  bars* (1–5). Above `1` it is legal only over a header a completed bar actually moves, at or above
+  the strategy timeframe, never over a developing read, and only where the condition carries a clause
+  of its own — a referenced condition resolves once and contributes the same answer to every bar, so
+  a hold reached only through a reference would count reads that never happened.
+
+### Changed shape — what you receive moves
+
+- **`ConditionOutcome.closeClock` becomes `hold`, and it is NON-NULL for every condition.** A
+  one-close condition reads `0 or 1 of 1` rather than serving an absence, so a client no longer
+  branches on whether the reading exists. The count is taken from completed strategy bars whatever
+  basis the surface evaluated on.
+
+- **`ReportConditionColumnDTO.closeClockReadable` becomes `closesReadable`, beside a new
+  `developingRead`.** The first answers whether a condition addressing that header may hold more than
+  one completed bar; the second states whether the header reads the bar still in progress at the
+  decision instant. Both are server-supplied — derive neither. Eight output hashes move, covering
+  every tool that serves a strategy's conditions or a report's addressable columns.
+
+### Wider input — nothing you send today breaks
+
+- **The `bars` selector is declared on eleven candle-series transforms, not four.** `value`,
+  `classifyZone`, `classifyState`, `distance`, `spread`, `crossDetect` and `bandTouch` join
+  `trajectory`, `aggregate`, `efficiency` and `maxShare`. It carries **no default value**, because
+  the default is a rule rather than a constant: Confirmed (`"closed"`) above the strategy timeframe,
+  and at or below it the series as the frame carries it. The resolved answer is served per column on
+  `effectiveParameters.bars` — `null` where discovery has no anchor to resolve a rung against.
+
+- **A higher-timeframe level is measured from the current strategy-bar price.** Distances and the
+  candle label classifiers compare against the frame's current price rather than the higher-timeframe
+  bar's own close, which could be a full higher-timeframe bar stale. A distance chained into a series
+  keeps every slot on its own bar's close.
+
+### Vocabulary
+
+`domains.conditionClock` is removed; `domains.columnBars: ["all", "closed"]` takes its place, and
+`axes.condition` loses `clock`. `toolCount` stays 117.
+
 ## Contract history — v60
 
 One release train, four numbers, and two parts to read first: **`propose_entry_decision` no longer
