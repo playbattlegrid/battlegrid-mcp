@@ -31,6 +31,15 @@ re-sorts a list, re-derives a verdict, or approves on the player's behalf.
 
 ## 2. Queue the request
 
+**In a conversation the Agent Toolbox hosts, this section does not apply: name the coin and stop.**
+The player presses **Request a trade** in the trade lane beside you and the same queued request is
+registered from there, free and without a model turn; your job is to say which coin is worth
+requesting and what the gates read, and to leave the press to them. `propose_entry_decision` and
+`cancel_entry_request` are refused from such a conversation as tool errors, so calling one spends an
+op of your budget and queues nothing. The refusal is **host-wide** — every tool that writes is
+refused there, which is why no other skill carries a paragraph of its own — and every read in this
+flow stays available.
+
 - `propose_entry_decision` **only** on the coins the player named, or on the top qualifying row
   when they asked for the best fit. One coin per call.
 - **The call does not decide.** It registers a request against the agent's next strategy-bar close
@@ -61,6 +70,13 @@ re-sorts a list, re-derives a verdict, or approves on the player's behalf.
   fresh call.
 
 ## 4. When the answer arrives — approve or decline only on the player's word
+
+**In a conversation the Agent Toolbox hosts, the approval is not yours to send.** The decided close
+lands on the trade card in the lane beside you, carrying the player's own Accept and Decline;
+`accept_entry_decision` and `cancel_entry_decision` are refused there as tool errors, so calling one
+spends an op and moves nothing. Read the card back to them — the direction, the levels, the
+conviction, the expiry — and say what you would do, which is the whole of your part. What you have
+to work from is whatever the player attaches from a card: its rendered readings, nothing more.
 
 - A decided close produces one of: a PROPOSED decision awaiting approval; a no-trade with the
   reason and the next coins worth asking about; a close that did not qualify; a window that passed
