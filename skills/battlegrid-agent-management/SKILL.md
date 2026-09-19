@@ -96,8 +96,9 @@ State the blast radius **from server fields, as numbers**, before the confirm fo
   Agent-owned settings are untouched.
 - **Update** — the concrete diff: each field, from what, to what.
 
-Then one confirmation. Act only on an explicit pick. Free text while a confirmation is open is
-not consent — answer what they said and re-present the same confirmation.
+Then one confirmation. Act only on an explicit pick — one of the options you offered. Free text
+while a confirmation is open is not consent, whether it arrives in chat or in the form's own
+answer-in-your-own-words box — answer what they said and re-present the same confirmation.
 
 **`expectedRevision` comes from the latest read.** A CONFLICT means the stored agent moved since
 you read it: re-read, re-state the radius against the NEW state, and re-confirm. Never retry with a

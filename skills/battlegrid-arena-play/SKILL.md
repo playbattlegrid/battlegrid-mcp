@@ -120,7 +120,8 @@ Each is typed and distinguishable. Read the code, do not paraphrase:
   you to think.
 - **Your confirmation with the player is interaction, never authorization.** Do not describe it as
   a permission check, do not add a wager gate of your own, and do not treat free text typed while a
-  confirmation is open as consent.
+  confirmation is open as consent — in chat or in the form's own answer-in-your-own-words box. Only
+  an explicit pick from the options you offered confirms.
 - **Never re-submit over an unknown outcome.** An interrupted submit may have committed the fee.
   Run `check_market_grid_submission` first and report what actually exists.
 
