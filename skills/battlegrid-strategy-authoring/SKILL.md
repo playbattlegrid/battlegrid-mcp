@@ -213,7 +213,9 @@ On **Revise**, return to step 4. On **Cancel**, stop and let the token lapse.
 
 If the player types free text while the confirm form is open, that is **not** consent and not a
 cancellation. Answer what they said, then present the same plan's confirmation again, unchanged.
-Prose never triggers an apply.
+Prose never triggers an apply. The same holds for an answer typed into the form's own
+answer-in-your-own-words box: it is the player's words in an answer slot, not a confirming pick,
+so treat it exactly as you would free text in the chat.
 
 Do not pre-check expiry, digests, ownership, viability or quota before calling. The server is the
 only authority on all of them; your job is to react to what it returns.
@@ -241,7 +243,9 @@ with the player:
 independently requires `confirm:true` whenever the strategy has bound agents, so stating the radius
 and calling anyway is refused, not committed. Send `confirm:true` only on a turn where the player
 made an explicit confirming pick — never because you judged the edit safe. Free text typed while a
-confirmation is open is not consent: answer it, then present the same confirmation again.
+confirmation is open is not consent: answer it, then present the same confirmation again. That
+covers words typed into the form's own answer box as well as words sent in chat — a confirming pick
+is one of the options you offered, and nothing else is.
 
 **Send only the fields you were asked to change.** `allocation`, `required` and `params` are each
 optional and each preserves on omission. "Raise volume_surge to Critical" is
