@@ -1,6 +1,6 @@
 {
   "generator": "battlegrid-app/server/scripts/export-mcp-skills.mjs",
-  "contractVersion": "61.2.0",
+  "contractVersion": "61.3.0",
   "files": {
     "battlegrid-agent-management/SKILL.md": "8c7ed25e61e013c69694ada82e5893e7af8d12d0c0a6dccdaaaedea868efa47e",
     "battlegrid-arena-play/SKILL.md": "67375816c1b5a40f55fcd4616386eb5afd97f3d91ea6fb94aeb6a56c7d0948a5",
