@@ -56,8 +56,13 @@ flow stays available.
   (`barStart`), when the answer is due (`decidesBy`), and the deadline past which that bar can no
   longer be decided (`windowEndsAt`). `decidesBy` and `windowEndsAt` are different instants — a bar
   that has already settled is decided at the next sweep, seconds away.
-- Say where the answer will appear: in the agent's conversation, and — if it proposes a trade — in
-  `list_pending_approvals`. Nothing further is needed from the player until then.
+- Say where the answer will appear: on the delegation card in this conversation, and — if it
+  proposes a trade — in `list_pending_approvals`. Nothing further is needed from the player until
+  then; the card carries the answer to them when the bar closes.
+- When the player asks what the agent decided, read the request's conversation with
+  `get_trade_conversation({ conversationId })`, using the id the `queued` result carried. It serves
+  the whole transcript in stored order — the queued card, the agent's reasoning, its thesis and
+  setups, the recommendation, a no-trade with its reason and next coins, or a close answer.
 - `get_entry_request` re-reads a request still pending; `cancel_entry_request` withdraws it. Both
   are `NOT_FOUND` once it has been answered, cancelled or expired, and that is the honest record:
   the answer is in the conversation.
@@ -71,12 +76,17 @@ flow stays available.
 
 ## 4. When the answer arrives — approve or decline only on the player's word
 
-**In a conversation the Agent Toolbox hosts, the approval is not yours to send.** The decided close
-lands on the trade card in the lane beside you, carrying the player's own Accept and Decline;
+**On a web Commander surface the approval is the card's own.** The decided close lands on the
+delegation card in this conversation, carrying the player's Accept and Decline. `accept_entry_decision`
+and `cancel_entry_decision` remain yours for the external and Telegram doors, and on the web only on
+the player's explicit typed word — never inferred from interest, agreement, or a question about the
+trade.
+
+**In a conversation the Agent Toolbox hosts, the approval is not yours to send at all.** The decided
+close lands on the trade card in the lane beside you, carrying the player's own Accept and Decline;
 `accept_entry_decision` and `cancel_entry_decision` are refused there as tool errors, so calling one
 spends an op and moves nothing. Read the card back to them — the direction, the levels, the
-conviction, the expiry — and say what you would do, which is the whole of your part. What you have
-to work from is whatever the player attaches from a card: its rendered readings, nothing more.
+conviction, the expiry — and say what you would do, which is the whole of your part.
 
 - A decided close produces one of: a PROPOSED decision awaiting approval; a no-trade with the
   reason and the next coins worth asking about; a close that did not qualify; a window that passed

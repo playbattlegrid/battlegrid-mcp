@@ -78,6 +78,14 @@ this confirm turn. A create spends an agent slot against the player's rank quota
 dropped response would spend a second one. With the key, an ambiguous retry replays the original
 result instead.
 
+**When the mandate names the arena, read `get_account_state` in the same breath.** The arena needs
+Agent Wagers: `mcpWagerEnabled: false` means every entry will be refused at the fee, so say the
+arena needs it and offer the switch — **in a conversation a web Commander surface hosts, the switch
+renders beneath the account card just shown, so offer it there**, and in every other host name the
+Profile → Wallet tab path instead, because no control renders there. **Create the agent either
+way**: the consent gates entering a game, never commissioning one. A `true` flag is consent alone
+and not readiness — the pipeline's own refusal at the fee is the authority.
+
 ### 3. Lifecycle verbs: read first, state the radius, then confirm
 
 Every one of update, rebind, halt, resume, activate and archive runs this shape. The reads
