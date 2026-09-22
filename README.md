@@ -24,6 +24,57 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v64.1
+
+Purely additive in schema, with **one refusal behind an unchanged one.** An agent's unsaved
+configuration now has a server home — the same owner-scoped *draft* strategies gained in v63.1 — so
+the agent form, Telegram and a connected client all see one set of unsaved values. These tools are
+how a conversation reaches it, and the two agent committers now step aside while it is open.
+
+### Wider surface — four tools added
+
+- **`stage_agent_draft({ request: { agentId?, axes } })`** writes proposed axes into the player's
+  draft for an agent and commits **nothing**: the values become the agent's configuration only when
+  the player saves. Unlike `stage_strategy_plan` it takes the axis *values* — `IDENTITY`,
+  `BEHAVIOR`, `MODEL`, `TRADING_CONFIG`, and for an agent not yet created `STRATEGY_BINDING` — each
+  written **whole**, so `BEHAVIOR` carries all three of risk, outlook and conviction and
+  `TRADING_CONFIG` the complete agent-owned configuration. Axes you omit keep their values.
+  Structure is checked on the way in; ranges are checked only when the player saves.
+
+- **Omit `agentId` to open a create draft.** The server mints the id and the response carries it;
+  name that id on every later call so one draft accumulates rather than a second opening beside it.
+
+- **`get_agent_draft({ request: { agentId } })`** reads one draft, or answers `{ draft: null }` —
+  not part-way through that agent is a value, not an error. `baseRevision` is `null` for an agent not
+  yet created, and `baseMoved` reports an agent committed past the revision the draft was written
+  against.
+
+- **`list_agent_drafts({ request: { cursor? } })`** answers "what am I part-way through?" for a
+  conversation holding no agent id, newest first. Offer to continue one of these before starting a
+  second.
+
+- **`discard_agent_draft({ request: { agentId, confirm } })`** destroys one draft on the player's
+  word. Called with `confirm: false` it destroys nothing and is refused with when the draft was last
+  written and which surface wrote it — tell the player that, then ask.
+
+### Refusals worth knowing before you stage or save
+
+- **A staged proposal refuses the axes the player typed after your call read the draft.** The
+  refusal names the axes; read the draft again and propose against what they now have. Another
+  surface's write to a *different* axis is retried once for you, then reported as a conflict.
+
+- **`STRATEGY_BINDING` is refused on an agent that exists.** Rebinding replaces an agent's
+  configuration and stays its own confirmed call, `rebind_intelligence_agent`.
+
+- **`update_intelligence_agent` and `rebind_intelligence_agent` answer `CONFLICT` while the player
+  holds a draft for that agent**, naming staging as the act available. Nothing about their input or
+  output changed, and a caller whose player holds no draft is unaffected — this is the one change
+  existing code can observe.
+
+### Vocabulary
+
+`toolCount` 122 → 126. No input or output schema of an existing tool moves.
+
 ## Contract history — v64
 
 **Breaking, and it is a removal you will feel on two tools.** A vocabulary that never depended on
