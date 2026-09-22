@@ -24,6 +24,47 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v63.1
+
+Purely additive: **four new tools, nothing you send today changes.** A strategy now has an
+owner-scoped *draft* — the unsaved authored values a player is part-way through — and these are how
+an agent reads it, writes a compiled plan into it, and destroys one. The canonical record for every
+contract move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`; the served version
+is what the handshake announces.
+
+### Wider surface — four tools added
+
+- **`stage_strategy_plan({ request: { planToken } })`** writes a compiled plan's own changed axes
+  into the owner's draft. It commits nothing and does **not** spend the plan, so the same token is
+  still directly applicable afterwards. `planToken` is the only member the request accepts.
+
+- **`get_strategy_draft({ request: { strategyId } })`** reads one draft, or answers `{ draft: null }`
+  — "you are not part-way through this one" is a value, not an error. It reports `baseMoved` when the
+  strategy has been committed past the revision the draft was written against.
+
+- **`list_strategy_drafts({ request: { cursor? } })`** answers "what am I part-way through?" for a
+  conversation holding no id. It includes a draft whose strategy you can no longer see, marked
+  `strategyExists: false`, because that is exactly the work a player has lost track of.
+
+- **`discard_strategy_draft({ request: { strategyId, confirm: true } })`** destroys one draft. The
+  confirmation is required and unsaved values have no other copy; the strategy, its revisions and
+  your other drafts are untouched.
+
+### Refusals worth knowing before you stage
+
+- **A staged plan refuses the axes you typed after it compiled.** `stage_strategy_plan` answers
+  `CONFLICT` naming `contestedAxes`, the version the plan compiled over and the draft's own version
+  per axis. Compile again so the plan absorbs those edits, then stage. A *previous staging* on the
+  same axis is not a contest — only the owner's own hand is.
+
+- **An apply refuses a plan whose draft has moved since.** Moved, discarded and
+  already-committed-by-a-sibling are one answer with one recovery: compile again.
+
+### Vocabulary
+
+`toolCount` 118 → 122. No input or output schema of an existing tool moves — the draft version a
+plan was compiled over rides inside the opaque plan token, which no schema declares.
+
 ## Contract history — v61
 
 One part to read first: **the per-condition evidence clock is gone**, and what replaced it is not a
