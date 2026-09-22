@@ -52,6 +52,18 @@ conversation has changed it. A re-read returns the same bytes, and both copies t
 later step, so the player pays for the same payload twice and keeps paying for it. If you need a
 detail you did not keep, scroll back rather than re-fetching.
 
+**Drafts are carved out of that rule.** A draft is the player's unsaved work, and another surface —
+their builder, another device, an earlier plan you staged — can change it while you work. Read it
+again whenever you are about to act on it.
+
+**Start from what they are already part-way through.**
+
+- Holding no strategy id? Call `list_strategy_drafts` first. If a draft comes back, say what it is,
+  when it was last touched and which surface touched it, and offer to continue it — never start a
+  second edit beside one the player has open.
+- Holding an id? Call `get_strategy_draft` before you propose anything. A draft means the player is
+  mid-edit.
+
 ### 2. Lock the spec before you build anything
 
 **First, check the ask is expressible at all — and note that you cannot know until you have looked.**
@@ -187,9 +199,30 @@ returned, as numbers, not buried in prose.
 There is no backtest here and no expected-frequency figure. Do not imply one. What you have is a
 point-in-time reading, and you say so.
 
-### 6. Confirm, then apply
+### 6. Stage or apply
 
-**In a conversation the Strategy Builder hosts, this section does not apply: compile and stop.**
+**A draft decides which of the two you are doing.**
+
+- **The player holds a draft for this strategy** → call `stage_strategy_plan` with the compile's
+  `planToken` and nothing else. The plan's own changed values land in their draft as proposed
+  changes, and *their* save is the consent. Committing instead would end a session they are in the
+  middle of. Staging does not spend the plan: the same token still applies while it lives.
+- **They hold none** → compile → confirm → apply, as below.
+
+When you compile over a draft, the diff names **every** axis the plan would commit, including
+unsaved work the draft already carried before your compile. Read that list out in the
+confirmation as the plan's own: the player is approving all of it, not only what you proposed.
+
+If a staging call is refused as contested, it names the axes the player's own hand changed after
+your compile. Do not retry it and do not work around it — compile again so the new plan absorbs
+those edits, then stage that one.
+
+**Offer to discard a draft only on the player's explicit word**, never on your own judgement that
+it looks stale, and never batched into another act. State when it was last touched and which
+surface touched it, ask, and call `discard_strategy_draft` with `confirm: true` only if they say
+so. The unsaved values are gone afterwards and there is no other copy.
+
+**In a conversation the Strategy Builder hosts, the apply half does not apply: compile and stop.**
 The compiled plan lands on the player's rail as unsaved changes and their Review & save is the one
 consent. Report that it is staged, name the axes, and present no apply confirmation — the server
 refuses `apply_strategy_plan` from such a conversation as a tool error, so calling it spends an op
