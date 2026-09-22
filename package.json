@@ -1,6 +1,6 @@
 {
   "name": "@battlegrid/mcp-server",
-  "version": "31.2.35",
+  "version": "31.2.36",
   "description": "BattleGrid MCP server \u2014 play crypto prediction games from AI agents",
   "type": "module",
   "main": "dist/index.js",

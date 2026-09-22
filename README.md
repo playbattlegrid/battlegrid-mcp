@@ -24,6 +24,49 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v63.2
+
+Purely additive again, and smaller: **one optional input field.** Drafts now cover a strategy that
+does not exist yet, so a playbook you author in chat survives between compiles instead of starting
+over each time.
+
+### Wider input — one optional field on one tool
+
+- **`compile_strategy_plan`'s CREATE arm gains an optional `strategyId`**, naming the create draft
+  this compile continues. Omit it and the server mints an id exactly as it always has, so nothing
+  you send today breaks.
+
+- **Send it to accumulate; omit it to start fresh.** A first CREATE names nothing and mints; stage
+  that plan and the draft opens at the minted id, which `list_strategy_drafts` and the plan itself
+  both report. Name that id on the next CREATE and the second plan carries the same identity, so the
+  one draft accumulates rather than a second opening beside it.
+
+- **WHY YOU HAVE TO SAY IT.** The server will not choose for you. A compile knows only who you are —
+  it has no conversation id — and you may hold several create drafts, so picking one could write this
+  playbook's values over another's. A compile that names none mints a third id rather than guessing.
+
+- **It names a draft; it does not choose an id.** It is accepted only as the identity of a create
+  draft you own. An id naming no such draft is refused, as is one naming a draft for a strategy that
+  already exists.
+
+### Behaviour changes behind unchanged schemas
+
+- **`stage_strategy_plan` admits a CREATE plan**, opening the create draft at the plan's own id when
+  none exists yet. Its input is still `{ planToken }` alone, and the contested-axis refusal applies
+  identically.
+
+- **`list_strategy_drafts` rows gain `baseRevision`.** It is `null` for a create draft — a strategy
+  that does not exist has no committed revision to be based on — and that null is the only thing that
+  distinguishes one. There is no `kind`, `isNew` or `status` field beside it.
+
+- **A create draft reserves nothing.** It consumes no quota and holds no name, so both are decided
+  when the strategy is actually created. Holding drafts past your limit is legal; creating past it is
+  not.
+
+### Vocabulary
+
+`axes.create` gains `strategyId`. No domain gains a value, and `toolCount` stays 122.
+
 ## Contract history — v63.1
 
 Purely additive: **four new tools, nothing you send today changes.** A strategy now has an
