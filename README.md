@@ -24,6 +24,73 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v64
+
+**Breaking, and it is a removal you will feel on two tools.** A vocabulary that never depended on
+your draft was being re-serialized into every preview result; it now lives on discovery and the
+preview names it.
+
+### Reshaped output — `preview_strategy_report`
+
+- **`conditionColumns` covers only the sections your report RENDERS.** It used to cover every
+  section the server's header inventory holds, which meant every report-level scalar on every
+  preview whether or not its module was placed — 36,652 bytes of payload, with each metric's gloss
+  repeated once per scope (11 market-breadth sentences published as 99). If you read
+  `session-field`, `market-breadth` or `reference-pairs` groups off a preview, they are gone.
+
+- **Nothing stopped resolving.** The header inventory is unchanged, so a condition naming
+  `mktBreadth_crypto` resolves exactly as it did. What changed is where you read its prose from.
+
+- **`vocabularyDigest` is new** — the sha256 identity of the authoring catalog that render described
+  its columns against, and the same digest a plan token binds as `authoringCatalogDigest`. Resolve
+  the vocabulary once, cache it against this string, and re-resolve when it moves.
+
+- **`structure.columns[].meaning` is gone.** It was a positional per-header string that neither
+  serialization ever rendered — the glossary paragraph in `section.text` is built from
+  `spanFragments`, and the structured arm always omitted `meaning`. `spanFragments` is unchanged.
+
+- **`budgetUsage.estimatedTokens` now measures the whole served payload**, not the rendered module
+  text inside it. Existing drafts read several times higher against the same cap. That is the fix,
+  not a regression: the byte cap is measured on the serialized result and cannot be reported inside
+  it, so this is the only meter that can warn you before a refusal — and it was counting about a
+  tenth of what actually refuses.
+
+### Wider output — `list_strategy_vocabulary`
+
+- **`scalarFamilies` is where the vocabulary went.** Every report-level scalar family with its
+  section, and one entry per METRIC carrying its gloss, legal condition operators, closed label
+  vocabulary, read contract (`closesReadable` / `developingRead`) and the scopes it is measured at.
+  One gloss per metric with its scopes named against it, never one per pair.
+
+- **Served whole under every category.** A scalar describes the report, not a metric family, so it
+  is not filtered by the `category` you asked for. The ambient session family carries
+  `moduleKey: null` — it places no module and its operands are nameable all the same.
+
+### Reshaped output — `compile_strategy_plan`
+
+- **`reviewContext.columns` is gone.** It recompiled a full column contract per authored custom
+  column — about 2,100 bytes for a five-header trajectory — describing columns the embedded
+  `reportPreview.conditionColumns` already describes per rendered header. Ask
+  `get_strategy_column_contract` when you want a column's exact normalized contract.
+
+- **`approvedPlan.creationSeed` is gone.** It was the dense 84-rule scorecard *before* the
+  overrides, published beside a `postState.signalRules` that is the same list *after* them and an
+  `explicitRuleOverrides` naming exactly what differs. Apply never saw it either.
+
+### Wider input acceptance
+
+- **The section array and a custom section's column array lose their `maxItems: 64`.** That bound
+  restated a configured cap of 32 as a looser 64 that never refused anything. `budgets.sections` and
+  `budgets.sectionColumns` from discovery are the published values, and the server enforces them
+  before it reads any market data.
+
+### What to do
+
+Call `list_strategy_vocabulary` once for the scalar vocabulary, key your cache on the preview's
+`vocabularyDigest`, and drop any code that reads scalar groups off `conditionColumns`,
+`structure.columns[].meaning`, `reviewContext.columns` or `approvedPlan.creationSeed`. A preview's
+size now tracks the report and cohort you composed rather than the size of the platform's catalog.
+
 ## Contract history — v63.2
 
 Purely additive again, and smaller: **one optional input field.** Drafts now cover a strategy that
