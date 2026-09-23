@@ -55,6 +55,10 @@ would otherwise land around the player's open draft or on a strategy that moved.
 - **`stage_strategy_plan` refuses a plan the strategy committed past** after the plan compiled,
   with the same answer `apply_strategy_plan` gives: compile again against what is committed now.
 
+- **Every refusal around an open draft names its version** in `details.draftVersion` — the
+  committers above, the agent committers, and a stage refused for a version above the draft's own —
+  so you can read the draft the player holds and propose against it.
+
 ### Changed meaning, unchanged shape
 
 - **A draft axis's `source` names the door it came through.** A Telegram Commander turn stamps
