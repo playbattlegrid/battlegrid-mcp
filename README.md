@@ -79,7 +79,8 @@ editor and every conversation share one unsaved draft per arena.
   They play out unless the player cancels them — tell the player and ask, then call
   `cancel_market_grid_submission` only for the entries they pick.
 - **`get_deployment_policy`'s `authoringContext`** gains the arena's header facts
-  (`regimeReferenceTicker`, `presetBadgeImageUrl`, `entryFee`, `playerCount`).
+  (`regimeReferenceTicker`, `presetBadgeImageUrl`, `entryFee`, and `playerCount` — null when the arena
+  has no pending session to count).
 - The thought-log **`outcome`** gains **`SKIPPED_DEPLOYMENT_DISARMED`**: an entry job that found its
   deployment withdrawn, paused or no longer slotting its agent stood down before paying.
 
