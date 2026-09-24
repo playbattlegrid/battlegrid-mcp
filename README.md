@@ -24,6 +24,55 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v65
+
+**Breaking on one input, and four refusals behind unchanged schemas.** Agent staging now names the
+draft version its proposal was read against, and three commits and one stage step aside where they
+would otherwise land around the player's open draft or on a strategy that moved.
+
+### Rejected input — something you send is no longer accepted
+
+- **`stage_agent_draft` requires `draftVersion`**, an integer ≥ 0: the `version` the
+  `get_agent_draft` read you proposed against returned, or `0` when it returned `{ draft: null }`.
+  A call that omits it, or sends a negative or fractional number, is refused at the boundary. On a
+  new create draft send `0`, then reuse the `version` each accepted call returns.
+
+### Refusals worth knowing before you stage or commit
+
+- **A `draftVersion` above the draft's own is refused.** A draft's version only grows, so no read
+  ever returned it: the draft you read was saved or discarded since. Read again — never raise the
+  number to get past the refusal.
+
+- **The contested-axis refusal is measured from your `draftVersion`**, not from a read the call
+  makes for itself, so an edit the player made between your read and your stage is refused by name
+  rather than silently overwritten.
+
+- **`update_strategy_signal_rule` and `restore_strategy` answer `CONFLICT` while the player holds a
+  draft of that strategy.** Compile the tune and stage it with `stage_strategy_plan`; for a restore,
+  ask the player to save or discard their draft first. A caller whose player holds no draft is
+  unaffected.
+
+- **`stage_strategy_plan` refuses a plan the strategy committed past** after the plan compiled,
+  with the same answer `apply_strategy_plan` gives: compile again against what is committed now.
+
+- **Every refusal around an open draft names its version** in `details.draftVersion` — the
+  committers above, the agent committers, and a stage refused for a version above the draft's own —
+  so you can read the draft the player holds and propose against it.
+
+### Changed meaning, unchanged shape
+
+- **A draft axis's `source` names the door it came through.** A Telegram Commander turn stamps
+  `telegram` and a connected client stamps `mcp`, where every staging call used to stamp
+  `commander`. Both values were already in the enum.
+
+- **A draft's `version` keeps counting after a save or discard empties it.** The next draft for the
+  same agent or strategy starts above the last version rather than at `1`, so a version you read is
+  never reissued to a different draft.
+
+### Vocabulary
+
+`toolCount` stays 126. One input schema moves, `stage_agent_draft`'s; no output schema moves.
+
 ## Contract history — v64.1
 
 Purely additive in schema, with **one refusal behind an unchanged one.** An agent's unsaved
