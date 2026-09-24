@@ -1,6 +1,6 @@
 ---
 name: battlegrid-radar-deployment
-description: Deploy the player's agents to standing duty — per-coin Radar policies that fire real trades on confirmed regime flips, and per-preset Arena deployment policies that enter sessions automatically. Reads what is deployed now, stages a Radar change into the player's draft, previews what it would actually resolve to, commits it only after the player has seen that preview, and un-deploys with the blast radius stated. Activate whenever the player wants an agent put on duty, wants to change or pause a deployment, asks what would fire right now or why nothing is firing, or wants to stop a coin or a preset being traded automatically.
+description: Deploy the player's agents to standing duty — per-coin Radar policies that fire real trades on confirmed regime flips, and per-preset Arena deployment policies that enter sessions automatically. Reads what is deployed now, stages a change into the player's draft, previews what it would actually resolve to, commits it only after the player has seen that preview, and un-deploys with the blast radius stated. Activate whenever the player wants an agent put on duty, wants to change or pause a deployment, asks what would fire right now or why nothing is firing, or wants to stop a coin or a preset being traded automatically.
 ---
 
 # Radar & Deployment
@@ -17,15 +17,14 @@ and never describe them as one thing with two modes.
 ## The five failures this flow exists to prevent
 
 1. **A write with no fresh preview.** *Cue: any `commit_radar_deployment_draft`,
-   `resume_radar_deployment` or `upsert_deployment_policy`.* The preview is the only place the
+   `resume_radar_deployment`, `commit_deployment_policy_draft` or `resume_deployment_policy`.* The preview is the only place the
    player sees which agent actually goes on duty and why. → steps 2–3.
 2. **A blind retry.** *Cue: a CONFLICT on a write.* Something moved under you — the stored policy,
-   or for Radar the player's draft. Retrying overwrites an edit you never read. → step 3.
+   or the player's draft. Retrying overwrites an edit you never read. → step 3.
 3. **Previewing one thing and writing another.** *Cue: the player adjusts a slot, a bar, a window
    or a regime after you previewed.* A preview vouches only for what it resolved. → step 2.
-4. **A replacement that silently drops slots.** *Cue: a Radar `RULES` axis staged over a deployed
-   coin, or any Arena upsert on a preset that already has a policy.* Radar's `RULES` is the COMPLETE
-   ordered rule list and Arena's `slots` the complete slot set: a rule or slot you did not resend is
+4. **A replacement that silently drops rules.** *Cue: a `RULES` axis staged over a deployed coin or
+   a deployed arena.* `RULES` is the COMPLETE ordered rule list on both: a rule you did not resend is
    deleted. → step 3.
 5. **Answering "why isn't it firing?" by paging the journal.** *Cue: any question about why a
    deployed agent has been quiet — "is it working?", "it hasn't traded all day", "what's blocking
@@ -55,9 +54,10 @@ Then read what exists:
   `list_radar_deployment_drafts` when no coin is named yet. The player may be part-way through a
   change in their radar builder. **If a draft exists, say so** — what it holds, and when and from
   where it was last written — and propose against it rather than starting over beside it.
-- `get_deployment_policy` / `list_deployment_policies` for Arena. The read supplies
-  `expectedRevision` for the Arena write: **`null` only for a first deploy** — a preset with no
-  policy at all.
+- `get_deployment_policy` / `list_deployment_policies` for Arena, and **the player's draft of the
+  arena** with `get_deployment_policy_draft` — or `list_deployment_policy_drafts` when no arena is
+  named yet, which also lists arenas the player started but never deployed. Mention an existing draft
+  the same way: what it holds, and when and from where it was last written.
 
 `get_regime_snapshot` / `get_regime_history` when the policy turns on regime conditions.
 
@@ -80,7 +80,17 @@ If the question is *why did my radar agent not fire*, do not start from the jour
 To try a slot set without touching the draft, preview `{ kind: "SLOTS", deploymentTimeframe, slots }` —
 it certifies nothing and cannot be committed.
 
-**Arena** → `preview_deployment_resolution` with the draft slots.
+**Arena** — the same shape, keyed on `presetId`:
+
+1. `stage_deployment_policy_draft` with `draftVersion` = the `version` you read (0 when there was no
+   draft) and only the axes you are changing, each WHOLE: `RULES` (the complete ordered rule list —
+   first is highest priority, one regime per rule), `DEFAULT_SLOT` (the catch-all, or null for none)
+   and `REGIME_ANCHOR` (the anchor override, or null to inherit the arena's). Pausing is never staged.
+2. `preview_deployment_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version
+   staging returned.
+
+A draft that would hold no rule and no catch-all is a withdrawal, which a commit never does — that is
+`delete_deployment_policy` (step 4).
 
 Both previews run the **same resolver the live sweep runs**, so the preview is the real outcome, not
 an estimate. Neither writes anything and neither costs the player an LLM call — so previewing
@@ -90,8 +100,8 @@ Render the preview as a card and read it out: which agent goes on duty, which sl
 what priority, the regime and conviction used, the qualification verdict, and any typed idle or
 blocked reason. **Render `section` as the server sends it — never re-derive it.** A non-null reason
 does not mean idle (`ON_DUTY_BUT_POSITION_BLOCKED` carries a reason and is not idle), so deciding
-the headline yourself gets it wrong. For Radar, `enabledAfterCommit` says whether the policy will
-trade once committed — a paused policy stays paused.
+the headline yourself gets it wrong. `enabledAfterCommit` says whether the policy will play once
+committed — a paused policy stays paused, and a first Arena deployment always plays.
 
 **If anything changes after a preview, re-preview.** A preview never vouches for what it did not
 resolve.
@@ -104,20 +114,20 @@ the reason — and **names what the change does to the stored policy**, read fro
 - every rule or slot the change **removes** (by agent and priority), because `RULES` and `slots` are
   the whole set;
 - a bar, window or regime that **changes** on a rule or slot that survives;
-- for Arena, `enabled` going false (**paused, slots kept — nothing fires**) or true (**resumed — it can
-  fire again from the next confirmed flip**).
+- whether it will play once committed, from `enabledAfterCommit` — a commit never changes a pause.
 
 Then:
 
 - **Radar** → `commit_radar_deployment_draft({ coinId, previewToken, confirm: true })`, with the
   `previewToken` the **live** DRAFT preview returned — no `simulatedRegime`, within five minutes. The
   draft ends when it commits.
-- **Arena** → `upsert_deployment_policy` with the revision from step 1.
+- **Arena** → `commit_deployment_policy_draft({ presetId, previewToken, confirm: true })`, the same
+  way: the live DRAFT preview's token, within five minutes. The draft ends when it commits.
 
 **On a typed CONFLICT: re-read, re-preview, re-confirm.** In that order, and all three. The draft or
 the policy changed under you, so the state your preview resolved and the radius you stated are both
-stale. A Radar certificate is bound to the draft version, the deployment and its content, so a
-retry with the old one is refused again — only a fresh preview earns a new one.
+stale. A certificate is bound to the draft version, the deployment and its content, so a retry
+with the old one is refused again — only a fresh preview earns a new one.
 
 ### 4. Pause, resume, discard, delete
 
@@ -127,23 +137,34 @@ never waits on a read. The player's draft is kept. **Resume** → preview the de
 `resume_radar_deployment({ coinId, previewToken, confirm: true })` with the token that preview
 returned.
 
-**Discard a Radar draft** only on the player's word. Call `discard_radar_deployment_draft` with
+**Pause an arena** → `pause_deployment_policy({ presetId })`, and **resume** it the Radar way: preview
+`{ kind: "COMMITTED" }`, then `resume_deployment_policy({ presetId, previewToken, confirm: true })` on
+the player's word. Both touch only the pause, never the rules or the player's draft.
+
+**Entries already made stand.** A pause or a delete of an arena returns `openEntries` — the sessions
+the player's agent already entered that have not locked, each with its lock time and entry fee. They
+play out unless the player cancels them. Name each one, ask whether to cancel it, and call
+`cancel_market_grid_submission({ sessionId, confirm: true })` only for the entries they pick — the
+same cancellation and refund as their own Cancel button. Say nothing is cancelled when they decline.
+
+**Discard a draft** only on the player's word. Call `discard_radar_deployment_draft` or
+`discard_deployment_policy_draft` with
 `confirm: false` first: the answer names what the draft holds, its version, and when and from where
 it was last written. Tell the player, ask, and call with `confirm: true` and `expectedVersion` set to
 **the version you were shown**. If the draft moved since, nothing is removed and the answer names what
 it now holds — show them again.
 
 **Deletes** — `delete_radar_deployment` / `delete_deployment_policy` remove the **entire** policy —
-every slot and condition — and revoke the standing authority. Un-deploying a Radar coin **also ends
-the player's draft of it**. There is no preview here, and correctly so: there is no resolution to
-preview once the policy is gone. The evidence is **the deployment's own read**, which supplies the
-`expectedRevision` the delete carries.
+every slot and condition — and revoke the standing authority. Un-deploying **also ends the player's
+draft** of the coin or the arena. There is no preview here, and correctly so: there is no resolution
+to preview once the policy is gone. The evidence is **the deployment's own read**, which supplies the
+`expectedRevision` the delete carries — and for Arena the `expectedPolicyId` beside it.
 
 State what stops, from that read: which agents were on duty or eligible, what the policy was
 firing on, and that the slots are not recoverable. Both tools carry a schema-level `confirm: true`.
 
 **If the player wants to stop trading without losing the slots, that is not a delete** — it is
-`pause_radar_deployment` for Radar, and an upsert with `enabled: false` for Arena. Offer that
+`pause_radar_deployment` for Radar and `pause_deployment_policy` for Arena. Offer that
 whenever the ask sounds like "pause", "stop for now", or "take it off duty for a while".
 
 ### 5. "Why isn't it firing?" — state, then pattern, then rows
@@ -187,23 +208,19 @@ Two negatives, both checkable:
   rollup's counts span every matching row inside `windowStartAt`–`windowEndAt` — quote them with
   that window ("41 times in the last 7 days"), never as a total.
 
-## Preview-before-commit: enforced for Radar, this flow's rule for Arena
+## Preview-before-commit: enforced for both
 
-**Radar** arms only with a certificate. `commit_radar_deployment_draft` takes the certificate a live
-preview of that draft returned, and `resume_radar_deployment` one from a live preview of the deployed
-policy. Each is bound to your credential, the player, the coin, the subject previewed, the deployment
-and its revision, the draft version and the content the preview resolved, and expires after five
-minutes. A simulated preview returns none. So a commit of anything the player was not shown is
+A deployment arms only with a certificate. `commit_radar_deployment_draft` and
+`commit_deployment_policy_draft` take the certificate a live preview of that draft returned, and
+`resume_radar_deployment` and `resume_deployment_policy` one from a live preview of the deployed
+policy. Each is bound to your credential, the player, the coin or arena, the subject previewed, the
+deployment and its revision, the draft version and the content the preview resolved, and expires after
+five minutes. A simulated preview returns none. So a commit of anything the player was not shown is
 refused by the server — but the player's confirmation is still yours to ask for, against the preview.
-
-**Arena** has no server-side preview receipt: the upsert takes no token proving a preview happened,
-and the CAS revision is the only cross-call state. There the sequence above is what holds the
-invariant. Treat it as binding anyway: an Arena write that reaches the player's confirm with no
-preview in the conversation is a failure of this skill even if the server accepts it.
 
 ## When a write's outcome is unknown
 
-An interrupted or timed-out commit, pause, resume, upsert or delete may have landed. **Read the
+An interrupted or timed-out commit, pause, resume, delete or cancel may have landed. **Read the
 deployment first** (`get_radar_deployment` / `get_deployment_policy`) and report what is actually
 stored. A committed change is a success to report, not a call to repeat. Never blind-retry a write
 whose outcome you did not see.
@@ -211,7 +228,7 @@ whose outcome you did not see.
 ## `test_generate_deployment_grid`
 
 This one runs a **billed LLM generation** against the player's intelligence credits and writes
-thought and activity records. It is a composition aid for tuning a draft deployment — say that it
+thought and activity records. It is a composition aid for tuning an Arena deployment — say that it
 is billed **before** invoking it, and only invoke it when the player is actually iterating on slots
 and wants to see what the resolved agent would produce. It is never a diagnostic read.
 
