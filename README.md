@@ -24,6 +24,71 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v66
+
+**Breaking: one tool retired and one input reshaped.** Radar content now commits only as a draft the
+player was shown a live preview of. The player's radar builder and every conversation share one
+unsaved draft per coin.
+
+### Removed tool — something you call no longer exists
+
+- **`upsert_radar_deployment` is retired**, with no alias. Calling it is an unknown-tool error. To
+  deploy or change a coin's Radar policy:
+  1. `stage_radar_deployment_draft` the axes you are changing;
+  2. `preview_radar_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version staging
+     returned;
+  3. show the player the resolution, and on their word call `commit_radar_deployment_draft` with the
+     `previewToken` that preview returned and `confirm: true`.
+
+  Pausing is no longer a flag on the write: use `pause_radar_deployment`.
+
+### Rejected input — something you send is no longer accepted
+
+- **`preview_radar_resolution`'s `request` needs a `kind`.** `{ kind: "SLOTS", deploymentTimeframe,
+  slots, simulatedRegime? }` is the old request. `{ kind: "DRAFT", draftVersion }` previews the
+  player's draft of the coin at that version, composed over the deployed policy exactly as the commit
+  writes it. `{ kind: "COMMITTED" }` previews the deployed policy a resume would arm. A request
+  without `kind` is refused.
+
+### Wider surface — seven tools added
+
+- **`stage_radar_deployment_draft`**, **`get_radar_deployment_draft`**,
+  **`list_radar_deployment_drafts`** and **`discard_radar_deployment_draft`** (`mcp:read`). The draft
+  axes are `DEPLOYMENT_TIMEFRAME`, `RULES` (the complete ordered rule list, first = highest priority)
+  and `DEFAULT_SLOT`, each written whole. None of them commits or arms anything.
+- **`commit_radar_deployment_draft`** (`coinId`, `previewToken`, `confirm: true`; `mcp:wager`) — the
+  only MCP committer of radar content.
+- **`pause_radar_deployment`** (`coinId`; `mcp:wager`) — no revision and no certificate: a disarm never
+  waits on a read.
+- **`resume_radar_deployment`** (`coinId`, `previewToken`, `confirm: true`; `mcp:wager`) — needs the
+  certificate a live `COMMITTED` preview returned.
+
+### Reshaped output — `preview_radar_resolution`
+
+- Gains **`previewToken`**, the certificate a LIVE preview (no `simulatedRegime`) of `DRAFT` or
+  `COMMITTED` earns — null otherwise, and good for five minutes. It also gains
+  **`enabledAfterCommit`**: whether the policy trades once the previewed write lands. A paused
+  policy's draft stays paused.
+
+### Refusals worth knowing before you commit or resume
+
+- **The certificate is bound to what you previewed**: your credential, the player, the coin, the
+  subject, the deployment and its revision, the draft version and the composed content. If the
+  player edits the draft, another commit lands, the coin is redeployed, or an agent in it is deleted,
+  the commit or resume is a `CONFLICT` and nothing is written. Preview again; never reuse the old
+  certificate.
+- **`commit_radar_deployment_draft` takes only a draft certificate**, and `resume_radar_deployment`
+  only a committed-policy one.
+- **`discard_radar_deployment_draft` with `confirm: true` requires `expectedVersion`**: the version the
+  unconfirmed call named and the player was shown. A draft that moved since is answered again, and
+  nothing is removed.
+- **`delete_radar_deployment` also ends the player's radar draft of the coin.**
+
+### Vocabulary
+
+`toolCount` goes 126 → 132. `preview_radar_resolution`'s input and output schemas move, and
+`upsert_radar_deployment`'s are removed.
+
 ## Contract history — v65
 
 **Breaking on one input, and four refusals behind unchanged schemas.** Agent staging now names the
