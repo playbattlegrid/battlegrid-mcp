@@ -24,6 +24,86 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v68 (Arena drafts)
+
+**Breaking: one tool retired, two inputs reshaped.** Arena deployment content now commits only as a
+draft the player was shown a live preview of, as radar content has since v66. The player's deploy
+editor and every conversation share one unsaved draft per arena.
+
+### Removed tool — something you call no longer exists
+
+- **`upsert_deployment_policy` is retired**, with no alias. Calling it is an unknown-tool error. To
+  deploy or change an arena's deployment:
+  1. `stage_deployment_policy_draft` the axes you are changing (`RULES`, `DEFAULT_SLOT`,
+     `REGIME_ANCHOR`), with the `draftVersion` your last read returned;
+  2. `preview_deployment_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version
+     staging returned;
+  3. show the player the resolution and whether it will play (`enabledAfterCommit`), and on their word
+     call `commit_deployment_policy_draft` with the `previewToken` that preview returned and
+     `confirm: true`.
+
+  Pausing is no longer a flag on the write: use `pause_deployment_policy`. **A first deployment always
+  plays**; a replacement keeps its pause.
+
+### Rejected input — something you send is no longer accepted
+
+- **`preview_deployment_resolution`'s `request` needs a `kind`.** `{ kind: "SLOTS", slots, … }` is the
+  old request. `{ kind: "DRAFT", draftVersion }` previews the player's draft of the arena at that
+  version, composed over the deployed policy exactly as the commit writes it. `{ kind: "COMMITTED" }`
+  previews the deployed policy a resume would arm. A request without `kind` is refused.
+- **`delete_deployment_policy` requires `expectedPolicyId`** beside `expectedRevision`: a revision
+  restarts at 1 when an arena is redeployed, so only the pair names the deployment you read.
+- **A regime anchor override names its coin and timeframe together, or neither**, on every path
+  including `test_generate_deployment_grid` and the SLOTS preview.
+
+### Wider surface — eight tools added
+
+- **`stage_deployment_policy_draft`**, **`get_deployment_policy_draft`**,
+  **`list_deployment_policy_drafts`** and **`discard_deployment_policy_draft`** (`mcp:read`). None of
+  them commits or arms anything.
+- **`commit_deployment_policy_draft`** (`presetId`, `previewToken`, `confirm: true`; `mcp:wager`) — the
+  only MCP committer of Arena content.
+- **`pause_deployment_policy`** (`presetId`; `mcp:wager`) — no revision and no certificate.
+- **`resume_deployment_policy`** (`presetId`, `previewToken`, `confirm: true`; `mcp:wager`) — needs the
+  certificate a live `COMMITTED` preview returned.
+- **`cancel_market_grid_submission`** (`sessionId`, `confirm: true`; `mcp:wager`) — the player's own
+  cancellation and refund of one entry.
+
+### Reshaped and wider output
+
+- **`preview_deployment_resolution`** nests the resolution under `resolution` and gains
+  **`previewToken`** (the certificate a live DRAFT or COMMITTED preview earns, null otherwise, good for
+  five minutes) and **`enabledAfterCommit`**.
+- **`pause_deployment_policy` and `delete_deployment_policy` return `openEntries`**: the entries the
+  player's agent already made in the arena's pending sessions, each with its lock time and entry fee.
+  They play out unless the player cancels them — tell the player and ask, then call
+  `cancel_market_grid_submission` only for the entries they pick.
+- **`get_deployment_policy`'s `authoringContext`** gains the arena's header facts
+  (`regimeReferenceTicker`, `presetBadgeImageUrl`, `entryFee`, and `playerCount` — null when the arena
+  has no pending session to count).
+- The thought-log **`outcome`** gains **`SKIPPED_DEPLOYMENT_DISARMED`**: an entry job that found its
+  deployment withdrawn, paused or no longer slotting its agent stood down before paying.
+
+### Refusals worth knowing before you commit or resume
+
+- **The certificate is bound to what you previewed**: your credential, the player, the arena, the
+  subject, the deployment and its revision, the draft version and the composed content. Anything that
+  moves is a `CONFLICT` and nothing is written. Preview again; never reuse the old certificate.
+- **A commit never withdraws**: a draft with no rule and no catch-all is refused, naming
+  `delete_deployment_policy`.
+- **Resume is refused on a retired arena and on one the player's access was revoked from**; pausing and
+  withdrawing stay open.
+- **Deployment refusals answer `INVALID_DEPLOYMENT_POLICY`.**
+- **`delete_deployment_policy` also ends the player's draft of the arena.**
+
+### Vocabulary
+
+`toolCount` goes 134 → 141 (eight added, one retired). `preview_deployment_resolution`'s input and
+output, `delete_deployment_policy`'s input and output, `get_deployment_policy`'s and
+`list_deployment_policies`' outputs, the three journal outputs and `test_generate_deployment_grid`'s
+input (a session start now accepts up to 288 times a day) move; `upsert_deployment_policy`'s are
+removed.
+
 ## Contract history — v66.1 → v67
 
 **Breaking at v67: four output fields removed.** v66.1 and v66.2 were additive and are recorded here
