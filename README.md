@@ -24,7 +24,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v67 (Arena drafts)
+## Contract history — v68 (Arena drafts)
 
 **Breaking: one tool retired, two inputs reshaped.** Arena deployment content now commits only as a
 draft the player was shown a live preview of, as radar content has since v66. The player's deploy
@@ -98,11 +98,45 @@ editor and every conversation share one unsaved draft per arena.
 
 ### Vocabulary
 
-`toolCount` grows by seven (eight added, one retired). `preview_deployment_resolution`'s input and
+`toolCount` goes 134 → 141 (eight added, one retired). `preview_deployment_resolution`'s input and
 output, `delete_deployment_policy`'s input and output, `get_deployment_policy`'s and
 `list_deployment_policies`' outputs, the three journal outputs and `test_generate_deployment_grid`'s
 input (a session start now accepts up to 288 times a day) move; `upsert_deployment_policy`'s are
 removed.
+
+## Contract history — v66.1 → v67
+
+**Breaking at v67: four output fields removed.** v66.1 and v66.2 were additive and are recorded here
+with it.
+
+### Reshaped output — `get_agents_hub` (v67, breaking)
+
+- **`summary` loses `messagesUsedToday`, `dailyLimit`, `messagesUsedPercent` and
+  `avgCostPerMessageUsd`.** They reported the in-app arena chat's daily message quota, and that chat
+  is retired, so every value would have read zero. A strict client that reads them fails to parse the
+  summary. The rest of the summary is unchanged; per-agent spend stays on each row's `cost24hUsd`.
+
+### Wider surface — two tools added (v66.2)
+
+- **`scan_coin_agents`** (`coinTicker`; `mcp:read`) — one coin evaluated against every one of the
+  caller's own agents, ranked in four arrays: `qualified` by score, `rejected` with the first failing
+  gate, `unscorable`, and `ineligible` with the code `propose_entry_decision` would refuse the agent
+  with (`AGENT_NOT_ACTIVE`, `MODEL_INACTIVE`, `AGENT_HALTED`). `rank` is global across the four.
+  Rate-limited per user: a refusal is `RATE_LIMITED` with `retryAfterSeconds`.
+- **`get_onboarding_requirements`** (no input; `mcp:read`) — the caller's readiness ladder: every
+  rung, the spine counts and the next rung.
+
+### Reshaped output — `get_strategy_draft` (v66.1)
+
+- **`draft` gains `lastSource`** — the surface of the draft's latest write (`form`, `commander`,
+  `telegram` or `mcp`), as the agent and radar draft reads already publish. Before v66.1 every read of
+  an existing strategy draft failed its output check with `INTERNAL_ERROR`; it now succeeds.
+
+### Vocabulary
+
+`toolCount` goes 132 → 134. The added tools' schemas are new; `get_strategy_draft`'s and
+`get_agents_hub`'s output schemas move. Descriptions that named the app's retired Agent Toolbox trade
+tab now name Commander.
 
 ## Contract history — v66
 
