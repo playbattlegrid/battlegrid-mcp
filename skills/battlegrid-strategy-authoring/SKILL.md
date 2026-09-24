@@ -215,7 +215,8 @@ confirmation as the plan's own: the player is approving all of it, not only what
 
 If a staging call is refused as contested, it names the axes the player's own hand changed after
 your compile. Do not retry it and do not work around it — compile again so the new plan absorbs
-those edits, then stage that one.
+those edits, then stage that one. The same holds when it is refused because the strategy committed
+a newer revision after your compile: compile again against what is committed now.
 
 **Offer to discard a draft only on the player's explicit word**, never on your own judgement that
 it looks stale, and never batched into another act. State when it was last touched and which
@@ -271,6 +272,12 @@ with the player:
   and open positions are unaffected.
 - **Tuning a single rule** — how many agents are bound, and that the change reaches every one of
   them immediately.
+
+**Never tune or restore around a draft.** `update_strategy_signal_rule` and `restore_strategy` are
+REFUSED while the player holds a draft of the strategy — check `get_strategy_draft` first. For a
+tune, compile the one-rule change and `stage_strategy_plan` it, so it lands in their form; for a
+restore, ask them to save or discard their draft first. The refusal is the server's, so do not
+retry the call.
 
 **Your `ask_user` is the explanation, not the mechanism.** For single-rule tuning the server
 independently requires `confirm:true` whenever the strategy has bound agents, so stating the radius

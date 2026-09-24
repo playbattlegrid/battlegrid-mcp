@@ -79,7 +79,8 @@ budget posture** — the capital ceiling and stops the trading configuration wil
 will take platform defaults.
 
 **Build it in a create draft.** As the picks come back, stage them with `stage_agent_draft` —
-omit `agentId` on the first call and reuse the id it returns — each axis WHOLE: IDENTITY
+omit `agentId` and send `draftVersion: 0` on the first call, then reuse the id and the `version` it
+returns — each axis WHOLE: IDENTITY
 `{ displayName }`, BEHAVIOR `{ behavior: { risk, outlook, conviction } }`, MODEL `{ modelId }`,
 TRADING_CONFIG with every agent-owned field, and STRATEGY_BINDING `{ strategyId }`. The build then
 survives a refresh, lists in the Agents Hub as *not yet created*, and opens on the create screen,
@@ -104,12 +105,15 @@ and not readiness — the pipeline's own refusal at the fee is the authority.
 Before proposing any change to an existing agent, `get_agent_draft`. **A draft means the player is
 mid-edit in their form.** Then:
 
-- **Stage** the change with `stage_agent_draft`: it lands in their open form, labelled as yours, and
-  **their Save commits it** together with their own edits. `update_intelligence_agent` and
-  `rebind_intelligence_agent` are REFUSED while the draft exists — that refusal is the server's, so
-  do not retry them.
-- A staging call **refused naming an axis** means the player changed it after you read the draft:
-  read again and propose against what they now have — never re-send the same values.
+- **Stage** the change with `stage_agent_draft`, naming as `draftVersion` the `version` the read you
+  proposed against returned (0 when `get_agent_draft` returned null): it lands in their open form,
+  labelled as yours, and **their Save commits it** together with their own edits.
+  `update_intelligence_agent` and `rebind_intelligence_agent` are REFUSED while the draft exists —
+  that refusal is the server's, so do not retry them.
+- A staging call **refused naming an axis** means the player changed it after the version you name:
+  read again and propose against what they now have — never re-send the same values. A call refused
+  because that version is one the draft never reached means the draft you read is gone: read again.
+  Never raise the number to get past either refusal.
 - **Rebinding is never staged.** While a draft is open, ask the player to save or discard it first.
 - `discard_agent_draft` only on the player's word: call it with `confirm:false` first, tell them
   when the draft was last written and from which surface, ask, then confirm.
