@@ -24,6 +24,659 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v69 (Radar multi-agent duty)
+
+**Breaking: one input removed from two tools, three outputs reshaped.** A Radar policy carries no
+timeframe. Every rule whose conditions match puts its agent on duty at once, and each rule's regime
+condition is read at that agent's own regime timeframe. A coin still holds one position at a time: at
+most one fire per coin per pass, offered in rule priority.
+
+### Rejected input — something you send is no longer accepted
+
+- **`preview_radar_resolution`'s `SLOTS` request refuses `deploymentTimeframe`** as an unrecognized key.
+  Send `{ kind: "SLOTS", slots }`.
+- **`stage_radar_deployment_draft` refuses the `DEPLOYMENT_TIMEFRAME` axis** the same way. Stage only
+  `RULES` and `DEFAULT_SLOT`.
+
+### Reshaped output — something you read has a new shape
+
+- **`resolvesNow`** on `get_radar_deployment`, `list_radar_deployments` and `preview_radar_resolution` is
+  the coin's state (`section`, `isIdle`, `rotating`, one `reason`, the open-position owner) plus
+  **`onDuty`**: one row per agent on duty, in priority order. Each row carries its slot, its regime reading
+  at its own regime timeframe, its qualification verdict and gate, cooldown, block, `edgeSpent`, last flip
+  and fire, and its own `closeDecision`. The single-winner fields (`onDutyAgentId` and its display pair,
+  `matchedSlot*`, `regimeUsed`, and the per-agent fields the rows now carry) are gone. Render every row in
+  the order served, and never pick one yourself.
+- **`preview_radar_resolution`'s `conditionReach`** is one flat list, each entry naming its `agentId` and
+  `agentDisplayName`.
+- **Each deployment slot gains `agentRegimeTimeframe`**, the timeframe its rule's regime is read at.
+
+### Removed output — a field you read is gone
+
+- **`deploymentTimeframe`** on a Radar policy, and the **`DEPLOYMENT_TIMEFRAME`** axis in the radar
+  draft's `content` and `axesMeta` on `get_radar_deployment_draft`, `list_radar_deployment_drafts` and the
+  stage result.
+
+### Wider enums — a value you may now receive
+
+- **`closeDecision.outcome` gains `CLAIMED`**: the agent's close qualified, but a higher-priority agent
+  took the coin's one fire that pass. Its edge is preserved, and it fires at a later close only if it
+  still qualifies there.
+- **`get_radar_activity` and `get_radar_activity_summary`** gain the events `ON_DUTY_JOINED` and
+  `ON_DUTY_LEFT` (duty is journaled per agent) and the fire disposition `EDGE_PRESERVED_COIN_CLAIMED`.
+  `curveDigest` describes the first agent on duty, named in `curveAgentName`.
+- **`get_trade_conversation`** may carry the `close_claimed_by_radar` card.
+
+The exported `battlegrid-radar-deployment` skill describes the v69 flow.
+
+## Contract history — v68.1 (Arena regime sets)
+
+Purely additive in schema, with **one refusal behind unchanged ones.** An Arena rule's regime condition
+is a SET in the draft, as it always was in the committed deployment: one rule can fire in several
+regimes, instead of one rule per regime.
+
+### Wider input — `stage_deployment_policy_draft`
+
+- **A rule's `regimes` may name several regimes**, where the draft capped it at one. The set is stored in
+  the selectable-regime order, so a staged `[VOLATILE, BULL_EXPANSION]` reads back
+  `[BULL_EXPANSION, VOLATILE]`. A regime named twice is refused.
+
+### Wider output — `get_deployment_policy_draft`
+
+- **The draft may return such a set.** `get_deployment_policy` has served sets all along, so a client that
+  reads a committed deployment already handles them.
+
+### Refusals behind unchanged schemas
+
+- **`preview_deployment_resolution` (SLOTS), `preview_radar_resolution` (SLOTS) and
+  `test_generate_deployment_grid` refuse a regime condition naming one regime twice**, as
+  `VALIDATION_ERROR` at its `regimes` field, where they used to resolve or generate over it. The stage tools
+  already refused a repeat, so no commit changes; a repeated member is a malformed set.
+
+## Contract history — v68 (Arena drafts)
+
+**Breaking: one tool retired, two inputs reshaped.** Arena deployment content now commits only as a
+draft the player was shown a live preview of, as radar content has since v66. The player's deploy
+editor and every conversation share one unsaved draft per arena.
+
+### Removed tool — something you call no longer exists
+
+- **`upsert_deployment_policy` is retired**, with no alias. Calling it is an unknown-tool error. To
+  deploy or change an arena's deployment:
+  1. `stage_deployment_policy_draft` the axes you are changing (`RULES`, `DEFAULT_SLOT`,
+     `REGIME_ANCHOR`), with the `draftVersion` your last read returned;
+  2. `preview_deployment_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version
+     staging returned;
+  3. show the player the resolution and whether it will play (`enabledAfterCommit`), and on their word
+     call `commit_deployment_policy_draft` with the `previewToken` that preview returned and
+     `confirm: true`.
+
+  Pausing is no longer a flag on the write: use `pause_deployment_policy`. **A first deployment always
+  plays**; a replacement keeps its pause.
+
+### Rejected input — something you send is no longer accepted
+
+- **`preview_deployment_resolution`'s `request` needs a `kind`.** `{ kind: "SLOTS", slots, … }` is the
+  old request. `{ kind: "DRAFT", draftVersion }` previews the player's draft of the arena at that
+  version, composed over the deployed policy exactly as the commit writes it. `{ kind: "COMMITTED" }`
+  previews the deployed policy a resume would arm. A request without `kind` is refused.
+- **`delete_deployment_policy` requires `expectedPolicyId`** beside `expectedRevision`: a revision
+  restarts at 1 when an arena is redeployed, so only the pair names the deployment you read.
+- **A regime anchor override names its coin and timeframe together, or neither**, on every path
+  including `test_generate_deployment_grid` and the SLOTS preview.
+
+### Wider surface — eight tools added
+
+- **`stage_deployment_policy_draft`**, **`get_deployment_policy_draft`**,
+  **`list_deployment_policy_drafts`** and **`discard_deployment_policy_draft`** (`mcp:read`). None of
+  them commits or arms anything.
+- **`commit_deployment_policy_draft`** (`presetId`, `previewToken`, `confirm: true`; `mcp:wager`) — the
+  only MCP committer of Arena content.
+- **`pause_deployment_policy`** (`presetId`; `mcp:wager`) — no revision and no certificate.
+- **`resume_deployment_policy`** (`presetId`, `previewToken`, `confirm: true`; `mcp:wager`) — needs the
+  certificate a live `COMMITTED` preview returned.
+- **`cancel_market_grid_submission`** (`sessionId`, `confirm: true`; `mcp:wager`) — the player's own
+  cancellation and refund of one entry.
+
+### Reshaped and wider output
+
+- **`preview_deployment_resolution`** nests the resolution under `resolution` and gains
+  **`previewToken`** (the certificate a live DRAFT or COMMITTED preview earns, null otherwise, good for
+  five minutes) and **`enabledAfterCommit`**.
+- **`pause_deployment_policy` and `delete_deployment_policy` return `openEntries`**: the entries the
+  player's agent already made in the arena's pending sessions, each with its lock time and entry fee.
+  They play out unless the player cancels them — tell the player and ask, then call
+  `cancel_market_grid_submission` only for the entries they pick.
+- **`get_deployment_policy`'s `authoringContext`** gains the arena's header facts
+  (`regimeReferenceTicker`, `presetBadgeImageUrl`, `entryFee`, and `playerCount` — null when the arena
+  has no pending session to count).
+- The thought-log **`outcome`** gains **`SKIPPED_DEPLOYMENT_DISARMED`**: an entry job that found its
+  deployment withdrawn, paused or no longer slotting its agent stood down before paying.
+
+### Refusals worth knowing before you commit or resume
+
+- **The certificate is bound to what you previewed**: your credential, the player, the arena, the
+  subject, the deployment and its revision, the draft version and the composed content. Anything that
+  moves is a `CONFLICT` and nothing is written. Preview again; never reuse the old certificate.
+- **A commit never withdraws**: a draft with no rule and no catch-all is refused, naming
+  `delete_deployment_policy`.
+- **Resume is refused on a retired arena and on one the player's access was revoked from**; pausing and
+  withdrawing stay open.
+- **Deployment refusals answer `INVALID_DEPLOYMENT_POLICY`.**
+- **`delete_deployment_policy` also ends the player's draft of the arena.**
+
+### Vocabulary
+
+`toolCount` goes 134 → 141 (eight added, one retired). `preview_deployment_resolution`'s input and
+output, `delete_deployment_policy`'s input and output, `get_deployment_policy`'s and
+`list_deployment_policies`' outputs, the three journal outputs and `test_generate_deployment_grid`'s
+input (a session start now accepts up to 288 times a day) move; `upsert_deployment_policy`'s are
+removed.
+
+## Contract history — v66.1 → v67
+
+**Breaking at v67: four output fields removed.** v66.1 and v66.2 were additive and are recorded here
+with it.
+
+### Reshaped output — `get_agents_hub` (v67, breaking)
+
+- **`summary` loses `messagesUsedToday`, `dailyLimit`, `messagesUsedPercent` and
+  `avgCostPerMessageUsd`.** They reported the in-app arena chat's daily message quota, and that chat
+  is retired, so every value would have read zero. A strict client that reads them fails to parse the
+  summary. The rest of the summary is unchanged; per-agent spend stays on each row's `cost24hUsd`.
+
+### Wider surface — two tools added (v66.2)
+
+- **`scan_coin_agents`** (`coinTicker`; `mcp:read`) — one coin evaluated against every one of the
+  caller's own agents, ranked in four arrays: `qualified` by score, `rejected` with the first failing
+  gate, `unscorable`, and `ineligible` with the code `propose_entry_decision` would refuse the agent
+  with (`AGENT_NOT_ACTIVE`, `MODEL_INACTIVE`, `AGENT_HALTED`). `rank` is global across the four.
+  Rate-limited per user: a refusal is `RATE_LIMITED` with `retryAfterSeconds`.
+- **`get_onboarding_requirements`** (no input; `mcp:read`) — the caller's readiness ladder: every
+  rung, the spine counts and the next rung.
+
+### Reshaped output — `get_strategy_draft` (v66.1)
+
+- **`draft` gains `lastSource`** — the surface of the draft's latest write (`form`, `commander`,
+  `telegram` or `mcp`), as the agent and radar draft reads already publish. Before v66.1 every read of
+  an existing strategy draft failed its output check with `INTERNAL_ERROR`; it now succeeds.
+
+### Vocabulary
+
+`toolCount` goes 132 → 134. The added tools' schemas are new; `get_strategy_draft`'s and
+`get_agents_hub`'s output schemas move. Descriptions that named the app's retired Agent Toolbox trade
+tab now name Commander.
+
+## Contract history — v66
+
+**Breaking: one tool retired and one input reshaped.** Radar content now commits only as a draft the
+player was shown a live preview of. The player's radar builder and every conversation share one
+unsaved draft per coin.
+
+### Removed tool — something you call no longer exists
+
+- **`upsert_radar_deployment` is retired**, with no alias. Calling it is an unknown-tool error. To
+  deploy or change a coin's Radar policy:
+  1. `stage_radar_deployment_draft` the axes you are changing;
+  2. `preview_radar_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version staging
+     returned;
+  3. show the player the resolution, and on their word call `commit_radar_deployment_draft` with the
+     `previewToken` that preview returned and `confirm: true`.
+
+  Pausing is no longer a flag on the write: use `pause_radar_deployment`.
+
+### Rejected input — something you send is no longer accepted
+
+- **`preview_radar_resolution`'s `request` needs a `kind`.** `{ kind: "SLOTS", deploymentTimeframe,
+  slots, simulatedRegime? }` is the old request. `{ kind: "DRAFT", draftVersion }` previews the
+  player's draft of the coin at that version, composed over the deployed policy exactly as the commit
+  writes it. `{ kind: "COMMITTED" }` previews the deployed policy a resume would arm. A request
+  without `kind` is refused.
+
+### Wider surface — seven tools added
+
+- **`stage_radar_deployment_draft`**, **`get_radar_deployment_draft`**,
+  **`list_radar_deployment_drafts`** and **`discard_radar_deployment_draft`** (`mcp:read`). The draft
+  axes are `DEPLOYMENT_TIMEFRAME`, `RULES` (the complete ordered rule list, first = highest priority)
+  and `DEFAULT_SLOT`, each written whole. None of them commits or arms anything.
+- **`commit_radar_deployment_draft`** (`coinId`, `previewToken`, `confirm: true`; `mcp:wager`) — the
+  only MCP committer of radar content.
+- **`pause_radar_deployment`** (`coinId`; `mcp:wager`) — no revision and no certificate: a disarm never
+  waits on a read.
+- **`resume_radar_deployment`** (`coinId`, `previewToken`, `confirm: true`; `mcp:wager`) — needs the
+  certificate a live `COMMITTED` preview returned.
+
+### Reshaped output — `preview_radar_resolution`
+
+- Gains **`previewToken`**, the certificate a LIVE preview (no `simulatedRegime`) of `DRAFT` or
+  `COMMITTED` earns — null otherwise, and good for five minutes. It also gains
+  **`enabledAfterCommit`**: whether the policy trades once the previewed write lands. A paused
+  policy's draft stays paused.
+
+### Refusals worth knowing before you commit or resume
+
+- **The certificate is bound to what you previewed**: your credential, the player, the coin, the
+  subject, the deployment and its revision, the draft version and the composed content. If the
+  player edits the draft, another commit lands, the coin is redeployed, or an agent in it is deleted,
+  the commit or resume is a `CONFLICT` and nothing is written. Preview again; never reuse the old
+  certificate.
+- **`commit_radar_deployment_draft` takes only a draft certificate**, and `resume_radar_deployment`
+  only a committed-policy one.
+- **`discard_radar_deployment_draft` with `confirm: true` requires `expectedVersion`**: the version the
+  unconfirmed call named and the player was shown. A draft that moved since is answered again, and
+  nothing is removed.
+- **`delete_radar_deployment` also ends the player's radar draft of the coin.**
+
+### Vocabulary
+
+`toolCount` goes 126 → 132. `preview_radar_resolution`'s input and output schemas move, and
+`upsert_radar_deployment`'s are removed.
+
+## Contract history — v65
+
+**Breaking on one input, and four refusals behind unchanged schemas.** Agent staging now names the
+draft version its proposal was read against, and three commits and one stage step aside where they
+would otherwise land around the player's open draft or on a strategy that moved.
+
+### Rejected input — something you send is no longer accepted
+
+- **`stage_agent_draft` requires `draftVersion`**, an integer ≥ 0: the `version` the
+  `get_agent_draft` read you proposed against returned, or `0` when it returned `{ draft: null }`.
+  A call that omits it, or sends a negative or fractional number, is refused at the boundary. On a
+  new create draft send `0`, then reuse the `version` each accepted call returns.
+
+### Refusals worth knowing before you stage or commit
+
+- **A `draftVersion` above the draft's own is refused.** A draft's version only grows, so no read
+  ever returned it: the draft you read was saved or discarded since. Read again — never raise the
+  number to get past the refusal.
+
+- **The contested-axis refusal is measured from your `draftVersion`**, not from a read the call
+  makes for itself, so an edit the player made between your read and your stage is refused by name
+  rather than silently overwritten.
+
+- **`update_strategy_signal_rule` and `restore_strategy` answer `CONFLICT` while the player holds a
+  draft of that strategy.** Compile the tune and stage it with `stage_strategy_plan`; for a restore,
+  ask the player to save or discard their draft first. A caller whose player holds no draft is
+  unaffected.
+
+- **`stage_strategy_plan` refuses a plan the strategy committed past** after the plan compiled,
+  with the same answer `apply_strategy_plan` gives: compile again against what is committed now.
+
+- **Every refusal around an open draft names its version** in `details.draftVersion` — the
+  committers above, the agent committers, and a stage refused for a version above the draft's own —
+  so you can read the draft the player holds and propose against it.
+
+### Changed meaning, unchanged shape
+
+- **A draft axis's `source` names the door it came through.** A Telegram Commander turn stamps
+  `telegram` and a connected client stamps `mcp`, where every staging call used to stamp
+  `commander`. Both values were already in the enum.
+
+- **A draft's `version` keeps counting after a save or discard empties it.** The next draft for the
+  same agent or strategy starts above the last version rather than at `1`, so a version you read is
+  never reissued to a different draft.
+
+### Vocabulary
+
+`toolCount` stays 126. One input schema moves, `stage_agent_draft`'s; no output schema moves.
+
+## Contract history — v64.1
+
+Purely additive in schema, with **one refusal behind an unchanged one.** An agent's unsaved
+configuration now has a server home — the same owner-scoped *draft* strategies gained in v63.1 — so
+the agent form, Telegram and a connected client all see one set of unsaved values. These tools are
+how a conversation reaches it, and the two agent committers now step aside while it is open.
+
+### Wider surface — four tools added
+
+- **`stage_agent_draft({ request: { agentId?, axes } })`** writes proposed axes into the player's
+  draft for an agent and commits **nothing**: the values become the agent's configuration only when
+  the player saves. Unlike `stage_strategy_plan` it takes the axis *values* — `IDENTITY`,
+  `BEHAVIOR`, `MODEL`, `TRADING_CONFIG`, and for an agent not yet created `STRATEGY_BINDING` — each
+  written **whole**, so `BEHAVIOR` carries all three of risk, outlook and conviction and
+  `TRADING_CONFIG` the complete agent-owned configuration. Axes you omit keep their values.
+  Structure is checked on the way in; ranges are checked only when the player saves.
+
+- **Omit `agentId` to open a create draft.** The server mints the id and the response carries it;
+  name that id on every later call so one draft accumulates rather than a second opening beside it.
+
+- **`get_agent_draft({ request: { agentId } })`** reads one draft, or answers `{ draft: null }` —
+  not part-way through that agent is a value, not an error. `baseRevision` is `null` for an agent not
+  yet created, and `baseMoved` reports an agent committed past the revision the draft was written
+  against.
+
+- **`list_agent_drafts({ request: { cursor? } })`** answers "what am I part-way through?" for a
+  conversation holding no agent id, newest first. Offer to continue one of these before starting a
+  second.
+
+- **`discard_agent_draft({ request: { agentId, confirm } })`** destroys one draft on the player's
+  word. Called with `confirm: false` it destroys nothing and is refused with when the draft was last
+  written and which surface wrote it — tell the player that, then ask.
+
+### Refusals worth knowing before you stage or save
+
+- **A staged proposal refuses the axes the player typed after your call read the draft.** The
+  refusal names the axes; read the draft again and propose against what they now have. Another
+  surface's write to a *different* axis is retried once for you, then reported as a conflict.
+
+- **`STRATEGY_BINDING` is refused on an agent that exists.** Rebinding replaces an agent's
+  configuration and stays its own confirmed call, `rebind_intelligence_agent`.
+
+- **`update_intelligence_agent` and `rebind_intelligence_agent` answer `CONFLICT` while the player
+  holds a draft for that agent**, naming staging as the act available. Nothing about their input or
+  output changed, and a caller whose player holds no draft is unaffected — this is the one change
+  existing code can observe.
+
+### Vocabulary
+
+`toolCount` 122 → 126. No input or output schema of an existing tool moves.
+
+## Contract history — v64
+
+**Breaking, and it is a removal you will feel on two tools.** A vocabulary that never depended on
+your draft was being re-serialized into every preview result; it now lives on discovery and the
+preview names it.
+
+### Reshaped output — `preview_strategy_report`
+
+- **`conditionColumns` covers only the sections your report RENDERS.** It used to cover every
+  section the server's header inventory holds, which meant every report-level scalar on every
+  preview whether or not its module was placed — 36,652 bytes of payload, with each metric's gloss
+  repeated once per scope (11 market-breadth sentences published as 99). If you read
+  `session-field`, `market-breadth` or `reference-pairs` groups off a preview, they are gone.
+
+- **Nothing stopped resolving.** The header inventory is unchanged, so a condition naming
+  `mktBreadth_crypto` resolves exactly as it did. What changed is where you read its prose from.
+
+- **`vocabularyDigest` is new** — the sha256 identity of the authoring catalog that render described
+  its columns against, and the same digest a plan token binds as `authoringCatalogDigest`. Resolve
+  the vocabulary once, cache it against this string, and re-resolve when it moves.
+
+- **`structure.columns[].meaning` is gone.** It was a positional per-header string that neither
+  serialization ever rendered — the glossary paragraph in `section.text` is built from
+  `spanFragments`, and the structured arm always omitted `meaning`. `spanFragments` is unchanged.
+
+- **`budgetUsage.estimatedTokens` now measures the whole served payload**, not the rendered module
+  text inside it. Existing drafts read several times higher against the same cap. That is the fix,
+  not a regression: the byte cap is measured on the serialized result and cannot be reported inside
+  it, so this is the only meter that can warn you before a refusal — and it was counting about a
+  tenth of what actually refuses.
+
+### Wider output — `list_strategy_vocabulary`
+
+- **`scalarFamilies` is where the vocabulary went.** Every report-level scalar family with its
+  section, and one entry per METRIC carrying its gloss, legal condition operators, closed label
+  vocabulary, read contract (`closesReadable` / `developingRead`) and the scopes it is measured at.
+  One gloss per metric with its scopes named against it, never one per pair.
+
+- **Served whole under every category.** A scalar describes the report, not a metric family, so it
+  is not filtered by the `category` you asked for. The ambient session family carries
+  `moduleKey: null` — it places no module and its operands are nameable all the same.
+
+### Reshaped output — `compile_strategy_plan`
+
+- **`reviewContext.columns` is gone.** It recompiled a full column contract per authored custom
+  column — about 2,100 bytes for a five-header trajectory — describing columns the embedded
+  `reportPreview.conditionColumns` already describes per rendered header. Ask
+  `get_strategy_column_contract` when you want a column's exact normalized contract.
+
+- **`approvedPlan.creationSeed` is gone.** It was the dense 84-rule scorecard *before* the
+  overrides, published beside a `postState.signalRules` that is the same list *after* them and an
+  `explicitRuleOverrides` naming exactly what differs. Apply never saw it either.
+
+### Wider input acceptance
+
+- **The section array and a custom section's column array lose their `maxItems: 64`.** That bound
+  restated a configured cap of 32 as a looser 64 that never refused anything. `budgets.sections` and
+  `budgets.sectionColumns` from discovery are the published values, and the server enforces them
+  before it reads any market data.
+
+### What to do
+
+Call `list_strategy_vocabulary` once for the scalar vocabulary, key your cache on the preview's
+`vocabularyDigest`, and drop any code that reads scalar groups off `conditionColumns`,
+`structure.columns[].meaning`, `reviewContext.columns` or `approvedPlan.creationSeed`. A preview's
+size now tracks the report and cohort you composed rather than the size of the platform's catalog.
+
+## Contract history — v63.2
+
+Purely additive again, and smaller: **one optional input field.** Drafts now cover a strategy that
+does not exist yet, so a playbook you author in chat survives between compiles instead of starting
+over each time.
+
+### Wider input — one optional field on one tool
+
+- **`compile_strategy_plan`'s CREATE arm gains an optional `strategyId`**, naming the create draft
+  this compile continues. Omit it and the server mints an id exactly as it always has, so nothing
+  you send today breaks.
+
+- **Send it to accumulate; omit it to start fresh.** A first CREATE names nothing and mints; stage
+  that plan and the draft opens at the minted id, which `list_strategy_drafts` and the plan itself
+  both report. Name that id on the next CREATE and the second plan carries the same identity, so the
+  one draft accumulates rather than a second opening beside it.
+
+- **WHY YOU HAVE TO SAY IT.** The server will not choose for you. A compile knows only who you are —
+  it has no conversation id — and you may hold several create drafts, so picking one could write this
+  playbook's values over another's. A compile that names none mints a third id rather than guessing.
+
+- **It names a draft; it does not choose an id.** It is accepted only as the identity of a create
+  draft you own. An id naming no such draft is refused, as is one naming a draft for a strategy that
+  already exists.
+
+### Behaviour changes behind unchanged schemas
+
+- **`stage_strategy_plan` admits a CREATE plan**, opening the create draft at the plan's own id when
+  none exists yet. Its input is still `{ planToken }` alone, and the contested-axis refusal applies
+  identically.
+
+- **`list_strategy_drafts` rows gain `baseRevision`.** It is `null` for a create draft — a strategy
+  that does not exist has no committed revision to be based on — and that null is the only thing that
+  distinguishes one. There is no `kind`, `isNew` or `status` field beside it.
+
+- **A create draft reserves nothing.** It consumes no quota and holds no name, so both are decided
+  when the strategy is actually created. Holding drafts past your limit is legal; creating past it is
+  not.
+
+### Vocabulary
+
+`axes.create` gains `strategyId`. No domain gains a value, and `toolCount` stays 122.
+
+## Contract history — v63.1
+
+Purely additive: **four new tools, nothing you send today changes.** A strategy now has an
+owner-scoped *draft* — the unsaved authored values a player is part-way through — and these are how
+an agent reads it, writes a compiled plan into it, and destroys one. The canonical record for every
+contract move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`; the served version
+is what the handshake announces.
+
+### Wider surface — four tools added
+
+- **`stage_strategy_plan({ request: { planToken } })`** writes a compiled plan's own changed axes
+  into the owner's draft. It commits nothing and does **not** spend the plan, so the same token is
+  still directly applicable afterwards. `planToken` is the only member the request accepts.
+
+- **`get_strategy_draft({ request: { strategyId } })`** reads one draft, or answers `{ draft: null }`
+  — "you are not part-way through this one" is a value, not an error. It reports `baseMoved` when the
+  strategy has been committed past the revision the draft was written against.
+
+- **`list_strategy_drafts({ request: { cursor? } })`** answers "what am I part-way through?" for a
+  conversation holding no id. It includes a draft whose strategy you can no longer see, marked
+  `strategyExists: false`, because that is exactly the work a player has lost track of.
+
+- **`discard_strategy_draft({ request: { strategyId, confirm: true } })`** destroys one draft. The
+  confirmation is required and unsaved values have no other copy; the strategy, its revisions and
+  your other drafts are untouched.
+
+### Refusals worth knowing before you stage
+
+- **A staged plan refuses the axes you typed after it compiled.** `stage_strategy_plan` answers
+  `CONFLICT` naming `contestedAxes`, the version the plan compiled over and the draft's own version
+  per axis. Compile again so the plan absorbs those edits, then stage. A *previous staging* on the
+  same axis is not a contest — only the owner's own hand is.
+
+- **An apply refuses a plan whose draft has moved since.** Moved, discarded and
+  already-committed-by-a-sibling are one answer with one recovery: compile again.
+
+### Vocabulary
+
+`toolCount` 118 → 122. No input or output schema of an existing tool moves — the draft version a
+plan was compiled over rides inside the opaque plan token, which no schema declares.
+
+## Contract history — v61
+
+One part to read first: **the per-condition evidence clock is gone**, and what replaced it is not a
+rename. Which bar a condition reads is now decided by the surface asking — a decision reads completed
+strategy bars, a display read shows the forming one — and by each candle column's own Confirmed /
+Developing selector. `closes` survives and changes meaning. The canonical record for every contract
+move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`; the served version is what
+the handshake announces.
+
+### Rejected input — something you author is no longer accepted
+
+- **A condition entry carrying `clock` is REFUSED** (61.0.0, `read-higher-timeframes-per-column`).
+  The authoring schemas are `.strict()`, so `compile_strategy_plan`, `apply_strategy_plan`,
+  `fork_strategy` and the HTTP save alike fail the body with the unknown-key error. There is no
+  replacement key to send: the decision instant belongs to the caller, not to the condition. Two
+  input hashes move, `compile_strategy_plan`'s and `preview_strategy_report`'s — the two tools that
+  accept a condition entry.
+
+- **`closes` stays mandatory and means something new.** It is now *held for N completed strategy
+  bars* (1–5). Above `1` it is legal only over a header a completed bar actually moves, at or above
+  the strategy timeframe, never over a developing read, and only where the condition carries a clause
+  of its own — a referenced condition resolves once and contributes the same answer to every bar, so
+  a hold reached only through a reference would count reads that never happened.
+
+### Changed shape — what you receive moves
+
+- **`ConditionOutcome.closeClock` becomes `hold`, and it is NON-NULL for every condition.** A
+  one-close condition reads `0 or 1 of 1` rather than serving an absence, so a client no longer
+  branches on whether the reading exists. The count is taken from completed strategy bars whatever
+  basis the surface evaluated on.
+
+- **`ReportConditionColumnDTO.closeClockReadable` becomes `closesReadable`, beside a new
+  `developingRead`.** The first answers whether a condition addressing that header may hold more than
+  one completed bar; the second states whether the header reads the bar still in progress at the
+  decision instant. Both are server-supplied — derive neither. Eight output hashes move, covering
+  every tool that serves a strategy's conditions or a report's addressable columns.
+
+### Wider input — nothing you send today breaks
+
+- **The `bars` selector is declared on eleven candle-series transforms, not four.** `value`,
+  `classifyZone`, `classifyState`, `distance`, `spread`, `crossDetect` and `bandTouch` join
+  `trajectory`, `aggregate`, `efficiency` and `maxShare`. It carries **no default value**, because
+  the default is a rule rather than a constant: Confirmed (`"closed"`) above the strategy timeframe,
+  and at or below it the series as the frame carries it. The resolved answer is served per column on
+  `effectiveParameters.bars` — `null` where discovery has no anchor to resolve a rung against.
+
+- **A higher-timeframe level is measured from the current strategy-bar price.** Distances and the
+  candle label classifiers compare against the frame's current price rather than the higher-timeframe
+  bar's own close, which could be a full higher-timeframe bar stale. A distance chained into a series
+  keeps every slot on its own bar's close.
+
+### Vocabulary
+
+`domains.conditionClock` is removed; `domains.columnBars: ["all", "closed"]` takes its place, and
+`axes.condition` loses `clock`. `toolCount` stays 117.
+
+## Contract history — v60
+
+One release train, four numbers, and two parts to read first: **`propose_entry_decision` no longer
+decides in the call**, and **a closed trade's `tradeStatus` now follows its net P&L**. v55 through v59 are not written up here; the canonical record for
+every contract move is `docs/architecture/MCP_CONTRACT_HISTORY.md` in `battlegrid-app`, and the
+served version is what the handshake announces.
+
+### Rejected input — something you author is no longer accepted
+
+- **The entry axis names no bar but the strategy's own, and three of its keys are gone** (60.0.0,
+  `decide-entry-on-strategy-close`). The authoring schemas are `.strict()`, so `compile_strategy_plan`,
+  `apply_strategy_plan`, `fork_strategy` and `restore_strategy` REFUSE a body carrying
+  `entry.confirmTf` (the deciding bar is the strategy's own timeframe, so a required input whose only
+  legal value was another field of the same strategy is absent rather than mirrored), `entry.closes`
+  and `entry.bandAtrMultiple` (a multi-bar hold is declared on the condition that needs it; the
+  displacement band is replaced by the platform's own entry-deviation gate, measured against the
+  decided close), and the whole `exit` object (the open-position exit lane judges one closed candle
+  of the position's strategy timeframe). Exactly one input hash moves, `compile_strategy_plan`'s.
+
+- **`entry.trigger: AT_SIGNAL` is retired for authoring** (60.0.0, `retire-at-signal-trigger`, riding
+  the same number). Refused on every authoring surface and on a RESTORE, which rebuilds a stored
+  revision through the same value object. The enum member stays READABLE on every strategy read and
+  on a fired decision's provenance, so a pre-retirement revision is still legible — it just cannot be
+  re-authored. The three that remain are `ON_CANDLE_CLOSE`, `STOP_THROUGH_LEVEL` and `ON_RETEST`.
+
+### Changed meaning, unchanged shape
+
+- **`tradeStatus` follows NET P&L on every closed trade** (60.3.0, `label-trade-outcome-by-pnl`).
+  No schema hash moves for this and the values you receive change anyway. It used to map the close
+  REASON onto a verdict — every `TAKE_PROFIT` was `WON`, every `STOP_LOSS` was `LOST`, and a
+  `MARKET_CLOSE` of either sign was the neutral `CLOSED` — so a stop that filled after a break-even
+  reprice was reported as a loss and a take-profit eaten by fees as a win. `LIQUIDATED` still
+  outranks the number, because a force-close is not a verdict about the trade; `CLOSED` now means
+  only that there is no outcome row to judge. A client that counted `WON` rows was counting
+  take-profits.
+
+- **A proposal is QUEUED, not decided** (60.2.0, `queue-manual-entry-for-close`). This is the entry in
+  this section to act on. `propose_entry_decision` registers a request against the agent's next
+  strategy-bar close and returns immediately: no model runs, nothing is spent, and the call carries
+  `type: "queued"` with `request` — `requestId`, the bar (`barStart`), when the answer is due
+  (`decidesBy`) and the last instant that bar may still be decided (`windowEndsAt`). The answer
+  arrives later, in the agent's conversation and, when it proposes a trade, in
+  `list_pending_approvals`. A close that does not qualify, a window that passes with no sweep, and a
+  bar the agent's own radar deployment decided first are each recorded in the conversation instead.
+
+  `recommendation` and `no_trade` REMAIN in the union: the idempotency registrar replays results
+  recorded before this release for their TTL, so a client that dropped those members would fail on
+  its own retry. **A client written against 60.2 handles `queued` and `error`**; one that must also
+  replay handles all four.
+
+### Reshaped output — the same call returns a different shape
+
+- **The four retired entry keys leave every strategy read** (60.0.0) — `get_strategy`,
+  `list_strategies`, `fork_strategy` and both plan envelopes — and `confirmTimeframesByMainCandle`
+  leaves `list_strategy_vocabulary`, because there is no confirm set left to publish.
+
+- **`entryDiscipline.closes` and `.bandAtrMultiple` go `number` → `number | null`** (60.0.0) on
+  `get_trade_outcome_by_decision` and `list_trade_outcomes`. Null on every decision fired after this
+  release, which authors neither; a non-null pair dates the row to the arming era.
+
+### Widened enum — new members your own copy rejects
+
+- **`TradeConvErrorCode` gains `REQUEST_PENDING`** (60.2.0), on the SURFACE arm of
+  `propose_entry_decision`'s error: one pending request per user and coin, so a second is refused. A
+  coin already carrying a pending or live position is refused before anything is queued, as an
+  ENGINE-origin `OPEN_POSITION_CONFLICT` — a member that was already published, reaching this surface
+  for the first time.
+
+### Additive in the same span
+
+- **The exit names the leg that filled** (60.3.0, `label-trade-outcome-by-pnl`). `TradeOutcomeDTO`
+  and the pipeline outcome summary gain `exitRepriceSource`: the reprice that placed the protection
+  leg which actually closed the position — `BREAK_EVEN`, `TRAILING`, `TIME_DECAY`,
+  `MANUAL_OVERRIDE`, `UPDATED` — or null on every close no protection leg filled and on a leg that
+  was never repriced. It is the mechanism behind the verdict above, so read it beside `closeReason`
+  before calling a stopped-out trade a failure. The enum is the one `get_position_audit_history`
+  already publishes. Four output hashes move; no input schema does.
+
+- **Two tools join the catalog for the request lifecycle** (60.2.0, `queue-manual-entry-for-close`).
+  `get_entry_request` (read scope) reads a request that is still pending and is `NOT_FOUND` once it
+  has been answered, cancelled or expired — the answer is in the conversation, not there.
+  `cancel_entry_request` (`mcp:wager`) withdraws one before its bar is decided. `toolCount` 115 → 117.
+
+- **Three radar reads publish the close decision** (60.1.0, `add-radar-close-decision-state`).
+  `get_radar_deployment`, `list_radar_deployments` and `preview_radar_resolution` carry one further
+  key on `resolvesNow`: `closeDecision`, non-null whenever an agent is on duty for the pair. It
+  carries the deciding `timeframe`, the `nextCloseAt` instant, a `state` of `WAITING` or `DEFERRED`
+  (a bar has closed and no sweep has decided it yet), and `last` — the bar, the instant, the outcome
+  (`FIRED` / `NOT_QUALIFIED` / `MISSED`), the gate and the closed reading's score against its
+  minimum — or null before the pair's first close decision.
+
+  **Read it first on a close-deciding pair.** The sibling `qualified` and `qualificationBlock` fields
+  are the per-minute DISPLAY reading there and decide nothing, so an agent ranking them reports
+  "qualified — watching for a setup" about a pair whose last three closes were each refused. Neither
+  field is removed or reshaped. A `NOT_QUALIFIED` outcome with a NULL gate beside a score at or above
+  the minimum is the consumed edge — the close qualified and the baseline was already spent — stated
+  by the server so no client compares the two numbers.
+
 ## Contract history — v37 → v54
 
 Eleven majors reached authors while this section stopped at v36. That gap is the mechanism, not an

@@ -52,6 +52,18 @@ conversation has changed it. A re-read returns the same bytes, and both copies t
 later step, so the player pays for the same payload twice and keeps paying for it. If you need a
 detail you did not keep, scroll back rather than re-fetching.
 
+**Drafts are carved out of that rule.** A draft is the player's unsaved work, and another surface —
+their builder, another device, an earlier plan you staged — can change it while you work. Read it
+again whenever you are about to act on it.
+
+**Start from what they are already part-way through.**
+
+- Holding no strategy id? Call `list_strategy_drafts` first. If a draft comes back, say what it is,
+  when it was last touched and which surface touched it, and offer to continue it — never start a
+  second edit beside one the player has open.
+- Holding an id? Call `get_strategy_draft` before you propose anything. A draft means the player is
+  mid-edit.
+
 ### 2. Lock the spec before you build anything
 
 **First, check the ask is expressible at all — and note that you cannot know until you have looked.**
@@ -100,11 +112,13 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   yourself on a CREATE is refused with a hint telling you to omit `sectionKey` on CREATE; on an
   UPDATE, send back the key the compile returned. This is the one composition field whose right
   answer is "leave it out".
-- **The `entry` axis is required on every CREATE**, all six keys, no defaults — `trigger`,
-  `confirmTf`, `closes`, `bandAtrMultiple`, `levelOffsetAtrMultiple`, `validForBars`. It decides
-  when an entry is taken; for the level triggers the level itself is derived from the trigger and
-  the trade's direction, never named. The `strategy-examples` skill carries the vocabulary and the
-  one-directional legality matrix; a CREATE without it is refused outright.
+- **The `entry` axis is required on every CREATE**, all three keys, no defaults — `trigger`,
+  `levelOffsetAtrMultiple`, `validForBars`. Every trigger is decided at the close of the strategy's
+  OWN bar, so there is no confirm-timeframe key; for the level triggers the level itself is derived
+  from the trigger and the trade's direction, never named. A multi-bar hold belongs to the condition
+  that needs it (its own `closes`, counted in completed strategy bars), not to this axis. The
+  `strategy-examples` skill carries the vocabulary, the hold's legality and the per-column
+  Confirmed / Developing read; a CREATE without it is refused outright.
 - `get_strategy_column_contract` → `outputs[].conditionOperators`. An empty array means that
   rendered header has no comparison semantics and cannot appear in a condition clause at all.
   Legality is per rendered header, not per column: a trajectory's slot header and its `_trend`
@@ -185,7 +199,35 @@ returned, as numbers, not buried in prose.
 There is no backtest here and no expected-frequency figure. Do not imply one. What you have is a
 point-in-time reading, and you say so.
 
-### 6. Confirm, then apply
+### 6. Stage or apply
+
+**A draft decides which of the two you are doing.**
+
+- **The player holds a draft for this strategy** → call `stage_strategy_plan` with the compile's
+  `planToken` and nothing else. The plan's own changed values land in their draft as proposed
+  changes, and *their* save is the consent. Committing instead would end a session they are in the
+  middle of. Staging does not spend the plan: the same token still applies while it lives.
+- **They hold none** → compile → confirm → apply, as below.
+
+When you compile over a draft, the diff names **every** axis the plan would commit, including
+unsaved work the draft already carried before your compile. Read that list out in the
+confirmation as the plan's own: the player is approving all of it, not only what you proposed.
+
+If a staging call is refused as contested, it names the axes the player's own hand changed after
+your compile. Do not retry it and do not work around it — compile again so the new plan absorbs
+those edits, then stage that one. The same holds when it is refused because the strategy committed
+a newer revision after your compile: compile again against what is committed now.
+
+**Offer to discard a draft only on the player's explicit word**, never on your own judgement that
+it looks stale, and never batched into another act. State when it was last touched and which
+surface touched it, ask, and call `discard_strategy_draft` with `confirm: true` only if they say
+so. The unsaved values are gone afterwards and there is no other copy.
+
+**In a conversation the Strategy Builder hosts, the apply half does not apply: compile and stop.**
+The compiled plan lands on the player's rail as unsaved changes and their Review & save is the one
+consent. Report that it is staged, name the axes, and present no apply confirmation — the server
+refuses `apply_strategy_plan` from such a conversation as a tool error, so calling it spends an op
+of your budget and commits nothing.
 
 One confirmation carrying the plan's own `confirmationSummary`, offering Apply / Revise / Cancel.
 
@@ -205,7 +247,9 @@ On **Revise**, return to step 4. On **Cancel**, stop and let the token lapse.
 
 If the player types free text while the confirm form is open, that is **not** consent and not a
 cancellation. Answer what they said, then present the same plan's confirmation again, unchanged.
-Prose never triggers an apply.
+Prose never triggers an apply. The same holds for an answer typed into the form's own
+answer-in-your-own-words box: it is the player's words in an answer slot, not a confirming pick,
+so treat it exactly as you would free text in the chat.
 
 Do not pre-check expiry, digests, ownership, viability or quota before calling. The server is the
 only authority on all of them; your job is to react to what it returns.
@@ -215,6 +259,12 @@ only authority on all of them; your job is to react to what it returns.
 `fork_strategy`, `update_strategy_signal_rule`, `restore_strategy`, `archive_strategy` and
 `preview_strategy_report` are part of this flow.
 
+**In a builder-hosted conversation, three of those are refused at execution** —
+`update_strategy_signal_rule`, `restore_strategy` and `archive_strategy`, alongside
+`apply_strategy_plan` — because each commits a revision of the open strategy around the player's
+save. `fork_strategy` stays available: it writes a DIFFERENT strategy, which is not the one the
+builder owns. `preview_strategy_report` and every read stay available.
+
 Before any destructive one, state the blast radius from the server's own fields and confirm it
 with the player:
 
@@ -223,11 +273,19 @@ with the player:
 - **Tuning a single rule** — how many agents are bound, and that the change reaches every one of
   them immediately.
 
+**Never tune or restore around a draft.** `update_strategy_signal_rule` and `restore_strategy` are
+REFUSED while the player holds a draft of the strategy — check `get_strategy_draft` first. For a
+tune, compile the one-rule change and `stage_strategy_plan` it, so it lands in their form; for a
+restore, ask them to save or discard their draft first. The refusal is the server's, so do not
+retry the call.
+
 **Your `ask_user` is the explanation, not the mechanism.** For single-rule tuning the server
 independently requires `confirm:true` whenever the strategy has bound agents, so stating the radius
 and calling anyway is refused, not committed. Send `confirm:true` only on a turn where the player
 made an explicit confirming pick — never because you judged the edit safe. Free text typed while a
-confirmation is open is not consent: answer it, then present the same confirmation again.
+confirmation is open is not consent: answer it, then present the same confirmation again. That
+covers words typed into the form's own answer box as well as words sent in chat — a confirming pick
+is one of the options you offered, and nothing else is.
 
 **Send only the fields you were asked to change.** `allocation`, `required` and `params` are each
 optional and each preserves on omission. "Raise volume_surge to Critical" is
