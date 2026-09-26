@@ -24,6 +24,51 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v69 (Radar multi-agent duty)
+
+**Breaking: one input removed from two tools, three outputs reshaped.** A Radar policy carries no
+timeframe. Every rule whose conditions match puts its agent on duty at once, and each rule's regime
+condition is read at that agent's own regime timeframe. A coin still holds one position at a time: at
+most one fire per coin per pass, offered in rule priority.
+
+### Rejected input — something you send is no longer accepted
+
+- **`preview_radar_resolution`'s `SLOTS` request refuses `deploymentTimeframe`** as an unrecognized key.
+  Send `{ kind: "SLOTS", slots }`.
+- **`stage_radar_deployment_draft` refuses the `DEPLOYMENT_TIMEFRAME` axis** the same way. Stage only
+  `RULES` and `DEFAULT_SLOT`.
+
+### Reshaped output — something you read has a new shape
+
+- **`resolvesNow`** on `get_radar_deployment`, `list_radar_deployments` and `preview_radar_resolution` is
+  the coin's state (`section`, `isIdle`, `rotating`, one `reason`, the open-position owner) plus
+  **`onDuty`**: one row per agent on duty, in priority order. Each row carries its slot, its regime reading
+  at its own regime timeframe, its qualification verdict and gate, cooldown, block, `edgeSpent`, last flip
+  and fire, and its own `closeDecision`. The single-winner fields (`onDutyAgentId` and its display pair,
+  `matchedSlot*`, `regimeUsed`, and the per-agent fields the rows now carry) are gone. Render every row in
+  the order served, and never pick one yourself.
+- **`preview_radar_resolution`'s `conditionReach`** is one flat list, each entry naming its `agentId` and
+  `agentDisplayName`.
+- **Each deployment slot gains `agentRegimeTimeframe`**, the timeframe its rule's regime is read at.
+
+### Removed output — a field you read is gone
+
+- **`deploymentTimeframe`** on a Radar policy, and the **`DEPLOYMENT_TIMEFRAME`** axis in the radar
+  draft's `content` and `axesMeta` on `get_radar_deployment_draft`, `list_radar_deployment_drafts` and the
+  stage result.
+
+### Wider enums — a value you may now receive
+
+- **`closeDecision.outcome` gains `CLAIMED`**: the agent's close qualified, but a higher-priority agent
+  took the coin's one fire that pass. Its edge is preserved, and it fires at a later close only if it
+  still qualifies there.
+- **`get_radar_activity` and `get_radar_activity_summary`** gain the events `ON_DUTY_JOINED` and
+  `ON_DUTY_LEFT` (duty is journaled per agent) and the fire disposition `EDGE_PRESERVED_COIN_CLAIMED`.
+  `curveDigest` describes the first agent on duty, named in `curveAgentName`.
+- **`get_trade_conversation`** may carry the `close_claimed_by_radar` card.
+
+The exported `battlegrid-radar-deployment` skill describes the v69 flow.
+
 ## Contract history — v68.1 (Arena regime sets)
 
 Purely additive in schema, with **one refusal behind unchanged ones.** An Arena rule's regime condition
