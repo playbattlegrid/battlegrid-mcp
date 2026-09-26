@@ -84,7 +84,7 @@ it certifies nothing and cannot be committed.
 
 1. `stage_deployment_policy_draft` with `draftVersion` = the `version` you read (0 when there was no
    draft) and only the axes you are changing, each WHOLE: `RULES` (the complete ordered rule list —
-   first is highest priority, one regime per rule), `DEFAULT_SLOT` (the catch-all, or null for none)
+   first is highest priority; a rule's regime condition names a set), `DEFAULT_SLOT` (the catch-all, or null for none)
    and `REGIME_ANCHOR` (the anchor override, or null to inherit the arena's). Pausing is never staged.
 2. `preview_deployment_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version
    staging returned.
