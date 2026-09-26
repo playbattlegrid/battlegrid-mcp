@@ -24,6 +24,30 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v68.1 (Arena regime sets)
+
+Purely additive in schema, with **one refusal behind unchanged ones.** An Arena rule's regime condition
+is a SET in the draft, as it always was in the committed deployment: one rule can fire in several
+regimes, instead of one rule per regime.
+
+### Wider input — `stage_deployment_policy_draft`
+
+- **A rule's `regimes` may name several regimes**, where the draft capped it at one. The set is stored in
+  the selectable-regime order, so a staged `[VOLATILE, BULL_EXPANSION]` reads back
+  `[BULL_EXPANSION, VOLATILE]`. A regime named twice is refused.
+
+### Wider output — `get_deployment_policy_draft`
+
+- **The draft may return such a set.** `get_deployment_policy` has served sets all along, so a client that
+  reads a committed deployment already handles them.
+
+### Refusals behind unchanged schemas
+
+- **`preview_deployment_resolution` (SLOTS), `preview_radar_resolution` (SLOTS) and
+  `test_generate_deployment_grid` refuse a regime condition naming one regime twice**, as
+  `VALIDATION_ERROR` at its `regimes` field, where they used to resolve or generate over it. The stage tools
+  already refused a repeat, so no commit changes; a repeated member is a malformed set.
+
 ## Contract history — v68 (Arena drafts)
 
 **Breaking: one tool retired, two inputs reshaped.** Arena deployment content now commits only as a
