@@ -24,6 +24,22 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v69.6 (insufficient-margin refusal)
+
+Purely additive: **one member added to the trade-failure reason**, in both directions. An agent entry
+the shared trading account cannot post the isolated margin for is now refused before any order is
+sent, with its own reason. The same reason replaces `EXCHANGE_ERROR` when the exchange refuses an
+order for margin first.
+
+### Wider input — `get_public_agent_signal_logs`, `get_public_agent_realized_trades`
+
+- **`filter.rejectionReason` accepts `INSUFFICIENT_MARGIN`**, where it used to refuse it.
+
+### Wider output — `get_signal_log`, `get_public_agent_signal_log_detail`
+
+- **`failureReason` may read `INSUFFICIENT_MARGIN`.** A client that switches exhaustively on the
+  reason needs one more arm; one that renders unknown reasons generically is unaffected.
+
 ## Contract history — v69.5 (liquidation-buffer refusal)
 
 Purely additive: **one member added to the trade-failure reason**, in both directions. An agent entry
