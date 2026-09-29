@@ -39,6 +39,22 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
   the tools again, because the old schema required the field. Reconnect, or re-list, after the server
   deploys.
 
+## Contract history — v71.1 (two read-fault refusals)
+
+**Two members added to the evaluation-attempt reason**, published as output only. When the server
+cannot read an agent's daily trade count or its trading account's approval, the admission is blocked
+with its own reason instead of borrowing the verdict it could not reach.
+
+### Wider output — the risk budget, Radar reads, the trade conversation, gate blocks and signal logs
+
+- **`TradeEvaluationAttemptReasonCode` may read `DAILY_COUNT_CHECK_UNAVAILABLE` or
+  `APPROVAL_CHECK_UNAVAILABLE`** on `get_agent_budget`, `reset_agent_drawdown_baseline`,
+  `get_radar_activity`, `get_radar_deployment`, `list_radar_deployments`, `preview_radar_resolution`,
+  `get_trade_conversation`, `propose_entry_decision`, `list_gate_blocks`, `get_signal_log` and
+  `get_public_agent_signal_log_detail`. `DAILY_TRADE_LIMIT_REACHED` and `AGENT_APPROVAL_EXPIRED` still
+  mean what they say. A client holding its own closed copy of the enum rejects the new members; one
+  that renders unknown reasons generically is unaffected.
+
 ## Contract history — v71 (owner-private reasons on the public profile)
 
 **Breaking at v71: two public inputs narrow, and one public output widens.**
