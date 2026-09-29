@@ -24,6 +24,59 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v72 (public decision `userId` removed)
+
+**Breaking at v72: one output field removed from one public read.**
+
+### Removed output — `get_public_agent_signal_log_detail`
+
+- **`log.linkedEntryDecision.userId` is gone.** It was the user the agent acted for. On a SYSTEM
+  agent, which has no author and which any user may deploy, that named whoever deployed it, and the
+  public profile deliberately shows no owner for a SYSTEM agent. There is **no replacement path** on
+  the public read. A PRIVATE agent's author is `ownerUserId` on the agent's public profile, and the
+  owner tool `get_signal_log` still carries `linkedEntryDecision.userId` on your own agents.
+- **A client that validates results against a cached output schema** fails the call until it lists
+  the tools again, because the old schema required the field. Reconnect, or re-list, after the server
+  deploys.
+
+## Contract history — v71 (owner-private reasons on the public profile)
+
+**Breaking at v71: two public inputs narrow, and one public output widens.**
+
+### Rejected input — `get_public_agent_signal_logs`, `get_public_agent_realized_trades`
+
+- **`filter.rejectionReason` refuses the six owner-private failure reasons** —
+  `BELOW_EXCHANGE_MINIMUM`, `INSUFFICIENT_BALANCE`, `INSUFFICIENT_MARGIN`,
+  `AGENT_APPROVAL_EXPIRED`, `SIGNING_KEY_UNAVAILABLE`, `AGENT_HALTED` — with a validation error,
+  where they used to filter. These tools read another user's agent, and a private reason answered a
+  question about that user's budget, margin, approval, key or halt. No alias exists; filter by a
+  public reason. `filter.expiryReason` still accepts every member.
+
+### Wider output — `get_public_agent_signal_log_detail`
+
+- **`pipeline.attempt.reasonCodes`, `pipeline.execution.failureReason` and `.expiryReason` may read
+  `OWNER_PRIVATE`** in place of an owner-private reason, whose detail is then omitted. A client
+  holding its own closed copy of these enums rejects the new member; one that renders unknown
+  reasons generically is unaffected. A failed execution's `executionMessage` is now always null.
+- **`get_signal_log` is unchanged**: on your own agents it still carries every precise code, its
+  detail and the narrative.
+
+## Contract history — v70.2 (allocation-check refusal)
+
+**One member added to the evaluation-attempt reason**, published as output only. An admission the
+server blocked because it could not read the account's allocation now carries
+`ALLOCATION_CHECK_UNAVAILABLE`; `NO_AGENT_ALLOCATION` survives only on historical rows.
+
+### Wider output — the risk budget, Radar reads, the trade conversation and gate blocks
+
+- **`TradeEvaluationAttemptReasonCode` may read `ALLOCATION_CHECK_UNAVAILABLE`** on
+  `get_agent_budget`, `reset_agent_drawdown_baseline`, `get_radar_activity`, `get_radar_deployment`,
+  `list_radar_deployments`, `preview_radar_resolution`, `get_trade_conversation`,
+  `propose_entry_decision` and `list_gate_blocks`. A client holding its own closed copy of the enum
+  rejects the new member; one that renders unknown reasons generically is unaffected.
+- **The reason detail no longer declares `availableUsd` or `requiredUsd`** (`get_signal_log`,
+  `get_public_agent_signal_log_detail`). No response ever carried them.
+
 ## Contract history — v70 (risk-gauge `configured` removed)
 
 **Breaking at v70: one output field removed from every risk-budget gauge.**
