@@ -24,6 +24,19 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v70.1 (budget run-state)
+
+**Additive at v70.1: one output field added to the risk budget.**
+
+### Added output — `get_agent_budget`, `reset_agent_drawdown_baseline`
+
+- **`budget.runStatus`** is your run-state for the agent: `blocked`, `paused` or `active`, already
+  ranked by the server. `blocked` means the admission gate is refusing the agent for a reason other
+  than its halt (`blockedReason` names it). A halted agent reads `paused`, even while its own
+  `AGENT_HALTED` block stands. Read it rather than re-deriving it from `blockedReason` and `haltedAt`.
+- A client that ignores the field is unaffected. A client that validates results against a cached,
+  closed output schema should list the tools again after the server deploys.
+
 ## Contract history — v70 (risk-gauge `configured` removed)
 
 **Breaking at v70: one output field removed from every risk-budget gauge.**
