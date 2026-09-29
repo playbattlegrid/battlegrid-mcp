@@ -24,6 +24,20 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v70 (risk-gauge `configured` removed)
+
+**Breaking at v70: one output field removed from every risk-budget gauge.**
+
+### Reshaped output — `get_agent_budget`, `reset_agent_drawdown_baseline`
+
+- **`budget.gauges.<gauge>.configured` is gone** from all four gauges (`dailyTrades`, `exposure`,
+  `drawdown`, `dailyLoss`). It could only read `true`: the daily-trades cap is at least 1, and an
+  agent's exposure ceiling, drawdown stop and daily-loss stop are all required and strictly positive.
+  Every gauge has a limit, so read `fill`, `remaining` and `breached` and render every meter enabled.
+- **A client that validates results against a cached output schema** fails the call until it lists
+  the tools again, because the old schema required the field. Reconnect, or re-list, after the server
+  deploys.
+
 ## Contract history — v69.7 (insufficient-margin refusal)
 
 Purely additive: **one member added to the trade-failure reason**, in both directions. An agent entry
