@@ -24,6 +24,189 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v74 (preview `conditionReach` replaced by `readings`)
+
+**Breaking at v74: one required output field replaced on one tool, and an opt-in reading added to
+another.** Both now serve what an agent reads on a coin, in the decision-record format v73.3
+introduced.
+
+### Reshaped output — `preview_radar_resolution`
+
+- **`conditionReach` is gone, replaced by `readings`**: one entry per on-duty agent, in on-duty order,
+  each naming `agentId` and `agentDisplayName`. A `kind: "READ"` entry carries the agent's `reading`,
+  the one `get_agent_coin_qualification` serves (below). A `kind: "UNSCORABLE"` entry, an agent whose
+  evaluation was rejected, carries `coinDataStopped` instead: the coin's stopped-data reading, or
+  null. One agent's rejection is its own entry, never a failed preview. The tool always asks for
+  readings, so `readings` is null only under a `simulatedRegime`.
+- **`blocksScanGate` has no successor.** Since v73 the preview refuses a slot agent with a condition
+  the radar scan cannot read on the coin, so no previewed pair holds a permanently blocking
+  condition. Whether the conditions hold the coin is the reading's own gate,
+  `reading.live.reading.qualification.gates.requiredConditions`.
+- **Read `reachReason` from the reading.** Each `READ` entry's
+  `reading.live.reading.conditions.entries[]` lists the conditions: a `kind: "UNEVALUATED"` entry
+  carries the condition's `conditionKey`, `name` and `reachReason`, and a `kind: "EVALUATED"` entry,
+  the counterpart of a null `reachReason`, carries its outcome with its clause values.
+  `declaration.required` marks the required ones, the set `conditionReach` covered.
+- **A client that validates results against a cached output schema** fails the call until it lists
+  the tools again, because the old schema required `conditionReach`. Reconnect, or re-list, after the
+  server deploys.
+
+### Wider input and output — `get_agent_coin_qualification`
+
+- **`reading` (boolean, default false) asks for the pair's reading**, and each verdict gains the
+  required-nullable `reading`, null unless asked. A call without the flag is answered as before, with
+  `reading: null`.
+- **`reading.live`** is the reading the verdict was built from, with `anchorBarStatus` (`live` while
+  the anchor bar still forms), `scoredBarStart` (the bar the signals and gates were scored on) and
+  `observedAt`. It is what the agent reads now, not a decision: the radar decides at the close.
+- **`reading.lastClose`** is the deciding reading of the bar the agent's on-duty row names as its
+  last close decision: `state: "RECORDED"` with that bar's close-decision `record`,
+  `state: "PENDING"` with its `barStart` while that record is being written, or `state: "NONE"`.
+  `get_radar_close_decisions` holds the decisions before it.
+
+## Contract history — v73.3 (decision records)
+
+Purely additive: **one read tool, one evaluation-attempt reason and four output fields added.** What
+a decision read is now served: the radar's close decisions on a coin, the report behind a trade, and
+the compose decision behind a gate block.
+
+### Wider surface — one tool added
+
+- **`get_radar_close_decisions`** (`coinId`; optional `agentId`, `before`, `limit`; `mcp:read`) — one
+  coin's radar close-decision records, newest decided bar first: every bar an agent decided —
+  `FIRED`, `CLAIMED`, `NOT_QUALIFIED` or `MISSED` — with the reading it was decided on (a miss's
+  answer instead), its fire disposition and its versions. Your own records only: a SYSTEM agent's
+  records on a coin belong to every user who deployed it. A page never splits a bar, so it can run
+  past `limit`; to page back, pass the oldest record's `bar.barStart` as `before`. `toolCount` goes
+  141 → 142.
+
+### Wider output — the risk budget, Radar reads, the trade conversation, gate blocks and signal logs
+
+- **`TradeEvaluationAttemptReasonCode` may read `SCREENED_OUT`** on `get_agent_budget`,
+  `reset_agent_drawdown_baseline`, `get_radar_activity`, `get_radar_deployment`,
+  `list_radar_deployments`, `preview_radar_resolution`, `get_trade_conversation`,
+  `propose_entry_decision`, `list_gate_blocks`, `get_signal_log` and
+  `get_public_agent_signal_log_detail`: compose's deterministic pre-model screen found no routable
+  direction. That refusal now writes a gate block. It is public: the public profile carries it as is.
+  A client holding its own closed copy of the enum rejects the new member; one that renders unknown
+  reasons generically is unaffected.
+- **`get_signal_log`'s `log` gains `reportSections`** (the report the model read, section by section,
+  in the shape of `preview_strategy_report`'s `renderedSections`), **`promptDataSerialization`** (the
+  serialization it was rendered under) and **`missingData`** (the data compose lacked), each null for
+  a trade recorded before capture. `get_public_agent_signal_log_detail` carries none of them.
+- **Each `list_gate_blocks` entry gains `decisionRecord`**: the compose decision record written with
+  the block — its outcome, its evidence (the reading compose computed, the per-bar values a refused
+  decided bar lacked, or none), its missing data and its versions. It is null for a block written
+  before capture and for a block raised before compose.
+
+## Contract history — v73.2 (decided-bar refusal)
+
+**One member added to the evaluation-attempt reason**, published as output only, and two detail
+fields added to gate blocks. A confirming-close fire now names the bar it decided, and compose reads
+that bar or refuses with the new reason, instead of reading the newest completed bar at its own
+instant.
+
+### Wider output — the risk budget, Radar reads, the trade conversation, gate blocks and signal logs
+
+- **`TradeEvaluationAttemptReasonCode` may read `DECIDED_BAR_UNAVAILABLE`** on `get_agent_budget`,
+  `reset_agent_drawdown_baseline`, `get_radar_activity`, `get_radar_deployment`,
+  `list_radar_deployments`, `preview_radar_resolution`, `get_trade_conversation`,
+  `propose_entry_decision`, `list_gate_blocks`, `get_signal_log` and
+  `get_public_agent_signal_log_detail`: compose refused a radar fire at the conditions stage, before
+  any LLM call, because a per-bar value its conditions gate reads was not on its due bar for the bar
+  the radar decided — its entry had not landed, or had gone. It is public: the public profile carries
+  it as is. A client holding its own closed copy of the enum rejects the new member; one that renders
+  unknown reasons generically is unaffected.
+- **`list_gate_blocks`' `reasonDetail` gains `decidedBarStart`** (ISO 8601, the decided bar's open)
+  **and `decidedBarTimeframe`** (the strategy timeframe), present on that reason alone.
+
+## Contract history — v73.1 (strategy card fields)
+
+Purely additive: **thirteen read-only fields added to every `list_strategies` row.** The input is
+unchanged, and a client that ignores the fields is unaffected.
+
+### Wider output — `list_strategies`
+
+- **The strategy card:** `regimeTimeframe` and `lowerTimeframe` (the derived ladder rungs
+  `get_strategy` already serves); `conditionTally`, `signalRuleTally` and `exitTally` (`armed` out of
+  `total`, the four exit mechanisms); and `minRequiredCount`, `entryTrigger`, `minRiskRewardRatio` and
+  `maxStopLossAtrMultiple`.
+- **`forkedFromStrategyName`**, null when the strategy is not a fork or its source is neither yours
+  nor a SYSTEM strategy.
+- **`viewerBoundAgentCount` and `viewerOpenPositionCount`**, your own agents on the strategy and their
+  open positions. `boundAgentCount` still counts every user's agents; read the viewer fields for
+  yours.
+- **`viewerPerformance`**, your own all-time results on the strategy, null when you never traded it.
+  A trade counts toward the strategy recorded on the signal log that opened it, so rebinding an agent
+  never moves it.
+
+## Contract history — v73 (unreadable radar conditions refused)
+
+**Breaking at v73: seven tools refuse bodies they used to accept, behind unchanged input schemas.**
+A condition the radar acts on — a required one, a direction-setting one (a verdict carrier), an exit
+one, and every condition they reference — must be readable by the radar scan on every coin the radar
+acts on for its agent: each coin a Radar policy slots it on, enabled or paused; each coin it holds an
+open position on, for its exit conditions; and each coin it has a pending manual request on.
+
+### Rejected input — refused behind unchanged schemas
+
+- **`VALIDATION_ERROR` with the authoring code `CONDITION_UNREADABLE_BY_RADAR_SCAN`** from
+  `preview_radar_resolution` (every kind, for every slot agent whether on duty now or not, issuing no
+  `previewToken`), `commit_radar_deployment_draft`, `rebind_intelligence_agent`, and
+  `compile_strategy_plan` and `restore_strategy` on behalf of the bound agents the radar acts on (a
+  strategy none of whose agents holds a slot, an open position or a pending request is never
+  checked). `details.context.reachReason` says why: `INSTRUMENT` (the coin, or a benchmark section's
+  own instrument, has no such data), `AGENT_TIMEFRAME` (the agent has no such rung) or `FEED` (the
+  radar scan never reads that data: crowd reads, a spot read for an uncatalogued ticker, a timeframe
+  the agent's plan does not load).
+- **The message names the first conflicting agent, the condition, the column, the coin and the
+  fixes**: stop the radar acting on the condition, make it read a column the scan has on that coin,
+  or free the coin — take the agent off that coin's policy, close the position, or cancel the pending
+  request. It is a fact about the pair, which no later sweep changes.
+- **A refused compile issues no plan token**, so `stage_strategy_plan` cannot stage that content, and
+  **`apply_strategy_plan` applies only a plan whose bound agents still hold the radar slot coins its
+  compile checked**: a plan compiled before a deploy moved them fails verification. Compile again.
+- **A condition reading a Session Field scalar** keeps `CONDITION_OPERAND_UNSERVED_IN_LANE`, now
+  refused at the rebind and every strategy revision too, not only at the deploy.
+- `stage_radar_deployment_draft` is unchanged: a draft holds no slot, and the preview its commit
+  needs refuses. A body accepted under v72 is refused under v73 without one byte of it changing.
+
+### Wider output — `propose_entry_decision`, `get_trade_conversation`
+
+- **`propose_entry_decision` refuses a request whose agent the radar scan cannot read on the
+  requested coin**, before its watch is registered, and releases its idempotency claim. It returns
+  `type: "error"` with `error: { reasonCode: "CONDITION_UNREADABLE_ON_COIN", unreadable: {
+  conditionKey, conditionName, column, coinTicker, reachReason } }`: facts only, no prose. Choose
+  another coin, another agent, or a condition reading a column the radar reads on that coin, and
+  send it again. `get_trade_conversation`'s error card carries the same `reasonCode` and
+  `unreadable`.
+- **A client that validates results against a cached output schema** fails a call that returns the
+  new error until it lists the tools again, because the old schema has no such member. Reconnect, or
+  re-list, after the server deploys.
+
+### Refusals worth knowing before you apply, restore or rebind
+
+- **`CONFLICT` with `details.reason: "RADAR_DEPLOYMENT_MOVED"`** from `apply_strategy_plan`,
+  `restore_strategy` and `rebind_intelligence_agent`: the agents' radar slot coins moved after the
+  write's check. Re-read and retry, so the retry's check covers the moved deployment; for a plan,
+  compile again.
+- **`commit_radar_deployment_draft` is a `CONFLICT`** when a slot agent's strategy or timeframes
+  changed after its check. Preview again.
+
+## Contract history — v72.0.1 (account read faults withheld on the public profile)
+
+**No schema change: one value reclassified on one public read.**
+
+### Reclassified output — `get_public_agent_signal_log_detail`
+
+- **`pipeline.attempt.reasonCodes` carries `OWNER_PRIVATE`, with its detail omitted, where it would
+  have carried `EQUITY_CHECK_UNAVAILABLE`, `ALLOCATION_CHECK_UNAVAILABLE`,
+  `DAILY_COUNT_CHECK_UNAVAILABLE` or `APPROVAL_CHECK_UNAVAILABLE`.** Each says the account has an open
+  block, which the public profile withholds. This supersedes the v71.1 note below that the public
+  detail carries the two faults v71.1 added. `OWNER_PRIVATE` has been in that field's schema since
+  v71, so a client validating against a cached output schema accepts it. `get_signal_log` still
+  carries every precise code on your own agents.
+
 ## Contract history — v72 (public decision `userId` removed)
 
 **Breaking at v72: one output field removed from one public read.**
