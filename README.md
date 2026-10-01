@@ -24,6 +24,41 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v76 (the extreme funding signals in percent a year)
+
+**Breaking at v76: `funding_extreme_positive` and `funding_extreme_negative` take their threshold in
+percent a year.** Their parameter is `thresholdAnnualizedPct`, the unit of the strategy grammar's
+`ann` column, where it was `thresholdPct`, a fraction of one hourly funding settlement.
+
+### Rejected input — the retired `thresholdPct`
+
+- **Both signals take `thresholdAnnualizedPct`**, bounded 1–43,800 and defaulting to 100 — the
+  funding label's crypto `extreme` band, so `100` means 100% a year, and the negative signal fires
+  below -100%.
+- **`thresholdPct` on either signal is refused as `VALIDATION_ERROR`** wherever a rule's parameters
+  are authored: `compile_strategy_plan`, `update_strategy_signal_rule`, `derive_strategy_rule_view`
+  and a strategy draft's `SIGNAL_RULES` axis. `oi_surge` keeps its own `thresholdPct`.
+- **A body accepted at v75 can be refused at v76 without one byte of it changing.** A rate per hourly
+  settlement converts to percent a year by × 8,760 × 100: `0.0002` is `175.2`.
+
+### Stale plans
+
+- **A plan token compiled before the deploy fails as a stale plan** at `stage_strategy_plan` and
+  `apply_strategy_plan`, because the authoring catalog digest covers each signal's parameters,
+  defaults and explanation: compile again. The strategy preview's `vocabularyDigest` moves too.
+
+### Served values
+
+- **`get_strategy_signal_definition` and `list_strategy_signals` serve the new parameter**, its
+  default and its explanation.
+- **Each signal's indicator values gain `funding_annualized_pct`**, the annualized rate the signal
+  compared, beside `funding_rate`.
+- **Stored rules move to the new key after the deploy**: a rule at the retired default takes `100`,
+  and any other converts exactly. `get_coin_signal_preview` and every stored rule then score at the
+  new threshold.
+- **No schema hash moves.** Signal parameters are published as a JSON object on every input and
+  output, so the change is in the values accepted and served, and `toolCount` is unchanged.
+
 ## Contract history — v75 (readability from each coin's data profile)
 
 **Breaking at v75: the seven tools v73 narrowed refuse by the coin's market-data profile, and one
