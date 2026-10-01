@@ -24,6 +24,104 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v75 (readability from each coin's data profile)
+
+**Breaking at v75: the seven tools v73 narrowed refuse by the coin's market-data profile, and one
+output vocabulary gains a member.** Which data a coin carries is now the profile the market-data
+service publishes for that coin, no longer the coin's asset class.
+
+### Rejected input — the seven tools v73 narrowed
+
+- **A condition reading a kind of data the coin's profile does not serve is refused as
+  `INSTRUMENT`**, on the coin or on a benchmark section's own instrument: a spot read on a crypto
+  coin no spot venue lists is refused as one on a TradFi coin always was.
+- **A coin the market-data service publishes no profile for refuses every condition that reads
+  market data**: a coin enabled since the service's last boot, a roster coin whose candle stream it
+  did not subscribe, a ticker with no catalog row.
+- **The tools, codes and `details.context` are v73's**: `preview_radar_resolution` (every kind,
+  issuing no `previewToken`); `commit_radar_deployment_draft`, `rebind_intelligence_agent`,
+  `compile_strategy_plan` and `restore_strategy` (`VALIDATION_ERROR` with
+  `CONDITION_UNREADABLE_BY_RADAR_SCAN`); `apply_strategy_plan`, which applies only what its compile
+  checked; and `propose_entry_decision` (`CONDITION_UNREADABLE_ON_COIN`).
+- **A body accepted at v74.1.1 can be refused at v75 without one byte of it changing.** A write whose
+  read of the published profiles fails is refused, never admitted unchecked.
+
+### Reclassified reason — `FEED` becomes `INSTRUMENT`
+
+- **A spot read for a ticker with no catalog row is `INSTRUMENT`, where it was `FEED`**, and an
+  uncatalogued benchmark refuses every market-data read, where only its spot reads refused before.
+- **The `INSTRUMENT` message names what the profile lacks**: "`<instrument>`'s market-data profile
+  carries no `<kind>` data", or "the market-data service publishes no data profile for
+  `<instrument>`, so it carries no market data", where it read "`<instrument>` has no spot tape".
+- **The readings v74 added report it as the sweep does**: `preview_radar_resolution`'s `readings`
+  and `get_agent_coin_qualification`'s `reading` mark a condition on a kind the coin's profile lacks
+  `INSTRUMENT`.
+
+### Wider output — `BarFamily` gains `MARKET_STATS`
+
+- **The market-stats snapshot is a per-bar value**: a decision reads the snapshot fetched inside the
+  `1m` bar ending at its close. A snapshot missing there is a per-bar shortfall, a `families` entry or
+  a MISSED close's `INPUTS_OFF_BAR` `lacking` entry naming `MARKET_STATS` at `1m` with its
+  `dueBarStart`, `ABSENT` or `GONE`, and the decision waits or misses as for any per-bar family.
+- **A decided close records no `MARKET_STATS` stale sample.** A reading at the latest values still
+  does, and its `boundMs` is the coin's market-stats freshness target, never below 300,000 ms.
+- **Five outputs publish the member**: `get_agent_coin_qualification`, `get_radar_close_decisions`,
+  `get_signal_log`, `list_gate_blocks` and `preview_radar_resolution`. No input takes the vocabulary.
+  A client that validates results against a cached output schema should list the tools again after
+  the server deploys.
+
+## Contract history — v74.1.1 (a same-agent request answered from what stopped the fire)
+
+**Not breaking: one answer corrected behind unchanged schemas.**
+
+- **A request on a pair your own radar policy decides with the same agent** is answered from that
+  policy's decision. When the policy's fire enqueued no trade decision and no admission gate refused
+  it — a coin cooldown, the hourly fire cap, post-close suppression, a decision already running on the
+  coin, a deduplicated fire, or a fire aborted at its re-read — the conversation gains the card the
+  request's own unfired fire gets: `close_claimed_by_radar` when another agent's fire holds the coin,
+  otherwise `close_refused` with the reading's score against its minimum. It gained
+  `close_fired_by_radar` before, though no trade was taken.
+- **Both cards are already in `get_trade_conversation`'s vocabulary**, so no served shape moves.
+
+## Contract history — v74.1 (missed-bar alerts and the entry pause)
+
+**Not breaking: four output vocabularies gain a member, and `propose_entry_decision` refuses while an
+entry pause is open.** While bars missed for lack of market data span many coins, the platform pauses
+every new entry the radar decides, a radar fire and a manual request alike, and the pause lifts by
+itself after a quiet period.
+
+### Refused while a pause is open — `propose_entry_decision`
+
+- **A request is refused after its own checks and before a watch is registered**, whatever the agent
+  or coin: `type: "error"` with `{ origin: "ENGINE", reasonCode: "ENTRIES_PAUSED" }`. The same
+  `idempotencyKey` replays the refusal for five minutes; ask again under a fresh key once the pause
+  lifts.
+- **A request queued before the pause** whose close qualifies while it is open gets the same ENGINE
+  error card in its conversation, and no decision is proposed. `accept_entry_decision` on a decision
+  already proposed, and every exit, run as without a pause.
+
+### Wider output — four vocabularies
+
+- **`TradeEvaluationAttemptReasonCode` gains `ENTRIES_PAUSED`**: the refusal's `reasonCode`,
+  `list_gate_blocks`' `reasonCode`, and the `scanBlockReason` of a refused fire's close record and
+  journal row.
+- **`TradingPipelineGateStage` gains `PLATFORM`**: a `list_gate_blocks` entry for each fire the pause
+  refused, with no coin, no detail and no decision record.
+- **`RadarFireDisposition` gains `EDGE_PRESERVED_ENTRIES_PAUSED`**: the refused fire keeps its edge,
+  so the pair fires at a later close only if that close qualifies on its own data. It is served on
+  `get_radar_activity` and `get_radar_activity_summary`, and as a close record's
+  `outcome.fireDisposition` beside `outcome.scanBlockReason: "ENTRIES_PAUSED"`, with
+  `outcome.outcome` staying `FIRED`.
+- **`RadarIdleReason` gains `ENTRIES_PAUSED`**: the `resolvesNow.reason` of every `SCANNING` card on
+  `get_radar_deployment` and `list_radar_deployments` while a pause is open. The section stays
+  `SCANNING`, because closes are still decided and recorded.
+
+### Answer corrected — a same-agent request
+
+- **When an admission gate refused your own policy's fire** — an entry pause, an account block, a
+  position already held on the coin — the request's conversation gains that block's ENGINE error card
+  instead of `close_fired_by_radar`.
+
 ## Contract history — v74 (preview `conditionReach` replaced by `readings`)
 
 **Breaking at v74: one required output field replaced on one tool, and an opt-in reading added to
