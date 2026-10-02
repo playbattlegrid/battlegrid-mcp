@@ -24,6 +24,31 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v81 (the allocation's committed figure removed, the hub names Max exposure)
+
+**Breaking at v81: one output field removed and one renamed.** v81 is the contract on top of v80.
+
+### Removed output — the agent fund allocation
+
+- **`committedUsd` is gone from the allocation** that `get_agent_fund_allocation`,
+  `halt_intelligence_agent`, `resume_intelligence_agent` and `set_agent_per_trade_push` return. It
+  measured a custody ledger whose allocate and recall routes are retired. The figure that bounds an
+  entry is capital at risk, on `get_agent_budget`. A client reading `committedUsd` reads nothing at
+  v81.
+
+### Renamed output — `get_agents_hub`
+
+- **Each agent's `envelope` names the exposure ceiling `maxConcurrentExposureUsd`**, the trading
+  config's own name for it, where v80 called it `budgetUsd`. The value is unchanged. A client reading
+  `budgetUsd` reads nothing at v81.
+
+### Corrected reason behind an unchanged schema
+
+- **An agent entry refused because its Max exposure is fully committed is recorded as
+  `INSUFFICIENT_BALANCE`**, where it was recorded as `BELOW_EXCHANGE_MINIMUM` with a $0.00 risk
+  budget. Its detail names Max exposure and the capital at risk. It reaches `get_signal_log` and
+  `get_public_agent_signal_log_detail`.
+
 ## Contract history — v79 (the agent's account reading, an exhausted budget, accept below the Balance floor)
 
 **Breaking at v79: the agent budget's account fields move into one object.**
