@@ -24,6 +24,62 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v79 (the agent's account reading, an exhausted budget, accept below the Balance floor)
+
+**Breaking at v79: the agent budget's account fields move into one object.**
+
+### Reshaped output — the agent budget
+
+- **`get_agent_budget` and `reset_agent_drawdown_baseline` replace `accountEquityUsd`,
+  `budgetOverSubscribed` and `openUnrealizedPnlUsd` with one `account` object** carrying the same three
+  fields, or `null` when the server holds no cached reading of the account. At v78 an unread account
+  read `0`, `false` and `0`, which looked like a real empty account. A client reading the three
+  top-level fields reads nothing at v79.
+
+### Widened enum
+
+- **The block reason gains `EXPOSURE_BUDGET_EXHAUSTED`** (owner-private): an agent whose capital at
+  risk has reached its Max exposure is blocked once at the account stage, where v78 blocked it per
+  coin as `EXCHANGE_MIN_NOTIONAL_UNREACHABLE`. It reaches every output that carries a block reason:
+  `list_gate_blocks`, `get_signal_log`, `get_public_agent_signal_log_detail`, `get_radar_activity`,
+  `get_radar_close_decisions`, `get_radar_deployment`, `list_radar_deployments`,
+  `preview_radar_resolution`, `get_agent_coin_qualification`, `get_trade_conversation` and
+  `propose_entry_decision`.
+
+### Refused behind an unchanged schema
+
+- **`accept_entry_decision` refuses with `CONFLICT` while your account equity is below the agent's
+  Balance floor (`balanceThresholdUsd`) or cannot be read.** The decision stays pending and can be
+  accepted once the equity is back at or above the floor.
+
+## Contract history — v78 (a new agent's risk policy from one seed)
+
+**Breaking at v78: `get_trading_config_catalog` serves a new agent's risk policy as one object.**
+
+### Reshaped output
+
+- **`tradingDefaults.defaults` replaces ten per-field seed values** — `defaultMaxDailyTrades`,
+  `defaultMaxLeverage`, `defaultSmallPct`, `defaultMediumPct`, `defaultLargePct`,
+  `defaultEntrySlippageBps`, `defaultMaxConcurrentExposureUsd`, `defaultBalanceThresholdUsd`,
+  `defaultMaxCumulativeDrawdownUsd` and `defaultMaxDailyLossUsd` — **with one `agentTradingConfig`**,
+  request-shaped, so it passes to `create_intelligence_agent` verbatim. A client reading the ten fields
+  reads nothing at v78.
+
+### Input schema
+
+- **`tradingConfig.maxLeverage` loses its published `minimum: 1`** on `create_intelligence_agent` and
+  `update_intelligence_agent`. Acceptance is unchanged: the platform's minimum leverage is the bound.
+
+### Wider input
+
+- **Both tools accept a strategy whose stored dials sit outside today's operator bounds.** An agent
+  write never re-judges a strategy dial.
+
+### Served values
+
+- **A `create_intelligence_agent` call without `tradingConfig` is seeded from the same object the
+  catalog serves**, never from column defaults, with Min order size from the platform minimum.
+
 ## Contract history — v77 (agent risk rules: each loss stop on its own rail)
 
 **Breaking at v77: an agent's `tradingConfig` accepts less.** `create_intelligence_agent` and
