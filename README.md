@@ -24,6 +24,45 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v77 (agent risk rules: each loss stop on its own rail)
+
+**Breaking at v77: an agent's `tradingConfig` accepts less.** `create_intelligence_agent` and
+`update_intelligence_agent` refuse values v76 stored, and one loss stop moves to a different bound.
+
+### Rejected input — `tradingConfig`
+
+- **`maxLeverage` must be a whole number.** `1.5` was stored and executed at `1`; it is now refused.
+- **`maxSlippageBps` is at most `300`**, the entry slippage ceiling no fill could exceed anyway.
+- **USD fields and the three size presets take at most 2 decimals.**
+- **`maxDailyLossUsd` must be at or below `maxCumulativeDrawdownUsd`.**
+- **A body accepted at v76 can be refused at v77 without one byte of it changing.** Each refusal
+  names its field in a plain sentence, such as `Whole numbers only.` or
+  `Can’t exceed the drawdown stop ($20.00).`
+
+### Wider input — the drawdown stop
+
+- **`maxCumulativeDrawdownUsd` is bounded by the platform's drawdown maximum, not by
+  `maxConcurrentExposureUsd`.** Max exposure caps margin open at once; the drawdown stop caps loss
+  over time. A `$150` drawdown stop on a `$100` max exposure is accepted.
+
+### Wider output
+
+- **`get_trading_config_catalog` gains `maximumMaxCumulativeDrawdownUsd`**, the drawdown stop's
+  upper bound.
+- **The execution-failure reason gains `BELOW_AGENT_MIN_ORDER`** (owner-private) on `get_signal_log`
+  and `get_public_agent_signal_log_detail`: an order sized under the agent's own `minAllocationUsd`,
+  which was reported as `BELOW_EXCHANGE_MINIMUM`.
+
+### Served values
+
+- **`get_agent_budget`'s `tradesToday` counts entries filled since 00:00 UTC plus entries still
+  waiting to fill.** Refused and expired entries no longer count, and the cap is enforced where an
+  entry is created. `DAILY_LIMIT_RESERVED` is no longer emitted.
+- **A daily-loss halt whose drawdown stop is also breached becomes a drawdown halt** when the day
+  rolls over, rather than lifting.
+- **A capital-feasibility refusal names what clears it**: the `maxConcurrentExposureUsd` that would,
+  and, when one at or above the platform minimum would, a lower `minAllocationUsd`.
+
 ## Contract history — v76 (the extreme funding signals in percent a year)
 
 **Breaking at v76: `funding_extreme_positive` and `funding_extreme_negative` take their threshold in
