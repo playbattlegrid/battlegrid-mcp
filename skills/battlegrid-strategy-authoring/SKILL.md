@@ -115,10 +115,13 @@ question you would otherwise guess — and a refusal you would otherwise earn:
 - **The `entry` axis is required on every CREATE**, all three keys, no defaults — `trigger`,
   `levelOffsetAtrMultiple`, `validForBars`. Every trigger is decided at the close of the strategy's
   OWN bar, so there is no confirm-timeframe key; for the level triggers the level itself is derived
-  from the trigger and the trade's direction, never named. A multi-bar hold belongs to the condition
-  that needs it (its own `closes`, counted in completed strategy bars), not to this axis. The
-  `strategy-examples` skill carries the vocabulary, the hold's legality and the per-column
-  Confirmed / Developing read; a CREATE without it is refused outright.
+  from the trigger and the trade's direction, never named. A multi-bar hold belongs to the clause
+  or group that needs it — its own `hold: { atLeast, of }`, which the editor calls **Hold** (Once,
+  In a row, Within, At least), counted in completed bars of the column's own timeframe — not to this
+  axis. Every clause and group carries `hold`; `{ "atLeast": 1, "of": 1 }` is Once. The
+  `strategy-examples` skill carries the vocabulary, the served hold domain (a crossover is held
+  "within" only; a Developing column cannot be held) and the per-column Confirmed / Developing read;
+  a CREATE without it is refused outright.
 - `get_strategy_column_contract` → `outputs[].conditionOperators`. An empty array means that
   rendered header has no comparison semantics and cannot appear in a condition clause at all.
   Legality is per rendered header, not per column: a trajectory's slot header and its `_trend`

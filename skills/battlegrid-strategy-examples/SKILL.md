@@ -86,12 +86,15 @@ against a literal; neither of those shapes is what a previous-session level need
 
 ## Conditions
 
-`{ conditionKey, name, definition, verdict, required, exit, closes }` — all seven
-required, no defaults. A `clock` key is REFUSED: the per-condition evidence clock was retired in
-contract `61.0.0`. Clauses: numeric/rank headers take `lt|lte|gte|gt|between`;
+`{ conditionKey, name, definition, verdict, required, exit }` — all six
+required, no defaults. A `clock` key is REFUSED (the per-condition evidence clock was retired in
+contract `61.0.0`), and so is a condition-level `closes` key: the hold lives on each clause and each
+group (contract `84.0.0`). Clauses: numeric/rank headers take `lt|lte|gte|gt|between`;
 classification/direction headers take `is|in` with the served vocabulary. Groups:
-`ALL | ANY | NOT | N_OF` (with `n`), depth ≤ 2. `conditionRef` composes named conditions (no
-cycles; forward refs legal). `sectionKey: null` is sugar for a report-unique header only.
+`ALL | ANY | NOT | N_OF` (with `n`), depth ≤ 2. Every clause and every group carries a required
+`hold: { atLeast, of }` — `{ "atLeast": 1, "of": 1 }` is a single read; a clause or group without
+`hold` is refused (`CONDITION_HOLD_INVALID`). `conditionRef` composes named conditions (no
+cycles; forward refs legal) and carries no hold of its own. `sectionKey: null` is sugar for a report-unique header only.
 Verdicts: resolution is taken over the DISTINCT verdicts of the carriers that read TRUE. One
 distinct verdict decides, and the first carrier in declaration order carrying it is named as the
 decider — so order breaks ties between carriers that AGREE. Carriers that DISAGREE resolve
@@ -121,19 +124,55 @@ bar a condition reads is decided by the surface asking — a decision (the radar
 compose that takes the trade, the exit sweep) reads completed strategy bars; a display read shows the
 forming one and decides nothing — and by each candle column's own Confirmed / Developing selector.
 
-**The hold count.** `closes` is how many consecutive COMPLETED strategy bars must read TRUE (1–5). A
-hold counts the same completed bars whichever surface asks, so a held condition reads them on the
-display lane too. Above `1` it is legal **only** where a completed bar changes the reading: over a
-header resolved from this coin's own candle series, at offset 0, at or above the strategy timeframe,
-read Confirmed. Everything else is refused (`CONDITION_HOLD_OPERAND_ILLEGAL`) — perp-payload scalars,
-published rolling changes, ranks, zone entities, MDS regime labels, enrichment metrics, session
-scalars, a non-zero offset, a column BELOW the strategy timeframe (the retained lower series cannot
-reach an earlier strategy close), and a developing read (the bar in progress exists on the newest
-frame only). A hold also needs a clause of the condition's OWN
-(`CONDITION_HOLD_ILLEGAL`): a referenced condition is resolved once and contributes the same answer
-to every frame, so a hold that moves with the bar only through a reference would count reads that
-never happened. **Worked liquidity floor:** `LIQUID_FLOOR` holds one close because `vol24hUsd` is a
-bundle scalar. Reach for a split to keep a condition's MEANING separable, not to buy it a hold.
+**Hold — how many closes a clause counts.** A clause's `hold: { atLeast, of }` reads TRUE when the
+clause read TRUE on at least `atLeast` of its newest `of` COMPLETED bars — counted on the clause's
+OWN column timeframe, not the strategy's: a `4h` column on a `1h` strategy held 3 reads three `4h`
+bars. The editor calls the control **Hold** and offers four modes:
+
+| Mode | Hold | Reads as |
+|---|---|---|
+| Once | `{ 1, 1 }` | a single read of the bar being decided |
+| In a row | `{ n, n }` | "3 closes in a row" |
+| Within | `{ 1, n }` | "within 5 closes" |
+| At least | `{ m, n }` | "at least 2 of 5 closes" |
+
+A hold counts the same completed bars whichever surface asks. Each bar is read or unreadable; an
+unreadable bar is never replaced by an older one, and the count decides as soon as the bars read
+decide it (TRUE once `atLeast` bars read TRUE, FALSE once the rest can no longer reach it), else
+UNRESOLVED.
+
+What a header admits is SERVED, never guessed: every column in the strategy's report catalog
+(`preview_strategy_report` → `conditionColumns[].outputs[].conditionHold`, and each scalar metric in
+the vocabulary) carries `{ timeframe, maxWindow, maxAtLeast, refusal }` — the timeframe it counts,
+the largest `of`, the largest `atLeast`, and, when it admits only Once, why. `maxWindow` is the
+history the store keeps for that column, less the column's own lookback and warm-up. A hold past
+the served domain is refused (`CONDITION_HOLD_ILLEGAL`, the domain in `allowedDomain`). The reasons
+a header admits only Once:
+
+- `NOT_REWINDABLE` — the value is stored for the current bar only (session and universe scalars,
+  ranks, zone entities, enrichment metrics, published rolling changes). **Worked liquidity floor:**
+  `LIQUID_FLOOR` holds Once because `vol24hUsd` is a bundle scalar.
+- `DEVELOPING` — the column reads the bar still forming. **Developing columns cannot be held**; set
+  the column Confirmed to count closes.
+- `OFFSET` — the column already reads an earlier bar; remove the offset to count closes.
+- `BAR_STATE` — the header describes only the bar being decided.
+- `HISTORY` — not enough history is stored on that timeframe to count more than one close.
+
+Candle columns (at, above or below the strategy timeframe), the regime (counted on the regime rung),
+and the funding and open-interest histories (on the coarser of the strategy timeframe and their own
+hourly cadence) can all be held. **A crossover is an event**: it fires on the bar a state changes,
+so its `maxAtLeast` is 1 — hold a cross "within n closes", never "in a row".
+
+**Group hold — closes counted together.** A group's `hold` counts its members' joint reading on the
+same bar: the group's own outcome, its members folded by its operator, must read TRUE on at least
+`atLeast` of its newest `of` bars, counted on its finest member's timeframe. The phrases add
+"together": "together on 3 closes in a row", "together within 5 closes", "together on at least 2 of
+5 closes". Inside a group holding more than Once, every member holds Once and none is a
+`conditionRef` — each read is counted by exactly one hold — so a row holding its own closes, a
+reference, or a held group inside is refused, naming the member. A conjunction that needs a
+crossover to be TRUE (`ALL(cross, x)`) admits "within" only. Reach for a split to keep a condition's
+MEANING separable; a reference carries its condition's one answer for the bar being decided and is
+never counted across closes.
 
 **Confirmed / Developing, per candle column.** Every transform whose home is the coin's candle series
 carries `bars`: `"closed"` is Confirmed — the newest bar completed at the strategy close — and
@@ -142,18 +181,18 @@ it completes. Left unset the default is a rule, not a value: Confirmed for a col
 strategy timeframe, and at or below it the series as the frame carries it. At or below the strategy
 timeframe the choice therefore sets only what the live lane shows — no bar is in progress at the
 anchor's own close — so Developing there is legal and changes no decision. A condition reading a
-developing bar is single-frame: it holds one close, carries no verdict and cannot take the `exit`
-role. One exception overrides both the stored value and the default: a column reading a metric with
+developing bar is single-frame: its clause holds Once (a Developing column cannot be held), it
+carries no verdict and it cannot take the `exit` role. One exception overrides both the stored value and the default: a column reading a metric with
 no live value (itself, or a `spread` operand) reads completed bars at every rung, because the forming
 bar publishes nothing for it. The resolved answer for a column is served on
 `effectiveParameters.bars`, and it states that exception.
 
 **A higher-timeframe level is measured from the current strategy-bar price.** The distance to a `4h`
 Donchian band, and every candle label classifier (`MA_ALIGN`, `PRICE_ZONE`, `BB_TOUCH`), compares
-against the frame's current price — the strategy bar's close under a decision, the live mark on
-display — not against the higher-timeframe bar's own close, which is up to one higher-timeframe bar
-stale. A distance CHAINED into a series transform keeps every slot on its own bar's close, so one
-series carries one reference basis.
+against the frame's current price, `LAST` — the strategy bar's close under a decision, the last
+traded price on display — not against the higher-timeframe bar's own close, which is up to one
+higher-timeframe bar stale. A distance CHAINED into a series transform keeps every slot on its own
+bar's close, so one series carries one reference basis.
 
 **The lane a strategy is deployed to.** Report-level scalars split by LANE, and the split is not a
 quality of the header — it is which reader runs. Market breadth and the reference pairs are ordinary
@@ -232,8 +271,8 @@ and is REFUSED on every save; there is no live-reading entry to author.
   short) by the offset, waiting for a return to it. Not filling is a correct outcome, not a
   failure; no unrecovered break in memory means no setup, never a fallback level.
 
-**A multi-bar hold belongs to the CONDITION that needs it.** Declare that condition's own `closes` —
-the entry axis counts no bars, and there is no displacement band: the
+**A multi-bar hold belongs to the CLAUSE (or group) that needs it.** Declare that clause's own
+`hold` — "3 closes in a row", "within 5 closes" — the entry axis counts no bars, and there is no displacement band: the
 platform's entry-deviation gate measures the live mark against the decided close and refuses a fill
 that drifted past the budget in either direction.
 
