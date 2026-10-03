@@ -24,6 +24,59 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v84 (the hold moves from the condition to each clause and group)
+
+**Breaking at v84: a condition body accepted at v83 is refused, and condition evidence is reshaped.**
+v84 is the contract on top of v83.
+
+How many completed bars a reading must hold is no longer one number on the condition. Each clause
+holds its own reading, counted on its own column's timeframe, and a group can hold its members'
+same-bar reading.
+
+### Rejected input — `compile_strategy_plan`, `apply_strategy_plan`
+
+- **A condition no longer carries `closes`.** A condition entry naming it is refused with the
+  unknown-key error, in a plan body and in every normalized post-state and strategy draft those tools
+  carry.
+- **Every clause and every group requires `hold: { atLeast, of }`**, whole numbers of at least 1.
+  `{ "atLeast": 1, "of": 1 }` is one read (what every v83 condition did), `{n, n}` is "n closes in a
+  row", `{1, n}` is "within n closes", and anything else is "at least m of n closes". A clause or group
+  without `hold` is refused. A plan staged under v83 must be recompiled.
+- **What a header admits is refused by the builder, never by the schema.** `atLeast` above `of`, a
+  window above the header's maximum, or a group hold over members that hold their own bars is a typed
+  remediation error.
+
+### Replaced output — `preview_strategy_report`, `list_strategy_vocabulary`
+
+- **`closesReadable: boolean` is replaced by `conditionHold: { timeframe, maxWindow, maxAtLeast,
+  refusal }`** on each report condition column and each scalar metric. It names the timeframe a
+  clause counts on, the largest `of` and `atLeast` it admits (`maxAtLeast` is 1 for a cross or other
+  event, so an event can only be held "within n closes"), and why it admits one bar when it does:
+  `NOT_REWINDABLE`, `DEVELOPING`, `OFFSET`, `BAR_STATE` or `HISTORY`. Read the window from here
+  rather than assuming a ceiling; there is no longer a fixed 1–5 limit.
+
+### Reshaped output — condition evidence
+
+- **Every clause-evidence entry gains `hold`, `counts` and `decidedBar`**, on `preview_strategy_report`,
+  `list_gate_blocks`, `get_radar_close_decisions`, `get_agent_coin_qualification`,
+  `preview_radar_resolution` and `get_signal_log`. `counts` is `{ trueCount, total, unresolvedCount }`
+  over the clause's own bars. `decidedBar` is `{ timeframe, closesBack }`, the bar its operand was read
+  on, or `null` when the hold that counts it reads one bar.
+- **A condition outcome loses `hold`** (`closesHeld`, `closesRequired`, `liveOutcome`, `nextCloseAt`):
+  the counted outcome is the clause's own, on its evidence. A decision record's condition
+  `declaration` loses `closes`.
+- **Every strategy read returns `hold` on each clause and group** and no `closes` on the condition.
+
+### Widened enum — the evidence union
+
+- **The evidence union gains a `group` arm**, `{ kind: 'group', op, hold, counts, decidedBar, outcome,
+  memberCount }`, emitted only for a group holding more than one bar, just before the `memberCount`
+  entries that belong to it. A client switching exhaustively on `kind` must add the branch. A strategy
+  without group holds serves no new arm.
+
+A strict client that rejects unknown keys fails to parse condition evidence at v84; list the tools
+again after the server deploys.
+
 ## Contract history — v70.1 (budget run-state)
 
 **Additive at v70.1: one output field added to the risk budget.**
@@ -36,6 +89,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
   `AGENT_HALTED` block stands. Read it rather than re-deriving it from `blockedReason` and `haltedAt`.
 - A client that ignores the field is unaffected. A client that validates results against a cached,
   closed output schema should list the tools again after the server deploys.
+
 ## Contract history — v83 (a model's vendor is its vendor slug)
 
 **Breaking at v83: four output fields renamed and retyped, one aggregation regrouped.** v83 is the
@@ -1019,7 +1073,8 @@ preview names it.
 
 - **`scalarFamilies` is where the vocabulary went.** Every report-level scalar family with its
   section, and one entry per METRIC carrying its gloss, legal condition operators, closed label
-  vocabulary, read contract (`closesReadable` / `developingRead`) and the scopes it is measured at.
+  vocabulary, read contract (`closesReadable` / `developingRead`; v84 replaces `closesReadable` with
+  `conditionHold`) and the scopes it is measured at.
   One gloss per metric with its scopes named against it, never one per pair.
 
 - **Served whole under every category.** A scalar describes the report, not a metric family, so it
