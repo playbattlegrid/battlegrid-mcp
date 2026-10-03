@@ -24,6 +24,135 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v83 (a model's vendor is its vendor slug)
+
+**Breaking at v83: four output fields renamed and retyped, one aggregation regrouped.** v83 is the
+contract on top of v82.
+
+Wherever a model's vendor is published, it is now the router vendor slug of the model's id — the part
+before the `/` (`anthropic`, `z-ai`, `moonshotai`, …). It is never the BYOK provider enum, and never the
+catalogue's display label, which sometimes named a hosting provider rather than the model's maker.
+
+### Reshaped output — the agent
+
+- **Every agent loses `provider` and gains `modelVendorSlug: string`**, on `list_intelligence_agents`,
+  `get_intelligence_agent`, `create_intelligence_agent`, `update_intelligence_agent`,
+  `rebind_intelligence_agent`, `archive_intelligence_agent` and `activate_intelligence_agent`.
+  `provider` was the BYOK enum and was `null` for every agent; `modelVendorSlug` is never null. A
+  client reading `provider` reads nothing at v83.
+
+### Renamed output — `list_approved_models`
+
+- **Each model's `provider` is renamed `vendorSlug`**, and its value changes: the vendor slug
+  (`z-ai`) where v82 served a display label that could name a host (`StreamLake`).
+
+### Renamed output, regrouped rows — `get_agent_explorer`
+
+- **Each `modelVendors[]` row's `provider` / `providerImageUrl` are renamed `vendorSlug` /
+  `vendorImageUrl`.**
+- **Rows group by vendor slug**, so every model one vendor makes shares a row whatever its display
+  label: three GLM labels that were three rows at v82 are one `z-ai` row at v83. Counts and sums add;
+  each mean is the merged total over the merged trade count.
+
+### Renamed output — the `ownerView` LLM-call envelope
+
+- **The envelope's `provider` is renamed `modelVendorSlug`**, on `get_agent_journal`, `get_signal_log`,
+  `get_agent_game_history`, `get_user_agent_game_history`, `get_public_agent_signal_log_detail` and
+  `get_public_agent_game_history`. It is `null` exactly when `modelDisplayName` is — a call whose model
+  has left the catalogue.
+
+## Contract history — v82 (approved models lose their pin flag)
+
+**Breaking at v82: one output field removed.** v82 is the contract on top of v81.
+
+### Removed output — `list_approved_models`
+
+- **`pinProvider` is gone from every model** `list_approved_models` returns. A model is now served
+  only by an ordered list of verified hosts that the server keeps to itself, so a pin flag no longer
+  describes anything. There is no alias. A client that reads `pinProvider` reads nothing at v82, and
+  a strict client that requires it fails to parse the response.
+
+## Contract history — v81 (the allocation's committed figure removed, the hub names Max exposure)
+
+**Breaking at v81: one output field removed and one renamed.** v81 is the contract on top of v80.
+
+### Removed output — the agent fund allocation
+
+- **`committedUsd` is gone from the allocation** that `get_agent_fund_allocation`,
+  `halt_intelligence_agent`, `resume_intelligence_agent` and `set_agent_per_trade_push` return. It
+  measured a custody ledger whose allocate and recall routes are retired. The figure that bounds an
+  entry is capital at risk, on `get_agent_budget`. A client reading `committedUsd` reads nothing at
+  v81.
+
+### Renamed output — `get_agents_hub`
+
+- **Each agent's `envelope` names the exposure ceiling `maxConcurrentExposureUsd`**, the trading
+  config's own name for it, where v80 called it `budgetUsd`. The value is unchanged. A client reading
+  `budgetUsd` reads nothing at v81.
+
+### Corrected reason behind an unchanged schema
+
+- **An agent entry refused because its Max exposure is fully committed is recorded as
+  `INSUFFICIENT_BALANCE`**, where it was recorded as `BELOW_EXCHANGE_MINIMUM` with a $0.00 risk
+  budget. Its detail names Max exposure and the capital at risk. It reaches `get_signal_log` and
+  `get_public_agent_signal_log_detail`.
+
+## Contract history — v79 (the agent's account reading, an exhausted budget, accept below the Balance floor)
+
+**Breaking at v79: the agent budget's account fields move into one object.**
+
+### Reshaped output — the agent budget
+
+- **`get_agent_budget` and `reset_agent_drawdown_baseline` replace `accountEquityUsd`,
+  `budgetOverSubscribed` and `openUnrealizedPnlUsd` with one `account` object** carrying the same three
+  fields, or `null` when the server holds no cached reading of the account. At v78 an unread account
+  read `0`, `false` and `0`, which looked like a real empty account. A client reading the three
+  top-level fields reads nothing at v79.
+
+### Widened enum
+
+- **The block reason gains `EXPOSURE_BUDGET_EXHAUSTED`** (owner-private): an agent whose capital at
+  risk has reached its Max exposure is blocked once at the account stage, where v78 blocked it per
+  coin as `EXCHANGE_MIN_NOTIONAL_UNREACHABLE`. It reaches every output that carries a block reason:
+  `list_gate_blocks`, `get_signal_log`, `get_public_agent_signal_log_detail`, `get_radar_activity`,
+  `get_radar_close_decisions`, `get_radar_deployment`, `list_radar_deployments`,
+  `preview_radar_resolution`, `get_agent_coin_qualification`, `get_trade_conversation` and
+  `propose_entry_decision`.
+
+### Refused behind an unchanged schema
+
+- **`accept_entry_decision` refuses with `CONFLICT` while your account equity is below the agent's
+  Balance floor (`balanceThresholdUsd`) or cannot be read.** The decision stays pending and can be
+  accepted once the equity is back at or above the floor.
+
+## Contract history — v78 (a new agent's risk policy from one seed)
+
+**Breaking at v78: `get_trading_config_catalog` serves a new agent's risk policy as one object.**
+
+### Reshaped output
+
+- **`tradingDefaults.defaults` replaces ten per-field seed values** — `defaultMaxDailyTrades`,
+  `defaultMaxLeverage`, `defaultSmallPct`, `defaultMediumPct`, `defaultLargePct`,
+  `defaultEntrySlippageBps`, `defaultMaxConcurrentExposureUsd`, `defaultBalanceThresholdUsd`,
+  `defaultMaxCumulativeDrawdownUsd` and `defaultMaxDailyLossUsd` — **with one `agentTradingConfig`**,
+  request-shaped, so it passes to `create_intelligence_agent` verbatim. A client reading the ten fields
+  reads nothing at v78.
+
+### Input schema
+
+- **`tradingConfig.maxLeverage` loses its published `minimum: 1`** on `create_intelligence_agent` and
+  `update_intelligence_agent`. Acceptance is unchanged: the platform's minimum leverage is the bound.
+
+### Wider input
+
+- **Both tools accept a strategy whose stored dials sit outside today's operator bounds.** An agent
+  write never re-judges a strategy dial.
+
+### Served values
+
+- **A `create_intelligence_agent` call without `tradingConfig` is seeded from the same object the
+  catalog serves**, never from column defaults, with Min order size from the platform minimum.
+
 ## Contract history — v77 (agent risk rules: each loss stop on its own rail)
 
 **Breaking at v77: an agent's `tradingConfig` accepts less.** `create_intelligence_agent` and
