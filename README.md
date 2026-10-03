@@ -24,6 +24,54 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v83 (a model's vendor is its vendor slug)
+
+**Breaking at v83: four output fields renamed and retyped, one aggregation regrouped.** v83 is the
+contract on top of v82.
+
+Wherever a model's vendor is published, it is now the router vendor slug of the model's id — the part
+before the `/` (`anthropic`, `z-ai`, `moonshotai`, …). It is never the BYOK provider enum, and never the
+catalogue's display label, which sometimes named a hosting provider rather than the model's maker.
+
+### Reshaped output — the agent
+
+- **Every agent loses `provider` and gains `modelVendorSlug: string`**, on `list_intelligence_agents`,
+  `get_intelligence_agent`, `create_intelligence_agent`, `update_intelligence_agent`,
+  `rebind_intelligence_agent`, `archive_intelligence_agent` and `activate_intelligence_agent`.
+  `provider` was the BYOK enum and was `null` for every agent; `modelVendorSlug` is never null. A
+  client reading `provider` reads nothing at v83.
+
+### Renamed output — `list_approved_models`
+
+- **Each model's `provider` is renamed `vendorSlug`**, and its value changes: the vendor slug
+  (`z-ai`) where v82 served a display label that could name a host (`StreamLake`).
+
+### Renamed output, regrouped rows — `get_agent_explorer`
+
+- **Each `modelVendors[]` row's `provider` / `providerImageUrl` are renamed `vendorSlug` /
+  `vendorImageUrl`.**
+- **Rows group by vendor slug**, so every model one vendor makes shares a row whatever its display
+  label: three GLM labels that were three rows at v82 are one `z-ai` row at v83. Counts and sums add;
+  each mean is the merged total over the merged trade count.
+
+### Renamed output — the `ownerView` LLM-call envelope
+
+- **The envelope's `provider` is renamed `modelVendorSlug`**, on `get_agent_journal`, `get_signal_log`,
+  `get_agent_game_history`, `get_user_agent_game_history`, `get_public_agent_signal_log_detail` and
+  `get_public_agent_game_history`. It is `null` exactly when `modelDisplayName` is — a call whose model
+  has left the catalogue.
+
+## Contract history — v82 (approved models lose their pin flag)
+
+**Breaking at v82: one output field removed.** v82 is the contract on top of v81.
+
+### Removed output — `list_approved_models`
+
+- **`pinProvider` is gone from every model** `list_approved_models` returns. A model is now served
+  only by an ordered list of verified hosts that the server keeps to itself, so a pin flag no longer
+  describes anything. There is no alias. A client that reads `pinProvider` reads nothing at v82, and
+  a strict client that requires it fails to parse the response.
+
 ## Contract history — v81 (the allocation's committed figure removed, the hub names Max exposure)
 
 **Breaking at v81: one output field removed and one renamed.** v81 is the contract on top of v80.
