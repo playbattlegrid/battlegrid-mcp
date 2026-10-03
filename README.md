@@ -24,6 +24,17 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v82 (approved models lose their pin flag)
+
+**Breaking at v82: one output field removed.** v82 is the contract on top of v81.
+
+### Removed output — `list_approved_models`
+
+- **`pinProvider` is gone from every model** `list_approved_models` returns. A model is now served
+  only by an ordered list of verified hosts that the server keeps to itself, so a pin flag no longer
+  describes anything. There is no alias. A client that reads `pinProvider` reads nothing at v82, and
+  a strict client that requires it fails to parse the response.
+
 ## Contract history — v81 (the allocation's committed figure removed, the hub names Max exposure)
 
 **Breaking at v81: one output field removed and one renamed.** v81 is the contract on top of v80.
