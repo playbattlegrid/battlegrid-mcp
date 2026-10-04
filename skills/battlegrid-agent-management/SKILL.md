@@ -88,14 +88,11 @@ Create creates it**. Staging creates nothing and spends no slot.
 
 **Then read it, confirm it, and commit it.** `get_agent_draft` serves the draft, its
 `draftVersion`, a `committedRevision` of `null` and the diagnostics: a missing or invalid axis is
-an error there, named, before anything is spent. Its impact is `operation: CREATE` with the
-create's capital reading: the smallest order its configuration — drafted, or the platform seed —
-places, against the order floor, and whether that is `feasible`. Then one confirmation naming **the
-strategy, the model, and the budget posture** — the capital ceiling and stops the trading
-configuration will carry, or that it will take the platform seed, with the smallest order against
-the floor — and on the player's explicit pick call `commit_agent_draft` with the `agentId`, that
-read's `draftVersion` and `expectedRevision: null`. A reading with `feasible: false` is a create the
-commit will refuse: say so, and stage a larger ceiling or a looser configuration first. Where the player has the create screen open, their own Create is the
+an error there, named, before anything is spent. A create draft has no impact. Then one
+confirmation naming **the strategy, the model, and the budget posture** — the capital ceiling and
+stops the trading configuration will carry, or that it will take the platform seed — and on the
+player's explicit pick call `commit_agent_draft` with the `agentId`, that read's `draftVersion` and
+`expectedRevision: null`. Where the player has the create screen open, their own Create is the
 other way to commit it.
 
 A create spends an agent slot against the player's rank quota, decided by the commit itself: a

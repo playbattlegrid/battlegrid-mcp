@@ -24,51 +24,6 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v86 (a refusal hint belongs to the operation that can act on it)
-
-**Breaking at v86: refusals on most tools lose `details.nextAct`, two refusals change code, and one
-draft read is reshaped.** v86 is the contract on top of v85.
-
-### Narrowed refusal details
-
-- **`details.nextAct` follows the refusal's meaning.** `DRAFT_VERSION_MOVED` and `DRAFT_AXIS_CONTESTED`
-  still carry `get_draft` from every tool. A revision `CONFLICT` and the in-flight commit refusal
-  (`get_draft`) and a validation refusal (`stage`) now carry a hint only from `stage_<kind>_draft` and
-  `commit_<kind>_draft` of the strategy and agent kinds.
-- **Removed from every other tool's validation refusal and revision `CONFLICT`**: `submit_market_grid`,
-  `fork_strategy`, `archive_strategy`, `restore_strategy`, and the arena and radar commit, pause, resume
-  and delete tools, and from the malformed-cursor refusal of `list_agent_drafts` and
-  `list_strategy_drafts`. The arena and radar `commit_*_draft` stale-revision refusals lose `get_draft`
-  too. A client that branched on `nextAct` from those tools reads the code instead.
-
-### Changed error codes
-
-- **The strategy active-quota refusal is `FORBIDDEN`**, as the agent slot quota is, where it was
-  `VALIDATION_ERROR` with `nextAct: 'stage'`: on `commit_strategy_draft` and `restore_strategy`.
-- **A create naming an id that is already the caller's strategy or agent is `DRAFT_VERSION_MOVED`**,
-  carrying the caller's draft version at that id, where it was `NOT_FOUND`. An agent create naming a
-  SYSTEM agent is `FORBIDDEN`, where it was `NOT_FOUND`.
-- **The moved-draft refusals end "Read the draft again and show the player what it now holds before
-  committing."**, where they said to commit what it now holds. Read the draft again and show the player
-  before committing; never commit the re-read draft on your own.
-
-### Reshaped output
-
-- **`get_agent_draft.impact` is a union on `operation`**: `{ operation: 'CREATE', capital }` for a create
-  draft, where it was `null`, and `{ operation: 'UPDATE', deployedPresetCount, openPositionCount,
-  radarArmedCoinCount, capital, rebind }` for an edit draft, where the counts sat at the top level. A
-  create draft's `capital` reads its trading configuration — drafted, or the platform's seed — over the
-  bound strategy's band, as the commit's capital check reads it.
-
-### Behaviour behind unchanged schemas
-
-- **The stage and commit descriptions** state the draft content cap (256,000 UTF-8 bytes) and its
-  refusal, what a commit reaches — it closes no position, and the one refusal an open position can cause
-  — and that a moved draft is shown to the player before any commit.
-
-A strict client re-reads the `get_agent_draft` output schema; list the tools again after the server
-deploys.
-
 ## Contract history — v85 (agents and strategies change only through their drafts)
 
 **Breaking at v85: seven tools are retired, and a surviving tool refuses an input it accepted at v84.**
