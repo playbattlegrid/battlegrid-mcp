@@ -24,6 +24,29 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v87 (a fork's create resolves its source again)
+
+**Breaking at v87: a fork's create can now be refused where it committed.** v87 is the contract on top of
+v86. No schema, description or tool changes.
+
+### Narrowed acceptance
+
+A create draft that `fork_strategy` opened is committed by `commit_strategy_draft` with
+`expectedRevision: null`, or by the builder's Create. That create now resolves the strategy it copied
+again. It uses only the source id and revision in the draft's `ORIGIN`, by the same rule the fork applied:
+
+- **A source that moved past the forked revision** refuses the create with `CONFLICT` and **no
+  `details.nextAct`**. Reading the draft again cannot cure it; the message says to discard the draft and
+  fork again. `get_strategy_draft` and `stage_strategy_draft` report the same refusal in the draft's
+  diagnostics.
+- **A source you can no longer see** — archived, or neither yours nor SYSTEM — answers `NOT_FOUND`.
+
+### Widened acceptance
+
+- **Neither `fork_strategy` nor the create reads the source's stored revision snapshot.** A strategy whose
+  stored snapshot predates the current shape — every SYSTEM template among them — now forks and creates
+  from its live state, where both were refused.
+
 ## Contract history — v86 (a refusal hint belongs to the operation that can act on it)
 
 **Breaking at v86: refusals on most tools lose `details.nextAct`, two refusals change code, and one
