@@ -24,6 +24,91 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v85 (agents and strategies change only through their drafts)
+
+**Breaking at v85: seven tools are retired, and a surviving tool refuses an input it accepted at v84.**
+v85 is the contract on top of v84.
+
+Every agent and strategy is now created and changed the same way: stage the change into the
+entity's draft, read the draft back with its diff, diagnostics and impact, and commit exactly the
+draft version and the live revision that read returned.
+
+### Removed tools
+
+- **`compile_strategy_plan`, `stage_strategy_plan`, `apply_strategy_plan`, `update_strategy_signal_rule`,
+  `create_intelligence_agent`, `update_intelligence_agent`, `rebind_intelligence_agent`** are gone, with
+  no alias; a call gets an unknown-tool error. The replacements: `get_strategy_draft` →
+  `stage_strategy_draft` → `commit_strategy_draft` for a strategy (a signal rule is a row of the draft's
+  `SIGNAL_RULES` axis), and `stage_agent_draft` → `get_agent_draft` → `commit_agent_draft` for an agent
+  (a rebind is the draft's `STRATEGY_BINDING` axis).
+
+### Added tools
+
+- **`stage_strategy_draft { strategyId?, draftVersion, axes }`**, **`commit_strategy_draft`** and
+  **`commit_agent_draft`** (`{ <id>, draftVersion, expectedRevision }`, `expectedRevision` null for a
+  create). A commit publishes exactly the draft version and the live revision the caller read, is
+  idempotent on `{ id, draftVersion }`, and returns the kind's committer response plus the draft's
+  `draftVersion` after its clear (null when the commit emptied it).
+
+### Rejected input
+
+- **`archive_strategy` no longer takes `confirm`.** A request carrying it is refused with the
+  unknown-key error — a break on a surviving tool.
+- **`discard_agent_draft` and `discard_strategy_draft` take `draftVersion`** (the version
+  `get_<kind>_draft` returned) in place of `confirm`; `confirm` is refused as an unknown key, and a
+  version the draft moved past is refused `DRAFT_VERSION_MOVED`.
+- **`preview_strategy_report` takes `{ coinSelection, source }`.** The report fields move under
+  `source: { kind: 'FIELDS', … }`, and `source: { kind: 'DRAFT', strategyId, draftVersion }` previews the
+  owner's draft as a commit would compose it. A body with the fields at the top level is refused.
+- **A strategy's ENTRY axis is a union discriminated by `trigger`**: `{ trigger: 'ON_CANDLE_CLOSE' }`
+  alone, or a level trigger with `levelOffsetAtrMultiple` and `validForBars`. `ON_CANDLE_CLOSE` naming
+  either dial is refused, which the retired compile accepted; the server stamps the seed values.
+
+### Widened input
+
+- **`stage_agent_draft` accepts `STRATEGY_BINDING` on an edit draft**, where v84 refused it: a staged
+  binding commits as the agent's rebind. Its TRADING_CONFIG axis now describes each size preset as the
+  risk budget lost at the hard stop.
+
+### Reshaped output
+
+- **`fork_strategy` returns `{ strategyId, draftVersion }`** — the create draft it wrote, holding a copy
+  of the source — in place of `{ strategy }`. No strategy exists until that draft commits.
+- **`get_agent_draft` and `get_strategy_draft` gain `draftVersion`** (0 when no draft is held, beside a
+  null `draft`), **`committedRevision`, a per-axis `diff` against live, `diagnostics` and `impact`.**
+- **`stage_agent_draft` gains `diagnostics`**, the composed draft's errors and warnings.
+- **`discard_agent_draft` and `discard_strategy_draft` return `discarded: true` only**; a discard that
+  finds nothing is refused rather than answered `false`.
+
+### Widened enum
+
+- **Strategy draft axes gain `ORIGIN`**, the create-only axis a fork writes, on `list_strategy_drafts`
+  and every strategy draft read. A client switching exhaustively on a strategy draft axis must add the
+  branch.
+- **Error codes gain `DRAFT_VERSION_MOVED`** (details `draftVersion`, null when no draft is held) **and
+  `DRAFT_AXIS_CONTESTED`** (details `contestedAxes` and `draftVersion`), both 409.
+- **Refusal details gain `nextAct`.** Every draft-specific refusal, the revision `CONFLICT` and the
+  in-flight commit refusal carry `nextAct: 'get_draft'`; a commit's validation refusal carries
+  `nextAct: 'stage'`; every other refusal carries none. `details.expectedRevision` widens to
+  `number | null`.
+
+### Removed error code
+
+- **`PLAN_APPROVAL_NOT_FOUND`**, with the plan path that raised it.
+
+### Behaviour behind unchanged schemas
+
+- **`archive_strategy` and `restore_strategy` no longer refuse around the owner's unsaved draft**: they
+  re-base it onto the revision they write. `restore_strategy`'s description drops the compile route — a
+  repair is staged into the draft and committed, which restores the strategy.
+- **The `author-strategy` prompt** reads "Discover, stage, review, and commit a BattleGrid strategy
+  through its draft".
+- **The server's manifest records a description hash per tool** (manifest format 4), and the tool count
+  moves 142 → 138.
+
+A strict client that rejects unknown keys fails to parse `fork_strategy` and the draft reads at v85;
+list the tools again after the server deploys.
+
 ## Contract history — v84 (the hold moves from the condition to each clause and group)
 
 **Breaking at v84: a condition body accepted at v83 is refused, and condition evidence is reshaped.**
@@ -2250,7 +2335,7 @@ For the strict authoring tools, the multi-account input is exactly `{ account, r
 
 ```json
 {
-  "name": "compile_strategy_plan",
+  "name": "commit_strategy_draft",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -2260,11 +2345,14 @@ For the strict authoring tools, the multi-account input is exactly `{ account, r
         "description": "Which BattleGrid account to use for this action"
       },
       "request": {
-        "oneOf": [
-          { "properties": { "operation": { "const": "CREATE" } } },
-          { "properties": { "operation": { "const": "UPDATE" } } },
-          { "properties": { "operation": { "const": "RESTORE" } } }
-        ]
+        "type": "object",
+        "properties": {
+          "strategyId": { "type": "string", "format": "uuid" },
+          "draftVersion": { "type": "integer", "minimum": 1 },
+          "expectedRevision": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] }
+        },
+        "required": ["strategyId", "draftVersion", "expectedRevision"],
+        "additionalProperties": false
       }
     },
     "required": ["account", "request"],
@@ -2287,24 +2375,19 @@ Each account supports one active key at a time. Generating a new key automatical
 
 For paid games and autonomous wagering, enable **Server-Signed Wagers** in the MCP tab (`mcp:wager` scope). Strategy discovery and non-financial configuration writes only need `mcp:read`.
 
-## Strategy authoring (compile → review → apply)
+## Strategy and agent authoring (stage → read → commit)
 
-Strategies are authored through one strict, whole-plan workflow. **Compilation changes no strategy, agent or revision; `apply_strategy_plan` is the only write to the strategy itself** — but compile is not read-only either: it parks the plan its own apply reads, and each call mints a distinct record and token, so compile once per reviewed payload and never retry or parallelise it. Always review the exact returned plan before confirming.
+Strategies and intelligence agents change only through their drafts, with one tool family per kind (`<kind>` is `strategy` or `agent`): `stage_<kind>_draft`, `get_<kind>_draft`, `commit_<kind>_draft`, `discard_<kind>_draft` and `list_<kind>_drafts`. **A stage writes the player's unsaved draft and commits nothing; `commit_<kind>_draft` is the only write to the entity itself**, and it publishes exactly the draft the caller read.
 
-1. **Choose the operation and revision.** `list_strategies` (add `includeInactive:true` when preparing a RESTORE) and `get_strategy` return the current `revision`; thread it into the next revisioned call.
+1. **Choose the entity.** `list_strategies` (add `includeInactive:true` when repairing an archived strategy) and `get_strategy`, or `list_intelligence_agents` and `get_intelligence_agent`. `fork_strategy({ strategyId, sourceRevision })` copies a visible revision into a new create draft and returns its `strategyId` and `draftVersion`; it creates nothing.
 2. **Discover the report vocabulary live.** Walk `list_strategy_categories` → `list_strategy_vocabulary` → `get_metric_construction_hints` → `get_strategy_column_contract`, and use `get_strategy_section_template` / `preview_strategy_report`. Do not guess metric, transform, parameter, template, or enabled-timeframe facts — they are server-discovered.
-3. **Compile one complete plan.** Call `compile_strategy_plan({ request })` where the nested request is exactly one strict branch plus a bounded `coinSelection`, `intentSummary`, and `assumptions`:
-   - **CREATE** supplies the full new strategy.
-   - **UPDATE** supplies at least one changed axis and `expectedRevision`.
-   - **RESTORE** targets an owned inactive revision (with any repair axes).
-4. **Review before confirming.** Inspect the returned `approvedPlan` (complete post-state, proposed revision, diff, bound-agent impact, expiry) and `reviewContext` (column contracts, point-in-time report preview, open positions, quota/name admission). The plan token expires after five minutes; recompile after expiry or drift.
-5. **Apply the plan the server already holds.** After explicit user approval, call `apply_strategy_plan({ request: { planToken, confirm: true } })`. **There is no `plan` member** — one is rejected as an unknown key. The server keeps the plan its own compile approved and reads it back, so nothing is copied out of the compile response and nothing can be mistyped or truncated in transit. Forward `planToken` byte-for-byte exactly as received: it is an opaque signed value, never retyped, paraphrased or rebuilt from memory, and a mangled one addresses no approved plan and is refused. `PLAN_APPROVAL_NOT_FOUND` means no approved plan answers to this token — already applied, lapsed, or never issued — and the recovery is to compile again; so is `TOKEN_EXPIRED` once the five minutes run out. Any other refusal (quota, name collision, a bound agent that changed, a moved catalog) **leaves the plan applicable**: clear the cause and confirm again with the same token while it lives. Changed configuration propagates to every bound agent immediately.
+3. **Read the draft.** `get_<kind>_draft({ request: { <id> } })` returns the draft (or `null`), its `draftVersion` (0 when none is held), the live `committedRevision` (null for an entity not created yet), a per-axis `diff` against live, `diagnostics` and `impact`.
+4. **Stage the change.** `stage_<kind>_draft({ request: { <id>?, draftVersion, axes } })` names the version you read. Each axis is whole, except a strategy's `SIGNAL_RULES`, whose rows replace the drafted rows for the same signals and keep every other one. Omit the id to open a new create draft; the response carries the minted id. A stage that has written never refuses: the composed draft's errors and warnings come back as `diagnostics`. It is refused only when the version is one the draft never reached (`DRAFT_VERSION_MOVED`) or when the player's own form changed an axis you are staging after that version (`DRAFT_AXIS_CONTESTED`, naming `contestedAxes`).
+5. **Review with the player, then commit.** Read the draft again, show the player its diff and impact, and on their explicit word call `commit_<kind>_draft({ request: { <id>, draftVersion, expectedRevision } })` with exactly the two numbers that read returned — `expectedRevision: null` creates the entity at revision 1. A draft that moved is refused `DRAFT_VERSION_MOVED`, a moved revision `CONFLICT`, and an invalid draft with the same code its diagnostics carried; nothing is written. Each refusal's `details.nextAct` says what to do next (`get_draft` or `stage`). The commit is idempotent on `{ id, draftVersion }`: a retried commit replays its outcome. Changed strategy configuration propagates to every bound agent immediately; committing a draft of an archived strategy restores it.
 
-   The authored axes — including normalized `sections` and `conditions`, each condition carrying its own required, nullable `verdict` — belong on the **compile** request. Every derived field (`diff`, `viability`, `mismatches`, `signalRules`, `creationSeed`, `proposedRevision`, `bindingImpact`, `authoringCatalogDigest`, `reviewContext`) is re-derived server-side and rejected as an unknown key if resubmitted, and `conditionVerdicts` is rejected with a message naming its replacement — the verdict belongs on the condition.
+`discard_<kind>_draft({ request: { <id>, draftVersion } })` removes the draft at the version you read and never one that moved since. `preview_strategy_report({ coinSelection, source: { kind: 'DRAFT', strategyId, draftVersion } })` previews a draft as a commit would compose it. In multi-account mode every one of these calls uses the `{ account, request }` sibling envelope.
 
-`update_strategy_signal_rule({ request })` is the thin, focused one-rule edit. In multi-account mode every one of these calls uses the `{ account, request }` sibling envelope.
-
-**Strategy-bound agents.** Bind a strategy to an intelligence agent at creation time — `create_intelligence_agent({ …, strategyId })` (discover `strategyId` via `list_strategies`). Rebinding via `update_intelligence_agent` requires `confirm:true`. There is no direct `create_strategy` operation.
+**Strategy-bound agents.** An agent binds to a strategy through its draft's `STRATEGY_BINDING` axis — on a create draft, or on an edit draft as a rebind that commits through the same `commit_agent_draft` (discover `strategyId` via `list_strategies`). The plan tools, `update_strategy_signal_rule` and the direct agent writers are retired, and so is `create_strategy`.
 
 ## Capabilities
 
@@ -2468,7 +2551,7 @@ you reach over MCP:
 | `battlegrid-arena-play` | Enter Market Grid sessions: find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have an agent generate it, submit, then read results and the reasoning journal |
 | `battlegrid-market-analysis` | Read the current crypto market — regime, funding and open interest, leaders and laggards, a deep-dive on any named coin — and close with the levels worth watching |
 | `battlegrid-radar-deployment` | Put agents on standing duty: per-coin Radar policies that fire on confirmed regime flips, and per-preset Arena deployment policies, previewed before they are written and un-deployed with the blast radius stated |
-| `battlegrid-strategy-authoring` | Build a strategy from a plain-English idea: gather evidence, lock the spec, compile against the platform grammar, review exactly what will run, apply only on confirmation. Also fork, tune, restore, archive, preview |
+| `battlegrid-strategy-authoring` | Build a strategy from a plain-English idea: gather evidence, lock the spec, stage it into the strategy's draft, review the diff, diagnostics and impact, commit only on confirmation. Also fork, tune, restore, archive, preview |
 | `battlegrid-strategy-doctor` | Diagnose an agent that is not doing what was expected — why it has not traded, why it stopped, whether it is healthy — from typed fields, then rank the fixes with the exact lever each needs |
 | `battlegrid-strategy-examples` | Full-surface composition patterns: custom report sections and header grammar, benchmark sections, condition trees with verdicts and enforcement gates, tiered signal weights and the aggregate gate math, routing gates, ATR trade levels, position management, plus validated desk-grade playbooks and TradingView process ports |
 | `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
