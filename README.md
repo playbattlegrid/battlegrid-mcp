@@ -24,6 +24,51 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v86 (a refusal hint belongs to the operation that can act on it)
+
+**Breaking at v86: refusals on most tools lose `details.nextAct`, two refusals change code, and one
+draft read is reshaped.** v86 is the contract on top of v85.
+
+### Narrowed refusal details
+
+- **`details.nextAct` follows the refusal's meaning.** `DRAFT_VERSION_MOVED` and `DRAFT_AXIS_CONTESTED`
+  still carry `get_draft` from every tool. A revision `CONFLICT` and the in-flight commit refusal
+  (`get_draft`) and a validation refusal (`stage`) now carry a hint only from `stage_<kind>_draft` and
+  `commit_<kind>_draft` of the strategy and agent kinds.
+- **Removed from every other tool's validation refusal and revision `CONFLICT`**: `submit_market_grid`,
+  `fork_strategy`, `archive_strategy`, `restore_strategy`, and the arena and radar commit, pause, resume
+  and delete tools, and from the malformed-cursor refusal of `list_agent_drafts` and
+  `list_strategy_drafts`. The arena and radar `commit_*_draft` stale-revision refusals lose `get_draft`
+  too. A client that branched on `nextAct` from those tools reads the code instead.
+
+### Changed error codes
+
+- **The strategy active-quota refusal is `FORBIDDEN`**, as the agent slot quota is, where it was
+  `VALIDATION_ERROR` with `nextAct: 'stage'`: on `commit_strategy_draft` and `restore_strategy`.
+- **A create naming an id that is already the caller's strategy or agent is `DRAFT_VERSION_MOVED`**,
+  carrying the caller's draft version at that id, where it was `NOT_FOUND`. An agent create naming a
+  SYSTEM agent is `FORBIDDEN`, where it was `NOT_FOUND`.
+- **The moved-draft refusals end "Read the draft again and show the player what it now holds before
+  committing."**, where they said to commit what it now holds. Read the draft again and show the player
+  before committing; never commit the re-read draft on your own.
+
+### Reshaped output
+
+- **`get_agent_draft.impact` is a union on `operation`**: `{ operation: 'CREATE', capital }` for a create
+  draft, where it was `null`, and `{ operation: 'UPDATE', deployedPresetCount, openPositionCount,
+  radarArmedCoinCount, capital, rebind }` for an edit draft, where the counts sat at the top level. A
+  create draft's `capital` reads its trading configuration — drafted, or the platform's seed — over the
+  bound strategy's band, as the commit's capital check reads it.
+
+### Behaviour behind unchanged schemas
+
+- **The stage and commit descriptions** state the draft content cap (256,000 UTF-8 bytes) and its
+  refusal, what a commit reaches — it closes no position, and the one refusal an open position can cause
+  — and that a moved draft is shown to the player before any commit.
+
+A strict client re-reads the `get_agent_draft` output schema; list the tools again after the server
+deploys.
+
 ## Contract history — v85 (agents and strategies change only through their drafts)
 
 **Breaking at v85: seven tools are retired, and a surviving tool refuses an input it accepted at v84.**
@@ -2162,8 +2207,8 @@ Retained for authors upgrading from 4.x. Everything below still describes the cu
 
 The v3 authoring contract below is unchanged and still current:
 
-- **Strict authoring envelopes.** `get_strategy_section_template`, `update_strategy_signal_rule`, `compile_strategy_plan`, and `apply_strategy_plan` publish one strict server-owned object, `{ request: canonicalPayload }`. In multi-account mode the proxy adds `account` **only** as a sibling of `request`, producing exactly `{ account, request }`; on a call it strips only `account` and forwards the unchanged `{ request }`. It never descends into, flattens, or reconstructs the nested request.
-- **`create_strategy` is retired.** Direct strategy creation no longer exists. Author strategies with the compile → review → apply workflow below, and bind them to agents at agent-creation time (`create_intelligence_agent({ …, strategyId })`). There is no alias, shim, or flat-payload fallback.
+- **Strict authoring envelopes.** `get_strategy_section_template` and every draft lifecycle tool (`stage_<kind>_draft`, `get_<kind>_draft`, `commit_<kind>_draft`, `discard_<kind>_draft`, `list_<kind>_drafts`) publish one strict server-owned object, `{ request: canonicalPayload }`. In multi-account mode the proxy adds `account` **only** as a sibling of `request`, producing exactly `{ account, request }`; on a call it strips only `account` and forwards the unchanged `{ request }`. It never descends into, flattens, or reconstructs the nested request.
+- **`create_strategy` is retired.** Direct strategy creation no longer exists. Author strategies through the strategy draft lifecycle below, and bind an agent to one through its draft's `STRATEGY_BINDING` axis. There is no alias, shim, or flat-payload fallback.
 - **Rediscover after deployment.** Publishing the package does **not** refresh a running proxy's cached capability snapshot. After the server cutover, restart/reconnect the proxy process and re-run `tools/list`, `prompts/list`, and `resources/list`.
 
 > Earlier majors: **v1.x** single/multi-account stdio proxy; **v2.0.0** moved the default `BATTLEGRID_API_URL` to the `/mcp` suffix; **v3.0.0** the strategy-authoring major; **v4.0.0** made `conditions` and `conditionVerdicts` required on the apply post-state; **v5.0.0** fused the conditions/verdicts split (section above). **v6.0.0** through **v11.0.0** were never published as separate package versions — they are absorbed by the v11 cutover at the top. See [Rediscovery & versioning](#rediscovery--versioning).
@@ -2385,7 +2430,7 @@ Strategies and intelligence agents change only through their drafts, with one to
 4. **Stage the change.** `stage_<kind>_draft({ request: { <id>?, draftVersion, axes } })` names the version you read. Each axis is whole, except a strategy's `SIGNAL_RULES`, whose rows replace the drafted rows for the same signals and keep every other one. Omit the id to open a new create draft; the response carries the minted id. A stage that has written never refuses: the composed draft's errors and warnings come back as `diagnostics`. It is refused only when the version is one the draft never reached (`DRAFT_VERSION_MOVED`) or when the player's own form changed an axis you are staging after that version (`DRAFT_AXIS_CONTESTED`, naming `contestedAxes`).
 5. **Review with the player, then commit.** Read the draft again, show the player its diff and impact, and on their explicit word call `commit_<kind>_draft({ request: { <id>, draftVersion, expectedRevision } })` with exactly the two numbers that read returned — `expectedRevision: null` creates the entity at revision 1. A draft that moved is refused `DRAFT_VERSION_MOVED`, a moved revision `CONFLICT`, and an invalid draft with the same code its diagnostics carried; nothing is written. Each refusal's `details.nextAct` says what to do next (`get_draft` or `stage`). The commit is idempotent on `{ id, draftVersion }`: a retried commit replays its outcome. Changed strategy configuration propagates to every bound agent immediately; committing a draft of an archived strategy restores it.
 
-`discard_<kind>_draft({ request: { <id>, draftVersion } })` removes the draft at the version you read and never one that moved since. `preview_strategy_report({ coinSelection, source: { kind: 'DRAFT', strategyId, draftVersion } })` previews a draft as a commit would compose it. In multi-account mode every one of these calls uses the `{ account, request }` sibling envelope.
+`discard_<kind>_draft({ request: { <id>, draftVersion } })` removes the draft at the version you read and never one that moved since. `preview_strategy_report({ coinSelection, source: { kind: 'DRAFT', strategyId, draftVersion } })` previews a draft as a commit would compose it. In multi-account mode the lifecycle tools use the `{ account, request }` sibling envelope; `preview_strategy_report` keeps its own flat input and takes `account` beside `coinSelection` and `source`.
 
 **Strategy-bound agents.** An agent binds to a strategy through its draft's `STRATEGY_BINDING` axis — on a create draft, or on an edit draft as a rebind that commits through the same `commit_agent_draft` (discover `strategyId` via `list_strategies`). The plan tools, `update_strategy_signal_rule` and the direct agent writers are retired, and so is `create_strategy`.
 

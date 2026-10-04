@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
  *   2. an unlisted file under an exported directory (an addition the generator did not write)
  *   3. a digest fixture whose contract version disagrees with the manifest's (the document and the
  *      contract it states did not travel from the same commit)
+ *   4. a manifest whose contract MAJOR lags the newest contract the README documents (an export lane
+ *      that stopped delivering, which no other check here can see)
  *
  * TO CHANGE A PUBLISHED SKILL: edit it in `battlegrid-app/server/src/skills/<name>/` and let the
  * export lane re-export it. Editing it here fails this test by name.
@@ -63,6 +65,26 @@ function exportedFilesOnDisk(): string[] {
   }
   return found.sort();
 }
+
+/**
+ * The contract MAJOR of every `## Contract history — vN` heading in a README. Those entries are
+ * written here by hand when a breaking contract ships, so the newest one is this repository's only
+ * offline record of the contract the server is on — and the README ships in the tarball beside the
+ * skills, so the two must name one contract.
+ */
+function documentedContractMajors(readme: string): number[] {
+  return [...readme.matchAll(/^## Contract history — v(\d+)(?:\.\d+)*\b/gm)].map((match) => Number(match[1]));
+}
+
+/** The MAJOR skills were vendored at, beside the newest MAJOR `readme` documents. */
+function contractMajors(contractVersion: string, readme: string): { vendored: number; documented: number } {
+  return {
+    vendored: Number(contractVersion.split('.')[0]),
+    documented: Math.max(...documentedContractMajors(readme)),
+  };
+}
+
+const readme = readFileSync(join(repoRoot, 'README.md'), 'utf8');
 
 function sha256(path: string): string {
   return createHash('sha256').update(readFileSync(path, 'utf8'), 'utf8').digest('hex');
@@ -112,6 +134,24 @@ describe('exported skills carry the provenance the generator wrote', () => {
     ) as { server: { contractVersion: string } };
     expect(digest.server.contractVersion).toBe(manifest.contractVersion);
   });
+
+  it('vendors the skills at the newest contract the README documents', () => {
+    // The export lane runs in battlegrid-app and opens its pull request here; when it stops (a
+    // revoked MCP_SKILLS_EXPORT_TOKEN did, for 17 runs), every other check here stays green on the
+    // stale export, and npm ships skills teaching tools the documented contract retired. A newer
+    // export than the README documents fails too: the contract history must document the break.
+    expect(
+      documentedContractMajors(readme).length,
+      'README.md documents no contract — its history headings moved',
+    ).toBeGreaterThan(0);
+    const { vendored, documented } = contractMajors(manifest.contractVersion, readme);
+    expect(
+      vendored,
+      'skills/EXPORT.json is not at the contract the README documents — run '
+        + 'battlegrid-app/server/scripts/export-mcp-skills.mjs --into this checkout (or dispatch the '
+        + 'MCP Skills Export workflow), and document a newer contract in README.md',
+    ).toBe(documented);
+  });
 });
 
 describe('the provenance check fails on the drift it was written for', () => {
@@ -130,5 +170,12 @@ describe('the provenance check fails on the drift it was written for', () => {
 
   it('reports a digest carrying a different contract version', () => {
     expect(manifest.contractVersion).not.toBe(`${manifest.contractVersion}-stale`);
+  });
+
+  it('reports skills vendored at a contract older than the README documents', () => {
+    const documented = '## Contract history — v70.1 (old)\n\n## Contract history — v85 (newer)\n';
+    expect(documentedContractMajors(documented)).toEqual([70, 85]);
+    expect(contractMajors('84.0.0', documented)).toEqual({ vendored: 84, documented: 85 });
+    expect(contractMajors('85.2.0', documented)).toEqual({ vendored: 85, documented: 85 });
   });
 });

@@ -46,8 +46,9 @@ Three tests divide the work and should not be merged:
   coverage, the four version values. (The name rule is why the export namespaces each skill to
   `battlegrid-<name>` on the way out.)
 - `skill-provenance.test.ts` — **arrival.** Every file hashes as `EXPORT.json` records it, nothing
-  unlisted sits under an exported directory, and the digest fixture's contract version matches the
-  manifest's.
+  unlisted sits under an exported directory, the digest fixture's contract version matches the
+  manifest's, and the manifest's contract MAJOR is the newest one README.md's contract history
+  documents — so an export lane that stopped delivering fails here instead of shipping stale skills.
 - `skill-contract.test.ts` — **consistency.** The exported `battlegrid-strategy-examples/SKILL.md`
   states the axes and domains the vendored digest carries. Its upstream twin
   (`authoring-recipe-contract.test.ts`) gates the same bytes; this one is the arrival check on the
