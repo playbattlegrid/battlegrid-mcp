@@ -88,10 +88,11 @@ against a literal; neither of those shapes is what a previous-session level need
 
 ## Conditions
 
-`{ conditionKey, name, definition, verdict, required, exit }` — all six
+`{ conditionKey, name, definition, verdict, required, exitSide }` — all six
 required, no defaults. A `clock` key is REFUSED (the per-condition evidence clock was retired in
-contract `61.0.0`), and so is a condition-level `closes` key: the hold lives on each clause and each
-group (contract `84.0.0`). Clauses: numeric/rank headers take `lt|lte|gte|gt|between`;
+contract `61.0.0`), so is a condition-level `closes` key — the hold lives on each clause and each
+group (contract `84.0.0`) — and so is a boolean `exit` key: the side an exit closes is its own
+`exitSide` (contract `88.0.0`). Clauses: numeric/rank headers take `lt|lte|gte|gt|between`;
 classification/direction headers take `is|in` with the served vocabulary. Groups:
 `ALL | ANY | NOT | N_OF` (with `n`), depth ≤ 2. Every clause and every group carries a required
 `hold: { atLeast, of }` — `{ "atLeast": 1, "of": 1 }` is a single read; a clause or group without
@@ -184,7 +185,7 @@ strategy timeframe, and at or below it the series as the frame carries it. At or
 timeframe the choice therefore sets only what the live lane shows — no bar is in progress at the
 anchor's own close — so Developing there is legal and changes no decision. A condition reading a
 developing bar is single-frame: its clause holds Once (a Developing column cannot be held), it
-carries no verdict and it cannot take the `exit` role. One exception overrides both the stored value and the default: a column reading a metric with
+carries no verdict and it cannot be an exit rule. One exception overrides both the stored value and the default: a column reading a metric with
 no live value (itself, or a `spread` operand) reads completed bars at every rung, because the forming
 bar publishes nothing for it. The resolved answer for a column is served on
 `effectiveParameters.bars`, and it states that exception.
@@ -205,7 +206,7 @@ strategy reads one is refused outright (`CONDITION_OPERAND_UNSERVED_IN_LANE`), n
 can read instead.
 
 **What the radar scan can read on a coin.** Beyond the lane, a condition the radar acts on — a
-required one, one carrying a verdict, an exit one, and every condition they reference — must be
+required one, one carrying a verdict, an exit rule, and every condition they reference — must be
 readable by the radar scan on each coin the radar acts on for the agent, or it would be decided unread.
 What a coin can be read for is its market-data profile: the kinds of data the market-data service
 publishes that it serves for that coin, never the coin's asset class. A refusal carries
@@ -216,7 +217,7 @@ column on a ticker with no catalog row), `AGENT_TIMEFRAME` when the agent has no
 enabled ladder, and `FEED` when the radar scan never reads that data for the agent (crowd reads:
 compose reads them, but only for a coin the scan has already admitted). An `INSTRUMENT` refusal names
 the kind of data the profile lacks, or says the coin has no profile. The fixes it names: take the
-condition's radar role away (neither required nor a verdict, or no exit role), read a column the radar
+condition's radar role away (neither required nor a verdict, or, for an exit rule, its exit role), read a column the radar
 scan has on that coin, or free the coin.
 
 **The refusal lands where an agent meets a coin**: at the radar deploy (its preview, the builder's
@@ -229,13 +230,19 @@ the same strategy is legal, and reads session-field scalars correctly, on an are
 may hold such content — staging never refuses a draft for being invalid — but its commit is
 refused, so it never reaches the agents.
 
-**The exit role.** `exit: true` makes a settled TRUE reading close open positions its verdict
-opposes — UP exits SHORTs, DOWN exits LONGs, a NEITHER or `null` verdict exits both. Legal only over
-a closure every operand of which a completed bar MOVES (`CONDITION_EXIT_READ_ILLEGAL`), which rules
-out a developing read — a bar in progress is the forming bar, and an exit fired on one is an intrabar
-exit — and rules out a frame-inert operand, which could never fire. Orthogonal to `required` — the
-two act on disjoint lifecycles, pre-entry versus open — so a condition may carry both, either, or
-neither.
+**Exit rules.** A condition is an entry condition (`exitSide: null`) or an exit rule, never both.
+An exit rule's `exitSide` names the side it closes — `LONG`, `SHORT` or `BOTH` — and it has two
+effects: a settled TRUE on a completed bar closes the agent's open position on that side, and while it
+reads TRUE that side is not offered for entry (a scan qualification or a compose refusal under
+`CONDITION_EXIT_RULE_CLOSES_DIRECTION`, after any verdict refusal of the same side). No verdict chooses
+the side: an exit rule carries `verdict: null` and `required: false` (`CONDITION_EXIT_RULE_CARRIES_VERDICT`,
+`CONDITION_EXIT_RULE_REQUIRED`). An entry condition cannot reference an exit rule
+(`CONDITION_ENTRY_REFERENCES_EXIT_RULE`), so editing an exit rule never changes what the agent enters;
+an exit rule may reference anything, so "exit when the entry setup stops holding" is an exit rule
+whose definition is `NOT` a `conditionRef` to the entry condition. An exit rule is legal only over a
+closure every operand of which a completed bar MOVES (`CONDITION_EXIT_READ_ILLEGAL`), which rules out
+a developing read — a bar in progress is the forming bar, and an exit fired on one is an intrabar
+exit — and rules out a frame-inert operand, which could never fire.
 
 **A state column is not a flip event.** `ST_DIR` reads the same on every bar of a trend, so
 `ST_DIR is "bullish"` is a regime filter and never an entry signal. The flip needs an event column
