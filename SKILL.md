@@ -68,8 +68,9 @@ than about authoring:
   is `null` for an entity not created yet. Commit only after the player has seen the diff and impact
   and said yes. `discard_<kind>_draft({ request: { <id>, draftVersion } })` is the same fence.
 - **The proxy forwards numbers and `null` unchanged.** It never fills in a version, never retries a
-  refused call and never rebuilds a request: a `DRAFT_VERSION_MOVED`, `DRAFT_AXIS_CONTESTED` or
-  revision `CONFLICT` refusal carries `details.nextAct`, and the next act is the caller's.
+  refused call and never rebuilds a request. A `DRAFT_VERSION_MOVED` or `DRAFT_AXIS_CONTESTED` refusal
+  carries `details.nextAct` from every tool, and a revision `CONFLICT` or validation refusal carries it
+  from a stage or commit; the next act is the caller's.
 
 `fork_strategy` copies a revision into a new create draft and creates nothing until that draft is
 committed. An agent binds to a strategy through its draft's `STRATEGY_BINDING` axis, on a create or
@@ -98,9 +99,9 @@ The `play-market-grid` prompt (discover via `prompts/list`) provides a guided en
 | `API key must start with "bg_live_"` | Invalid key format | Generate a new key at battlegrid.trade → Profile → MCP |
 | Authentication failed (401/403) | Key revoked/rotated | Generate a new key and **restart** the proxy (keys read once at startup) |
 | `"account" parameter is required` | Multi-account call missing `account` | Add the outer `account`; keep `request` unchanged |
-| `DRAFT_VERSION_MOVED` | The draft changed after you read it, or no draft is held (`details.draftVersion` null) | Call `get_<kind>_draft` again and commit what it now holds |
+| `DRAFT_VERSION_MOVED` | The draft changed after you read it, or no draft is held (`details.draftVersion` null) | Call `get_<kind>_draft` again, show the player what it now holds, and commit only on their word |
 | `DRAFT_AXIS_CONTESTED` | The player changed `details.contestedAxes` in their open form after the version you staged against | Read the draft again and propose against what they now have |
-| `CONFLICT` on a commit | The live revision moved after the draft read | Read the draft again; commit at the new `committedRevision` |
+| `CONFLICT` on a commit | The live revision moved after the draft read | Read the draft again, show the player the new diff and impact, and commit at the new `committedRevision` only on their word |
 | Required at allocation Off | A rule flags `required` on a signal weighted `0` (contract 34) | Read `details.inertRequiredSignalIds`; per signal either raise `allocation` or set `required: false` |
 | Method not found | Calling a retired/unknown tool | Re-run `tools/list`; stage, read and commit through the entity's draft |
 | `Wager scope required` | `mcp:wager` not enabled | Enable Server-Signed Wagers in Profile → MCP |

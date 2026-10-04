@@ -205,8 +205,8 @@ diagnostics you have not explained to them.
 - **`DRAFT_AXIS_CONTESTED`** names the axes the player's own hand changed after the version you
   named. Their edit is newer than your proposal: read the draft, tell them so, and propose again
   only when they ask. Never re-send the same values.
-- **`DRAFT_VERSION_MOVED`** — the version you named is not the draft's. Read it again and propose
-  against what the player now has.
+- **`DRAFT_VERSION_MOVED`** — the version you named is one the draft never reached: it was read from
+  a draft since committed or discarded. Read it again and propose against what the player now has.
 
 Never raise the number to get past either refusal.
 
@@ -335,9 +335,9 @@ offered, and nothing else is.
 
 ## When the server refuses
 
-Each refusal is a specific typed code, and a draft refusal names its next act in
-`details.nextAct` — `get_draft` or `stage`. Read it and take the cheapest correct step — never
-retry the same call blindly.
+Each refusal is a specific typed code, and a refusal of a draft's stage or commit names its next
+act in `details.nextAct` — `get_draft` or `stage`; a moved or contested draft names `get_draft`
+from any tool. Read it and take the cheapest correct step — never retry the same call blindly.
 
 - **`DRAFT_VERSION_MOVED`** (`nextAct: get_draft`) — the draft changed after your read: the
   player's form saved an edit, another surface staged, or a human-paced review outlived it. Read
@@ -353,8 +353,8 @@ retry the same call blindly.
 - **A validation error** (`nextAct: stage`) — the error the diagnostics named, with its own
   `field` and `details`. Nothing was written. Return to step 4: fix the axis, stage, read, and
   confirm again.
-- **A refusal with no `nextAct`** — the strategy quota, a name already in use, `REPAIR_REQUIRED`,
-  viability, or a `CONFLICT` whose `details.reason` is `RADAR_DEPLOYMENT_MOVED`. The draft is
+- **A refusal with no `nextAct`** — the strategy quota (`FORBIDDEN`), a name already in use,
+  `REPAIR_REQUIRED`, viability, or a `CONFLICT` whose `details.reason` is `RADAR_DEPLOYMENT_MOVED`. The draft is
   untouched. Clear the cause with the player — a rename is an IDENTITY stage, which makes a new
   version to read and confirm — then commit the draft they confirmed. A moved radar deployment is
   a race, not a decision: read and commit again.
