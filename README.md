@@ -24,6 +24,71 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v88 (an exit rule names the side it closes)
+
+**Breaking at v88: a condition body accepted at v87 is refused, and condition and chart output is
+reshaped.** v88 is the contract on top of v87.
+
+A condition is an entry condition or an exit rule, never both. An exit rule names the side it closes,
+where `exit: true` read that side from the condition's verdict.
+
+### Rejected input — `stage_strategy_draft`, `preview_strategy_report`
+
+- **A condition no longer carries `exit`.** A condition entry naming it is refused with the unknown-key
+  error, on the `CONDITIONS` axis of `stage_strategy_draft` and in the conditions of
+  `preview_strategy_report`'s `source: { kind: 'FIELDS', … }`.
+- **Every condition requires `exitSide`**: `LONG`, `SHORT` or `BOTH` for an exit rule, `null` for an
+  entry condition. It is nullable, never optional; a condition without it is refused.
+- **An exit rule carries `verdict: null` and `required: false`, and an entry condition cannot reference
+  an exit rule.** The builder refuses each with a typed remediation error —
+  `CONDITION_EXIT_RULE_CARRIES_VERDICT`, `CONDITION_EXIT_RULE_REQUIRED`,
+  `CONDITION_ENTRY_REFERENCES_EXIT_RULE` — in a staged draft's `diagnostics`, and as the refusal of its
+  `commit_strategy_draft`. An exit rule may reference anything: "exit when the entry setup stops holding"
+  is an exit rule whose definition is `NOT` a `conditionRef` to the entry condition.
+
+### Reshaped output
+
+- **Every condition a strategy read or commit returns carries `exitSide` and no `exit`**:
+  `get_strategy`, `archive_strategy`, `restore_strategy` and `commit_strategy_draft`.
+- **`get_agent_coin_qualification`'s chart names the side each exit rule closes.** Every served level
+  gains `referrers`, `{ conditionKey, conditionName, exitSide }` for each of its set's declared
+  conditions that reach it. Every series clause referrer and every `conditionsWithoutLevels` entry gains
+  `exitSide`, `null` on every entry-set referrer. The `ENTRY` set no longer lists exit rules; they are
+  listed under `EXIT`.
+
+### Widened enums
+
+- **`CONDITION_EXIT_RULE_CLOSES_DIRECTION`** joins the qualification gate code, the trade evaluation
+  attempt reason, the trade gate reason and the trade screen reason. It can appear in the output of
+  `get_agent_coin_qualification`, `scan_agent_coins`, `scan_coin_agents`, `list_gate_blocks`,
+  `get_signal_log`, `get_public_agent_signal_log_detail`, `get_radar_activity`,
+  `get_radar_activity_summary`, `get_radar_close_decisions`, `get_radar_deployment`,
+  `list_radar_deployments`, `preview_radar_resolution`, `propose_entry_decision`,
+  `get_trade_conversation`, `get_agent_budget` and `reset_agent_drawdown_baseline`. A gate block under it
+  names the refusing exit rule in `decidedBy`.
+- **`BLOCKED_BY_CONDITION_EXIT_RULE`** joins the radar evaluation outcome, on `get_radar_activity` and
+  `get_radar_activity_summary`.
+
+A client switching exhaustively on any of them meets a member it has not seen.
+
+### Behaviour
+
+- **An exit rule closes exactly the side it names.** A settled TRUE on a completed bar closes the
+  agent's open position on that side. No verdict chooses it; `exit: true` closed the side its verdict
+  opposed, and both sides for a `NEITHER` or `null` verdict.
+- **While an exit rule reads TRUE, its side is not offered for entry.** Scan qualification and compose
+  refuse that side under `CONDITION_EXIT_RULE_CLOSES_DIRECTION`, after any verdict refusal of the same
+  side.
+- **A stored `exit: true` condition is split and closes what it closed.** It keeps its verdict as an
+  entry condition, and its strategy gains an exit rule `CLOSE_ON_<conditionKey>`, a `conditionRef` to
+  it closing the side its verdict opposed (`UP` → `SHORT`, `DOWN` → `LONG`, `NEITHER` → `BOTH`). A
+  strategy read returns both.
+- **Unchanged names keep their place.** `list_strategies`' `conditionTally.exit` now counts exit rules,
+  and a decision record's condition `declaration` keeps `exit: boolean`, true for an exit rule.
+
+A strict client that rejects unknown keys fails to parse every condition and every chart level at v88;
+list the tools again after the server deploys.
+
 ## Contract history — v87 (a fork's create resolves its source again)
 
 **Breaking at v87: a fork's create can now be refused where it committed.** v87 is the contract on top of

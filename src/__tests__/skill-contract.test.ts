@@ -228,7 +228,7 @@ describe('the contract check fails on the drift it was written for', () => {
   // A gate never seen to reject anything is not evidence that it works.
   it('reports the keys the pre-contract-44 recipe omitted', () => {
     const stale = '\n## X\n\n`{ conditionKey, name, definition, verdict, required }` — five.\n';
-    expect(missingFrom(digest.axes.condition, braceListKeys(stale, '## X')).sort()).toEqual(['exit']);
+    expect(missingFrom(digest.axes.condition, braceListKeys(stale, '## X')).sort()).toEqual(['exitSide']);
   });
 
   it('reports a claimed-absent key the catalog now serves', () => {
