@@ -24,6 +24,34 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v89 (a new strategy is held to today's operator bounds)
+
+**Breaking at v89: acceptance narrows behind unchanged schemas.** v89 is the contract on top of v88.1.
+
+### Narrowed acceptance — `commit_strategy_draft`, `preview_strategy_report` (`DRAFT` source)
+
+- **A create judges every dial of the new strategy at the operator bounds configured now.** That includes a dial
+  the author typed, one a fork copied from its source, and one left at the creation default. The operator bounds
+  are the platform's ATR %, stop-loss ATR-multiple and risk:reward limits.
+- At v88.1 a create judged only the dials that differed from the fork's source or the creation default. So a copied
+  dial outside a bound tightened since the source stored it was committed.
+- At v89 `commit_strategy_draft` (`expectedRevision: null`) refuses that create with `VALIDATION_ERROR`, naming the
+  dial and the bound, for example `minAtrPct (0.1) must be >= 0.15`. Nothing is created and the draft is unchanged:
+  stage the dial inside the bound and commit again.
+- `preview_strategy_report` with `source: { kind: "DRAFT", … }` composes the draft exactly as the commit does, so it
+  refuses the same draft with the same error where v88.1 rendered it.
+- `stage_strategy_draft` and `get_strategy_draft` report the error in their diagnostics before the commit.
+- `fork_strategy`'s description now says this, so its description hash moves.
+
+### Behaviour behind unchanged schemas
+
+- **An edit still judges only what it moves.** An update or a restore carries a dial it leaves unchanged, so a stored
+  value outside a since-tightened bound stays readable and saveable on its own strategy.
+- **The platform keeps its defaults creatable.** An operator cannot set a bound that would put a creation default
+  outside it, so a create that leaves a dial untouched is never refused for a value the platform seeded.
+
+Something accepted at v88.1 is refused at v89 — hence the MAJOR.
+
 ## Contract history — v88.1 (an open position keeps the exit rules it opened under)
 
 **Additive at v88.1: acceptance widens and one served value narrows; no input or output schema
