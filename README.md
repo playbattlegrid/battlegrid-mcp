@@ -24,6 +24,43 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v91 (every data block an agent reads is one JSON object)
+
+**Breaking at v91: one output field is removed, and the published text that is the agent's prompt carries JSON.**
+v91 is the contract on top of v90. Every data block BattleGrid's trading agents read — the strategy's resolved
+conditions, fact sections, and the trade-decision blocks — is one JSON object naming itself with `id` and `title`.
+Instructions stay prose under their `## Title`. The tools that show you the prompt therefore show that JSON.
+
+### Removed output — something you read is gone
+
+- **`promptDataSerialization`** leaves `get_signal_log`'s owner detail. There is one serialization, so a trade
+  record stores none. `reportSections` and `missingData` are unchanged, and a trade recorded before capture still
+  serves both as `null`.
+
+### Reshaped output — the same fields, carrying JSON
+
+- **`preview_strategy_report.conditionsTableText`** is the conditions glossary as a `## Strategy Conditions
+  Glossary` instruction, then the conditions register as one JSON line: `surface: "GRID"`, and `coins[]` each with
+  `outcomes` keyed by condition and `verdict` by display name (`null` when the strategy declares no verdict). It was a
+  markdown table followed by the glossary.
+- **`preview_strategy_report.tradeConditionsBlockText`** is the trade glossary, a blank line, then the target coin's
+  register as one JSON line: `surface: "TRADE"`, `verdict` as `{ name, description }`, and `conditions[]` each with
+  `outcome`, `required`, `provisional`, `counts`, `exitRule` and the evaluator's `evidence`. It was a
+  `## STRATEGY CONDITIONS` heading, a table and evidence bullets.
+- **A fact section's text is its JSON**, `{ id, title, facts, glossary }` with `facts` keyed by label, in
+  `get_market_context.sections[].content`, `get_context_source_full_preview.content`,
+  `preview_strategy_report.renderedSections[].section.text`, and the `get_signal_log` report of trades recorded
+  from v91 on. The session field is a fact section. A table section's text is still its markdown.
+- **`get_agent_prompt_context_preview.promptSections[].content`** is each section as the agent reads it: a data
+  section's JSON, a table's included, and an instruction's prose.
+
+### Widened enum
+
+- **`get_agent_prompt_context_preview.promptSections[].kind`** gains `strategy-conditions-glossary`, the instruction
+  read before the conditions register. The market-context reads exclude it, as they exclude the register.
+
+Something read at v90 is gone or reshaped at v91 — hence the MAJOR.
+
 ## Contract history — v90 (Arena and radar deployments join the draft lifecycle)
 
 **Breaking at v90: input is refused and reshaped, output is reshaped, five error codes are removed.** v90 is the
