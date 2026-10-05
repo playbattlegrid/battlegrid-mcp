@@ -58,15 +58,19 @@ than about authoring:
 
 - **The envelope is `{ request }`, or `{ account, request }` on a multi-account proxy** (see above).
   It applies to every draft lifecycle tool and to `get_strategy_section_template`.
-- **Every change goes through the entity's draft.** `stage_<kind>_draft({ request: { <id>?,
-  draftVersion, axes } })` writes proposed axes into the player's unsaved draft and commits nothing;
-  omit the id to open a new create draft, whose minted id the response carries.
+- **Every change goes through the entity's draft** — an agent's, a strategy's, and an Arena or radar
+  deployment's. `stage_<kind>_draft({ request: { <id>?, draftVersion, axes } })` writes proposed axes
+  into the player's unsaved draft and commits nothing. For an agent or a strategy, omit the id to open a
+  new create draft, whose minted id the response carries; a deployment draft is keyed by its `presetId`
+  or `coinId`, which every call names.
   `get_<kind>_draft({ request: { <id> } })` returns the draft, its `draftVersion`, the live
   `committedRevision`, a per-axis `diff`, `diagnostics` and `impact`.
 - **A commit names exactly the two numbers that read returned.**
   `commit_<kind>_draft({ request: { <id>, draftVersion, expectedRevision } })` — `expectedRevision`
   is `null` for an entity not created yet. Commit only after the player has seen the diff and impact
-  and said yes. `discard_<kind>_draft({ request: { <id>, draftVersion } })` is the same fence.
+  and said yes. `discard_<kind>_draft({ request: { <id>, draftVersion } })` is the same fence. The two
+  deployment commits arm wagers and require `mcp:wager`; a deployment's resume and delete name the
+  `expectedPolicyId` and `expectedRevision` a `COMMITTED` preview returned.
 - **The proxy forwards numbers and `null` unchanged.** It never fills in a version, never retries a
   refused call and never rebuilds a request. A `DRAFT_VERSION_MOVED` or `DRAFT_AXIS_CONTESTED` refusal
   carries `details.nextAct` from every tool, and a revision `CONFLICT` or validation refusal carries it
@@ -89,7 +93,7 @@ The `play-market-grid` prompt (discover via `prompts/list`) provides a guided en
 
 ## Retired operations
 
-`create_strategy`, the plan tools (`compile_strategy_plan`, `stage_strategy_plan`, `apply_strategy_plan`), `update_strategy_signal_rule`, and the direct agent writers (`create_intelligence_agent`, `update_intelligence_agent`, `rebind_intelligence_agent`) are **retired** — they are absent from discovery and cannot be invoked. Stage into the entity's draft, read it back, and commit the version you read; a signal rule is a row of the strategy draft's `SIGNAL_RULES` axis, and a strategy binding is the agent draft's `STRATEGY_BINDING` axis. Do not attempt flat legacy payloads; the server enforces a closed-world request root and the proxy never reconstructs them.
+`create_strategy`, the plan tools (`compile_strategy_plan`, `stage_strategy_plan`, `apply_strategy_plan`), `update_strategy_signal_rule`, and the direct agent writers (`create_intelligence_agent`, `update_intelligence_agent`, `rebind_intelligence_agent`) are **retired** — they are absent from discovery and cannot be invoked. Stage into the entity's draft, read it back, and commit the version you read; a signal rule is a row of the strategy draft's `SIGNAL_RULES` axis, and a strategy binding is the agent draft's `STRATEGY_BINDING` axis. A deployment preview's `previewToken`, and the `confirm` on a deployment commit, resume, delete or draft discard, are retired the same way: a strict input refuses either key. Do not attempt flat legacy payloads; the server enforces a closed-world request root and the proxy never reconstructs them.
 
 ## Common errors
 
