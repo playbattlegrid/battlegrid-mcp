@@ -222,7 +222,7 @@ scan has on that coin, or free the coin.
 
 **The refusal lands where an agent meets a coin**: at the radar deploy (its preview, the builder's
 Save and the draft commit); at a manual entry request, as `CONDITION_UNREADABLE_ON_COIN`;
-and, for an agent already deployed or holding an open position or a pending manual request, at a
+and, for an agent already deployed or holding a pending manual request, at a
 strategy commit (`commit_strategy_draft`, the builder's Save, `restore_strategy`) or a rebind (the
 agent draft's STRATEGY_BINDING commit). A commit is checked only on behalf of those agents: a
 strategy carries no lane of its own, so one with no agent the radar acts on is never checked, and
@@ -242,7 +242,10 @@ an exit rule may reference anything, so "exit when the entry setup stops holding
 whose definition is `NOT` a `conditionRef` to the entry condition. An exit rule is legal only over a
 closure every operand of which a completed bar MOVES (`CONDITION_EXIT_READ_ILLEGAL`), which rules out
 a developing read — a bar in progress is the forming bar, and an exit fired on one is an intrabar
-exit — and rules out a frame-inert operand, which could never fire.
+exit — and rules out a frame-inert operand, which could never fire. A position stamps the exit rules
+it opened under, with the report and timeframes they read: an exit-rule edit applies to positions
+opened after it, and an open position keeps the exit rules it opened with, so an open position never
+refuses a commit or a rebind.
 
 **A state column is not a flip event.** `ST_DIR` reads the same on every bar of a trend, so
 `ST_DIR is "bullish"` is a regime filter and never an entry signal. The flip needs an event column

@@ -24,6 +24,33 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v88.1 (an open position keeps the exit rules it opened under)
+
+**Additive at v88.1: acceptance widens and one served value narrows; no input or output schema
+changes.** v88.1 is the contract on top of v88.
+
+### Widened acceptance — `commit_strategy_draft`, `restore_strategy`, `commit_agent_draft`
+
+- **An open position no longer refuses a strategy commit, a restore or a rebind.** At v88 a write that
+  would leave an exit rule unreadable on a coin a bound agent held an open position on was refused with
+  `CONDITION_UNREADABLE_BY_RADAR_SCAN` or `CONDITION_OPERAND_UNSERVED_IN_LANE`. At v88.1 it commits. A radar
+  slot's coin and a pending manual request's coin are still checked, and refused exactly as before.
+- The three tools' descriptions now say this, so their description hashes move.
+
+### Narrowed served value — the readability refusal's `coinRole`
+
+- The refusal's error context serves `coinRole` as `SLOT` or `MANUAL_REQUEST` only. `OPEN_POSITION` is no
+  longer emitted. A client switching on it loses a member it can no longer receive.
+
+### Behaviour behind unchanged schemas
+
+- **An open position keeps what it opened with.** An agent position records the exit rules it opened
+  under, with the report and timeframes they read, and its exit rules are evaluated from that record for
+  the life of the trade. An exit-rule, exit-policy or level edit reaches only positions opened after it;
+  a revision, rebind, SYSTEM update or timeframe change after the open never reaches an open trade.
+
+Nothing accepted at v88 is refused at v88.1.
+
 ## Contract history — v88 (an exit rule names the side it closes)
 
 **Breaking at v88: a condition body accepted at v87 is refused, and condition and chart output is
