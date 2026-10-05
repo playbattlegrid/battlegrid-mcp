@@ -24,6 +24,66 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v90 (Arena and radar deployments join the draft lifecycle)
+
+**Breaking at v90: input is refused and reshaped, output is reshaped, five error codes are removed.** v90 is the
+contract on top of v89. The Arena and radar deployment drafts now run the same five-tool lifecycle as agents and
+strategies, and the preview token is retired: a deployment commits on the draft version and the revision you read.
+
+### Rejected input — something you send is no longer accepted
+
+- **`previewToken` and `confirm`** leave `commit_deployment_policy_draft`, `commit_radar_deployment_draft`,
+  `resume_deployment_policy` and `resume_radar_deployment`.
+- **`confirm`** leaves `delete_deployment_policy`, `delete_radar_deployment`, `discard_deployment_policy_draft` and
+  `discard_radar_deployment_draft`.
+- Every input is strict, so a call naming either key is refused as an unrecognised key.
+
+### Reshaped input
+
+- **The commits** take `{ request: { presetId | coinId, draftVersion, expectedRevision } }`: exactly the
+  `draftVersion` and `committedRevision` the kind's `get_*_draft` returned (`expectedRevision: null` for a first
+  deployment).
+- **The resumes** take `{ presetId | coinId, expectedPolicyId, expectedRevision }`: the `policyId` and `revision` a
+  `COMMITTED` preview returned. Any other deployment or revision is a `CONFLICT`, and nothing is armed.
+- **`delete_radar_deployment`** gains `expectedPolicyId` beside `expectedRevision`, as `delete_deployment_policy`
+  already took. A delete naming a policy since removed and redeployed matches nothing.
+- **The discards** take `{ request: { presetId | coinId, draftVersion } }` with no dry run. A draft that moved, or
+  none, is `DRAFT_VERSION_MOVED`.
+
+### Reshaped output — something you read has a new shape
+
+- **`stage_deployment_policy_draft` and `stage_radar_deployment_draft`** gain `diagnostics`.
+- **`get_deployment_policy_draft` and `get_radar_deployment_draft`** answer the lifecycle read
+  `{ draft, draftVersion, committedRevision, diff, diagnostics, impact }`, where they answered `{ draft }`. `impact`
+  is the resolution the commit would arm and whether it plays (`enabledAfterCommit`), plus a radar first
+  deployment's coin-cap reading (`admission`); it is null when a diagnostic refuses.
+- **The commits** answer `{ presetId | coinId, revision, draftVersion }`. The radar commit answered `{ revision }`.
+- **The discards** answer `discarded: true`, never `false`.
+- **`preview_deployment_resolution` and `preview_radar_resolution`** lose `previewToken` and gain `policyId` and
+  `revision`: the deployment the preview resolved over, null for `SLOTS` and a first deployment.
+
+### Removed error codes
+
+`TOKEN_EXPIRED`, `TOKEN_BINDING_MISMATCH`, `INVALID_TOKEN_SIGNATURE`, `INVALID_TOKEN_FORMAT` and `INVALID_TOKEN_CLAIMS`
+leave the error vocabulary and every draft diagnostic's code enum — so the stage and get outputs of the agent and
+strategy drafts move too.
+
+### Behaviour behind the new schemas
+
+- **A retried commit replays its receipt.** Both commits are destructive and idempotent on
+  `<presetId | coinId>:<draftVersion>`, as the agent and strategy commits are.
+- **Refusals name the next act.** A moved draft or revision carries `details.nextAct: "get_draft"`; a refusal the
+  draft can repair (`INVALID_DEPLOYMENT_POLICY`, or the radar's `VALIDATION_ERROR`) carries `"stage"`; a retired arena
+  carries none and names the remedy.
+- **A revision conflict names the revision that won** in `details.actualRevision`, null when no deployment remains.
+- **A `DRAFT` preview at a version the draft is not at** is `DRAFT_VERSION_MOVED`.
+- **A draft whose arena or coin can no longer be deployed is still served**, with the refusal in its diagnostics and
+  a null impact, so you can show it and discard it.
+- **A radar resume of a policy already trading** answers its revision and changes nothing.
+- **The radar per-user coin cap is `FORBIDDEN`**, with no `nextAct`, where it was `VALIDATION_ERROR`.
+
+Something accepted at v89 is refused at v90 — hence the MAJOR.
+
 ## Contract history — v89 (a new strategy is held to today's operator bounds)
 
 **Breaking at v89: acceptance narrows behind unchanged schemas.** v89 is the contract on top of v88.1.
