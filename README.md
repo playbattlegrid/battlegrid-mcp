@@ -50,6 +50,13 @@ say — or `{ shape: "facts", section }`, `{ id, title, facts, glossary }`. It r
   **`tradeConditions`**, each `{ glossary, register }`: the glossary prose and the register object the text carried
   as one JSON line. Each is `null` where its text was.
 
+### Widened output — the register names what decided the verdict
+
+- **`decidedBy`** joins the conditions register: on each `GRID` coin and on the `TRADE` register, the key of the
+  condition the `verdict` came from, `null` when no single condition made the call. It reaches you in
+  `gridConditions.register`, `tradeConditions.register`, and the register `get_agent_prompt_context_preview` shows,
+  and the conditions glossary gains the sentence defining it.
+
 ### Narrowed default, new input — `preview_strategy_report` `detail`
 
 - **`detail`** is `"concise"` (the default) or `"detailed"`. A concise preview is exactly what the agent reads.
