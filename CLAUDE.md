@@ -53,10 +53,12 @@ Three tests divide the work and should not be merged:
   (`authoring-recipe-contract.test.ts`) gates the same bytes; this one is the arrival check on the
   exported pair, not a second opinion about it.
 
-**The export lane bumps the version itself** when it commits, but only if the version on `main` is
-already on the registry — an unpublished version means a pending release is carrying it, and a
-second bump would strand that number. So an export pull request usually arrives already bumped; do
-not bump it again.
+**The export lane bumps the version itself** whenever an export changes anything. It claims the
+next PATCH on `main`'s MAJOR.MINOR line above every version already held: `main`'s own, published
+or not, and that of every other open pull request into `main`. This is the same rule the reach check
+below prints, and like that check it never asks the registry, which cannot see a number `main` or an
+open PR is still carrying. So an export pull request always arrives already bumped to a free number;
+do not bump it again.
 
 ## Releasing — read this before touching a version
 
