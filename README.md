@@ -24,6 +24,38 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v93 (every value you read names the bar it came from)
+
+**Breaking at v93: a timeless metric refuses an `offset`, and a value with no reading on its bar reads absent
+instead of an older bar's.** v93 is the contract on top of v92. A column reads the bar it names, or nothing.
+
+### Rejected input — something you send is no longer accepted
+
+- A `value` column over a timeless metric — one `get_strategy_column_contract` serves with `timeframeMode`
+  `"timeless"`: funding, the regime, the previous-session levels and the other bundle reads — with `offset` above
+  `0` is refused at construction (`VALIDATION_ERROR`, authoring code `REPORT_COLUMN_CONSTRUCTION_FAILED`) by every
+  tool that builds a report column, the strategy and agent draft tools and `preview_strategy_report` among them. It
+  used to be accepted and ignored. Drop the offset: a timeless metric has no earlier bar.
+
+### Changed values — the same fields, read at a named bar
+
+- A **trajectory**, **zone**, **state** or **cross** value whose current bar holds no reading is now absent,
+  instead of the newest older bar's value. A trajectory's slots keep a missing bar as an empty slot, in place.
+- A window — a trajectory's, `efficiency`'s, `maxShare`'s — counts the newest bars, present or not; a window of
+  one bar has no trend (it read `flat`).
+- A candle **label** column at `offset N` reads bar t−N's label; it used to read the latest.
+- On a decided bar, a condition over a **published change** (`chg5m` … `chg24h`) or **`oiRegime`** reads
+  unresolved, and a condition over a **higher-timeframe column** reads unresolved during that bar's close lag.
+
+### Behaviour behind unchanged schemas
+
+- An Arena deployment that routes on the regime reads **`WARMING`** while its regime bar is landing — the regime
+  for the bar the clock just closed is not published yet — and plays nothing, its default slot included. Generating,
+  submitting or updating a grid for an agent on such a deployment is refused with `SERVICE_UNAVAILABLE` in those
+  seconds; retry.
+
+Something read at v92 reads absent at v93, and an input v92 accepted is refused — hence the MAJOR.
+
 ## Contract history — v92 (every section you read is the JSON the agent reads)
 
 **Breaking at v92: the section fields are reshaped, the report preview's default narrows, and its size is measured
