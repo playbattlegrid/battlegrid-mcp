@@ -24,6 +24,54 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v92 (every section you read is the JSON the agent reads)
+
+**Breaking at v92: the section fields are reshaped, the report preview's default narrows, and its size is measured
+in characters.** v92 is the contract on top of v91. Every tool that published a section as markdown text publishes
+it as the JSON object the agent reads, and `preview_strategy_report` takes a detail level.
+
+### Reshaped output — a section is its JSON
+
+A **section read** is `{ shape: "table", section }` — `{ id, title, notes, provenance?, anchorTf, groups, columns,
+rows, addendum? }`, rows positional and every cell its raw value, each column stating its `unit`, `precision`, bar
+set (`bars`) and, on a rank column, the ranked set's `universe`, with a key absent where the column has nothing to
+say — or `{ shape: "facts", section }`, `{ id, title, facts, glossary }`. It replaces:
+
+- **`preview_strategy_report.renderedSections[]`**: `{ sectionKey, section: { title, text }, structure,
+  authoredNote }` → `{ sectionKey }` and a section read, or `{ sectionKey, shape: "skipped" }` for a row that
+  rendered nothing. A custom section's authored note is its section's `notes`.
+- **`get_market_context.sections[]`**: `{ kind, title, content, structure }` → `{ kind }` and a section read.
+- **`get_context_source_full_preview.content`** → **`read`**, a section read or `null`.
+- **`get_context_sources_preview`**: each source's `value` → **`section`**, a section read or `null`, a coin-row
+  table sampled to its first five coins.
+- **`get_signal_log.reportSections[]`**: a section read, `skipped`, or `{ sectionKey, shape: "text", title, text }`
+  — a row stored before custom sections carried a structure, kept as its agent read it.
+- **`preview_strategy_report.conditionsTableText`** and **`.tradeConditionsBlockText`** → **`gridConditions`** and
+  **`tradeConditions`**, each `{ glossary, register }`: the glossary prose and the register object the text carried
+  as one JSON line. Each is `null` where its text was.
+
+### Narrowed default, new input — `preview_strategy_report` `detail`
+
+- **`detail`** is `"concise"` (the default) or `"detailed"`. A concise preview is exactly what the agent reads.
+- **`conditionColumns`** and **`conditionOutcomes`** leave the top level. With each row's `headerBindings`
+  (`{ sectionKey, columnIndexByHeader }`) they make up **`authoring`**, served only at `"detailed"` and `null`
+  otherwise. If you read either field, ask for `"detailed"` and read it under `authoring`.
+- **`marketReadMarkers[]`** lose `resolvedName` and `resolvedValue`.
+
+### Result size in characters
+
+- **`tokenCountModel`** and **`budgetUsage.estimatedTokens`** leave the preview. **`budgetUsage.resultChars`** is
+  the exact `JSON.stringify` length of the response that carries it, its own digits included, against the cap.
+- **`list_strategy_vocabulary`** drops `budgets.estimatedTokens`, and `previewExecutionLimits.maxResultBytes` is
+  renamed **`maxResultChars`**.
+- A preview over the cap is refused with **`PREVIEW_LIMIT_EXCEEDED`** and `limit: "result_chars"`;
+  `estimated_tokens` and `mcp_result_bytes` are retired. Every preview refusal now carries its `previewErrorCode`
+  and its bound (`deadlineMs`, or `limit`, `actual` and `maximum`) in the error's details.
+- **`preview_strategy_report`**, **`get_market_context`** and **`get_context_sources_preview`** declare the cap as
+  `_meta["anthropic/maxResultSizeChars"]`, so Claude Code keeps a large result inline.
+
+Something read at v91 is reshaped or gone at v92, and a default narrows — hence the MAJOR.
+
 ## Contract history — v91 (every data block an agent reads is one JSON object)
 
 **Breaking at v91: one output field is removed, and the published text that is the agent's prompt carries JSON.**
