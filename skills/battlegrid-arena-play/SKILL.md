@@ -59,7 +59,11 @@ the enablement path there.
 A direct submission carries `grid`, `reasoning`, `confidenceScore`, `modelName` and
 `pickReasoning`, and all of them are required.
 
-- **Exactly one cell is captain** (2× multiplier).
+- **Exactly one cell is captain.** The session's preset sets what that is worth: a correct captain's
+  points are multiplied by its `captainMultiplier`, and a wrong captain's penalty by its
+  `captainWrongPenaltyMultiplier` — both published by `list_game_presets`, and different per preset.
+  Read them rather than assuming a number, and captain the pick you are most confident in among
+  those with a move worth amplifying.
 - **`pickReasoning` carries one entry per grid cell — every cell, no coin twice.** Compose it
   correctly because it is yours to compose, not because something downstream will catch it: the
   boundary refuses an incomplete payload before the fee moves, and leaning on that check means
@@ -98,12 +102,15 @@ reasoning as the player's, and the attribution is part of what was scored.
 
 ### 5. After settlement
 
+- A session moves PENDING → LIVE → RESOLVING → SETTLED. Two states sit off that path: CANCELLED
+  (entry fees refunded) and SETTLEMENT_QUARANTINED (settlement exhausted its retries and awaits an
+  operator). Either one is the answer — report it as the status.
 - `get_market_grid_results` — available only once the session is SETTLED. Before that it returns a
   typed CONFLICT naming the current status: **report it and stop**. Do not poll it in a loop; the
   op budget is finite and a settling session is not a failure.
-- `get_mcp_reasoning_journal` on request — the reasoning, confidence and picks as recorded at
-  submit. Compare the outcome against what was actually reasoned, and say where the reasoning was
-  wrong.
+- `get_mcp_reasoning_journal` on request — the player's own submission: the reasoning, confidence
+  and picks as recorded at submit. Compare the outcome against what was actually reasoned, and say
+  where the reasoning was wrong. An agent's record is a different journal, `get_agent_journal`.
 
 ## Refusals, and what each one means
 

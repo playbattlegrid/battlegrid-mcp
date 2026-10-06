@@ -2912,6 +2912,11 @@ you reach over MCP:
 > request; `skills/EXPORT.json` records a hash per file and `src/__tests__/skill-provenance.test.ts`
 > fails CI on a hand edit. Change the skill upstream and let the export lane bring it here.
 
+A client connected to BattleGrid's remote server directly receives its `initialize` instructions:
+the rules that span tools and one routing card per workflow, each naming the `battlegrid-*` skill
+above that holds the full procedure. This proxy does not relay those instructions; the skills
+installed beside it carry the same workflows.
+
 ## License
 
 [MIT](LICENSE)
