@@ -24,10 +24,10 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v93 (every value you read names the bar it came from)
+## Contract history — v94 (every value you read names the bar it came from)
 
-**Breaking at v93: a timeless metric refuses an `offset`, and a value with no reading on its bar reads absent
-instead of an older bar's.** v93 is the contract on top of v92. A column reads the bar it names, or nothing.
+**Breaking at v94: a timeless metric refuses an `offset`, and a value with no reading on its bar reads absent
+instead of an older bar's.** v94 is the contract on top of v93. A column reads the bar it names, or nothing.
 
 ### Rejected input — something you send is no longer accepted
 
@@ -41,8 +41,7 @@ instead of an older bar's.** v93 is the contract on top of v92. A column reads t
 
 - A **trajectory**, **zone**, **state** or **cross** value whose current bar holds no reading is now absent,
   instead of the newest older bar's value. A trajectory's slots keep a missing bar as an empty slot, in place.
-- A window — a trajectory's, `efficiency`'s, `maxShare`'s — counts the newest bars, present or not; a window of
-  one bar has no trend (it read `flat`).
+- A window — a trajectory's, `efficiency`'s, `maxShare`'s — counts the newest bars, present or not.
 - A candle **label** column at `offset N` reads bar t−N's label; it used to read the latest.
 - On a decided bar, a condition over a **published change** (`chg5m` … `chg24h`) or **`oiRegime`** reads
   unresolved, and a condition over a **higher-timeframe column** reads unresolved during that bar's close lag.
@@ -54,7 +53,30 @@ instead of an older bar's.** v93 is the contract on top of v92. A column reads t
   submitting or updating a grid for an agent on such a deployment is refused with `SERVICE_UNAVAILABLE` in those
   seconds; retry.
 
-Something read at v92 reads absent at v93, and an input v92 accepted is refused — hence the MAJOR.
+Something read at v93 reads absent at v94, and an input v93 accepted is refused — hence the MAJOR.
+
+## Contract history — v93 (a trajectory reads at least two observations)
+
+**Breaking at v93: a trajectory column below two observations is refused.** v93 is the contract on top of v92.
+Nothing in a schema moves.
+
+### Rejected input — something you send is no longer accepted
+
+- A custom column `{ transformId: "trajectory", window: 1 }`, plain or as the chained outer of
+  `distance × trajectory`, for any metric: `stage_strategy_draft` reports `REPORT_COLUMN_CONSTRUCTION_FAILED`
+  in its diagnostics, naming the minimum, `commit_strategy_draft` refuses it, and `preview_strategy_report`
+  refuses a report carrying one with the same error. A window of one has no build-up, and its trend compared a
+  reading with itself, so it read `flat` for every coin on every bar. The trajectory's served `window`
+  description states the minimum.
+
+### Changed values
+
+- The CVD section renders its buy-pressure, buy-trade and sell-trade columns as window-4 trajectories —
+  `_t3`, `_t2`, `_t1`, `_now`, `_trend` each — and every `_now` keeps its value. Their `_trend` cells read a
+  direction where they read `flat`, and the CVD-crowd convergence classifies from that buy-pressure column, so
+  `captainConf` can read `true` and `conf` can read `high`.
+
+Something accepted at v92 is refused at v93 — hence the MAJOR.
 
 ## Contract history — v92 (every section you read is the JSON the agent reads)
 
