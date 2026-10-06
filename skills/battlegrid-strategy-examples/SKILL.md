@@ -12,8 +12,8 @@ shapes are binding in the sense that matters — they are checked, not merely as
 elsewhere in this file are not covered by that gate, and vocabulary moves with deploys, so discovery
 in the conversation stays the authority — prefer what `list_strategy_vocabulary`,
 `get_strategy_column_contract`, and `get_strategy_signal_definition` return over anything
-printed here, and read exact headers from a preview's `conditionColumns` before conditioning on
-them.
+printed here, and read exact headers from a `detail: "detailed"` preview's
+`authoring.conditionColumns` before conditioning on them.
 
 ## The full-power checklist
 
@@ -69,8 +69,8 @@ things you do depends on the operation: on a **CREATE, omit `sectionKey` entirel
 is refused, since a new strategy owns no custom sections yet; on an **UPDATE or RESTORE, send back
 the keys `get_strategy` returned** for the sections you are keeping, and omit it on a section you
 add. Either way you never invent one. To section-qualify a duplicated header, read the key from a
-preview's `conditionColumns` or from the qualified candidates a `CONDITION_COLUMN_AMBIGUOUS`
-refusal offers.
+`detail: "detailed"` preview's `authoring.conditionColumns` or from the qualified candidates a
+`CONDITION_COLUMN_AMBIGUOUS` refusal offers.
 
 **Event columns print only on their event.** `MACD_cross` and `EMA5_13` (Bullish/Bearish) carry a
 value on the crossing bar and are null on every other one, which reads as UNRESOLVED. Use an event
@@ -145,7 +145,7 @@ decide it (TRUE once `atLeast` bars read TRUE, FALSE once the rest can no longer
 UNRESOLVED.
 
 What a header admits is SERVED, never guessed: every column in the strategy's report catalog
-(`preview_strategy_report` → `conditionColumns[].outputs[].conditionHold`, and each scalar metric in
+(`preview_strategy_report` at `detail: "detailed"` → `authoring.conditionColumns[].outputs[].conditionHold`, and each scalar metric in
 the vocabulary) carries `{ timeframe, maxWindow, maxAtLeast, refusal }` — the timeframe it counts,
 the largest `of`, the largest `atLeast`, and, when it admits only Once, why. `maxWindow` is the
 history the store keeps for that column, less the column's own lookback and warm-up. A hold past
