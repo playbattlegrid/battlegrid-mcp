@@ -24,6 +24,79 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v103 (a column's contract carries its read size, measurement and series home)
+
+**Breaking at v103: a transform entry drops `sideRequired` and `operandRequired`, and
+`get_strategy_column_contract` validates its ticker as a coin symbol.** v103 is the contract on top of
+v102.1.1, which changed only two deployment-draft input descriptions.
+
+### Reshaped output — something you read has moved or been removed
+
+- **`sideRequired` and `operandRequired` leave every transform entry** `get_metric_construction_hints`
+  serves. Each restated a field the same entry already carries: read
+  `authoring.parameters.side.required` and `authoring.parameters.inputs.required` instead, where an
+  absent parameter means the transform does not accept it.
+
+### Rejected input — something you send is no longer accepted
+
+- **`get_strategy_column_contract`'s `benchmarkTicker` is a coin symbol**: trimmed, 1–20 characters of
+  the coin-symbol charset. Any non-empty string was accepted before.
+
+### Widened input — something new you can send
+
+- **The fixed `64` maximums leave strategy authoring**: a column's `window` and `offset`, a custom
+  section's `columns` and the `conditions` arrays. The configured budgets `list_strategy_vocabulary`
+  serves under `budgets` judge them instead — `sectionColumns`, `strategyConditions`,
+  `conditionClauses` and `columnLookback`. `window` and `offset` keep their integer floors.
+
+### Widened output
+
+- **The column contract gains `lookback`, `measurement` and `seriesHome`.**
+  - `lookback: { used, cap }` — the bars the column reads, against the lookback budget a save holds it to.
+  - `measurement: { transform, chainedTransform }` — how each transform reads its series: `readShape`,
+    `windowUnit`, `priceBasis` and `nullPolicy`. `chainedTransform` is `null` for an unchained column.
+  - `seriesHome` — where the metric's series is kept: `candle`, `history`, or `null` when it has none,
+    which is why a series transform does not compose on it.
+- **`list_strategy_vocabulary` gains `conditionGrammar`**: the group depth, the operator and group
+  operator vocabularies and the verdicts a condition is written in.
+- **A category example gains `clause`**: `{ op: 'between', low, high }`, or `null` for an example with
+  no recipe clause. The structure family gains two recipes — `VWAP × distance` held `between -2 2`
+  ("price within ±2% of VWAP") and `STRUCT_ZONES × nearestZoneDist(support)` held `between 0 1.5`
+  ("approaching support").
+- **A `window` or `offset` declaration gains `minimum`**, the smallest value the transform accepts.
+
+### Behaviour behind unchanged schemas
+
+- **A column whose read size exceeds the lookback budget is refused with
+  `REPORT_COLUMN_LOOKBACK_EXCEEDED`** by `get_strategy_column_contract` exactly as by a save, before
+  the column is built. A window too large to build was a construction failure before.
+- **A value below a declared `minimum` is refused naming the transform that declares it**, including
+  a chained transform's window.
+- **A spread with the wrong number of operands is refused naming the operand its operand order
+  declares.**
+- **A `regime` timeframe reference resolves to the anchor's regime rung** when the request names an
+  anchor timeframe. It resolved to `null` before.
+
+A client that reads `sideRequired` or `operandRequired`, or sends a ticker outside the coin-symbol
+charset to `get_strategy_column_contract`, breaks at v103 — hence the MAJOR.
+
+## Contract history — v102.1 (your agents' trading record)
+
+**Additive at v102.1: three read tools.** v102.1 is the contract on top of v102. Nothing a client sends
+is refused and nothing it reads is reshaped.
+
+### Added tools
+
+All three are `mcp:read` and read your own agents only.
+
+- **`list_agent_open_orders`** — the live orders (`PENDING`, `ACKED`, `WORKING`) of the positions your
+  agents hold, newest first, each naming its agent.
+- **`list_agent_trades`** — your agents' closed trades, newest close first, paged with `nextCursor` and
+  narrowed by `coinTicker` and `agentId`, with a `summary` of the whole filtered scope: trade count, win
+  count, win rate and net P&L in USD. Another user's agent reads as an empty scope.
+- **`get_agents_portfolio_pnl`** — your agents' combined P&L over `24H`, `7D` or `30D`, as 48 dated
+  points ending on the period figure.
+
 ## Contract history — v102 (your entry history's facets come with the first page)
 
 **Breaking at v102: `list_my_market_grid_entries` moves its counts, summary and agent options under one
