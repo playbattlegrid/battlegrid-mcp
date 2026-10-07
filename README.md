@@ -24,6 +24,31 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v102 (your entry history's facets come with the first page)
+
+**Breaking at v102: `list_my_market_grid_entries` moves its counts, summary and agent options under one
+`facets` object, sent with the first page only.** v102 is the contract on top of v101.
+
+### Reshaped output — something you read has moved
+
+- **`outcomeCounts`, `summary` and `agentOptions` move under `facets`**, unchanged inside it:
+  `facets.outcomeCounts`, `facets.summary`, `facets.agentOptions`.
+- **`facets` comes with the first page only.** A page you read with a `cursor` carries `facets: null`.
+  Keep the first page's facets for the whole scroll: every page of one read shares the same filters, so
+  the first page's counts, summary and agent options describe all of them.
+
+### Behaviour behind unchanged schemas
+
+- **A settled entry's `netPnl` is always computed from two recorded payouts.** The entries settled before
+  settlement wrote both payouts now record `0` for the payout they never received, so their net reads the
+  same as before. If an entry's settlement ever leaves a payout unrecorded, the read refuses with
+  `INTERNAL_ERROR` instead of treating it as zero.
+- The five filters (`window`, `outcome`, `source`, `agentId`, `cursor`) accept exactly what they
+  accepted before. Only the `agentId` description changes: it now points at `facets.agentOptions`.
+
+A client that reads `outcomeCounts`, `summary` or `agentOptions` at the top level, or expects them on
+every page, breaks at v102 — hence the MAJOR.
+
 ## Contract history — v101 (an agent on a radar cannot be archived)
 
 **Breaking at v101: `archive_intelligence_agent` refuses an agent held in any radar deployment, and its
