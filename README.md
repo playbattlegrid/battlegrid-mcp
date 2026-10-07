@@ -24,6 +24,74 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v96 (a metric's meaning is declared once)
+
+**Breaking at v96: `efficiency` admits only a level or a price-fact series, and `nearestZoneDist` changes
+sign.** v96 is the contract on top of v95.
+
+### Rejected input — something you send is no longer accepted
+
+- `efficiency` over an increment or an oscillator metric — `CLOSE_CHANGE`, `VOLUME`, `RSI14`, `FUNDING_RATE`
+  and the like — is refused at construction, and so is `efficiency` as the outer of `distance` or `spread`
+  (`VALIDATION_ERROR`, authoring code `REPORT_COLUMN_CONSTRUCTION_FAILED` or `REPORT_COLUMN_CHAIN_UNSUPPORTED`),
+  by every tool that builds a report column. `distance` and `spread` chain `trajectory`, `aggregate` and
+  `rank`; the column contract and the vocabulary tools serve exactly those sets.
+- `BB_PCT_B` no longer composes `maxShare`: `%B` leaves `[0, 1]` when price closes outside a band.
+- A `rank` column with no `ordering` is gated as the default `hi` it ranks by, so it is refused wherever a
+  written `hi` is (`REPORT_COLUMN_PAIR_UNSUPPORTED`). Write the ordering you mean.
+- `transformId` is the closed enum of the seventeen transforms and `chainedTransformId` the enum of the five
+  chain outers, where each was any 1–40 character string. An id outside them is refused by schema.
+
+### Changed values — the same fields, a declared meaning
+
+- **`nearestZoneDist` is price's distance from the zone midpoint**, `((price − mid) / mid) × 100`: positive
+  when price is above the zone, negative below it. It was the midpoint's distance from price, with the
+  opposite sign. A range symmetric about zero reads the same window; a one-sided bound needs its sign
+  flipped.
+- `BB_PCT_B` offers all four rank orderings.
+- A `classifyZone` column declares and resolves its own metric's vocabulary in canonical labels — ADX's
+  strength bands, MFI's five bands — not a shared `overbought / oversold / neutral` set.
+- `highDev`, `lowDev` and `oiRegime` read live sources and declare the live clock, so a condition over them
+  is provisional on the live frame.
+- A chained column's formula binds its outer half to the inner column's header (`dist_VWAP`), and every
+  relative-change formula reads `((value − reference) / reference) × 100`.
+
+### Reshaped output
+
+- An authoring parameter's `defaultValue` on `get_metric_construction_hints` is typed per knob — `window`
+  and `offset` integers, `ordering` a rank ordering — and absent on `side`, `inputs` and `bars`.
+- A rendered section column's `role` is one enum of the same members, where it was a union of an enum and
+  five literals.
+
+An input v95 accepted is refused at v96, and a value read at v95 reads with the opposite sign — hence the
+MAJOR.
+
+## Contract history — v95 (a refusal names the verdict it applied)
+
+**Breaking at v95: a gate block's `conditionVerdict` is the verdict applied, not the one read.** v95 is the
+contract on top of v94.
+
+### Changed meaning — the same key, a different question
+
+- On `list_gate_blocks`, a conditions-stage `reasonDetail.conditionVerdict` is the verdict **applied** — the
+  one bound for the pair, which can be a held verdict this evaluation did not read — where it was the verdict
+  the conditions read. It is served only on a `CONDITION_VERDICT_OPPOSES_DIRECTION` or
+  `CONDITION_EXIT_RULE_CLOSES_DIRECTION` block recorded since v95; a `REQUIRED_CONDITION_FALSE` block, which
+  no verdict decided, and a block recorded before v95 no longer carry it. Read `observedVerdict` for what the
+  conditions read.
+
+### Widened output
+
+- The reason detail gains `observedVerdict`, served on every conditions-stage block, and `heldVerdict`,
+  `verdictDwellResolutions` and `verdictDwellRequired` — the dwell state the binding was resolved from,
+  served beside `conditionVerdict` and absent where it is. `get_signal_log` and
+  `get_public_agent_signal_log_detail` embed the same schema and never fill these keys: a block writes no
+  signal log.
+- `get_signal_log`'s `conditionEvaluation.verdict` and `get_agent_journal`'s `marketSnapshot.conditionVerdict`
+  keep meaning the verdict the evaluation observed.
+
+A key read at v94 answers a different question at v95 — hence the MAJOR.
+
 ## Contract history — v94 (every value you read names the bar it came from)
 
 **Breaking at v94: a timeless metric refuses an `offset`, and a value with no reading on its bar reads absent
