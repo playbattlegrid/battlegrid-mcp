@@ -24,6 +24,46 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v97 (a signal records the evidence it decided on)
+
+**Breaking at v97: an evaluated signal's evidence keys move, `BB_TOUCH` touches by %B, and a crossing is
+read on the bar that leaves zero.** v97 is the contract on top of v96. No schema moves.
+
+### Changed meaning — the same record, different keys
+
+- An evaluated signal's `indicatorValues` — on `get_signal_log`, `get_public_agent_signal_log_detail` and
+  `get_coin_signal_preview` — records the last price a live-priced signal evaluated under **`last_price`**.
+  Six signals recorded it under `price`: `MA_SMA200_ABOVE` / `_BELOW`, `SR_AT_SUPPORT` / `_RESISTANCE` and
+  `BOLLINGER_LOWER_TOUCH` / `_UPPER_TOUCH`; the three structure-approach signals now record it too.
+- **`price` means the last closed close** on every signal that records it.
+- The Bollinger touches add `bb_upper` and `bb_lower`, and their `bb_percent_b` is the live %B they
+  compared — never the closed-bar %B.
+- The EMA 5/13 crosses add `ema_cross` (`1` / `−1`), and the sector comparison signals add `ema5`, `ema13`
+  and `ema20`.
+- `MFI_SUSTAINED_*` and `CVD_BULLISH` / `CVD_BEARISH` record their prior-bar value when there is one, and
+  omit it when there is not.
+
+A signal records exactly the keys its declared vocabulary names. Records written before v97 keep the keys
+they were written with, so a reader of history meets both.
+
+### Changed values — the same fields, one rule each
+
+- **Crossings.** One zero-cross rule decides every crossing: a value that reaches zero has not crossed; one
+  that leaves zero has. Every `crossDetect` column (`MACD_cross`, `PPO_cross`, `ROC_cross` and authored
+  ones), the `EMA_CROSS` label, the MACD / PPO / stochastic cross signals and `FUNDING_RATE_FLIPPING` read
+  no crossing on a bar that lands exactly on zero. They read the crossing on the bar that leaves it.
+- **`BB_TOUCH` and `bandTouch`** classify a touch when %B is strictly below `0.05` or above `0.95` — the
+  touch signals' default thresholds. Before, a price within 2% of the band width of an edge, inclusive,
+  touched. A degenerate band reads `none`, and a `BBtouch` condition now agrees with the scorecard's touch
+  at defaults.
+- **RSI zone.** The projected RSI state is overbought strictly above 70 and oversold strictly below 30, as
+  the `RSI14_zone` columns already read it.
+- **Descriptions.** A served rule description states the thresholds that rule evaluates, and the ROC
+  descriptions read "positive and rising".
+
+A key read at v96 is absent at v97 on the same signal, and a touch or a crossing read at v96 can read
+differently on the same bar — hence the MAJOR.
+
 ## Contract history — v96 (a metric's meaning is declared once)
 
 **Breaking at v96: `efficiency` admits only a level or a price-fact series, and `nearestZoneDist` changes
