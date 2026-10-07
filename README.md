@@ -24,6 +24,49 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v99 (your arena entries are one owner-only history)
+
+**Breaking at v99: four tools are retired, two are added, and `get_agent_journal` loses a field.** v99 is
+the contract on top of v98.
+
+Every Market Grid entry you made — by your deployed agent, an agent you asked for, an MCP client,
+Commander, a grid you built or dice you rolled — is now read from one history, and only by you.
+
+### Removed tools
+
+- **`get_agent_game_history`, `get_user_agent_game_history`, `get_public_agent_game_history` and
+  `get_mcp_reasoning_journal`** are gone, with no alias; a call gets an unknown-tool error. The
+  replacements:
+  - `get_agent_game_history { agentId }` → `list_my_market_grid_entries { agentId }`;
+  - `get_user_agent_game_history` → `list_my_market_grid_entries` with no `agentId`;
+  - `get_public_agent_game_history` → none: arena entry history is owner-only, so no public read
+    replaces it;
+  - `get_mcp_reasoning_journal { sessionId }` → `get_my_market_grid_entry { sessionId }`, whose
+    `reasoning` is the reasoning recorded with the entry's picks.
+
+### Added tools
+
+- **`list_my_market_grid_entries { window?, outcome?, source?, agentId?, cursor?, limit? }`** (`mcp:read`)
+  pages every entry you made, newest first by its first submission. `outcome` is `PLAYED` (the default:
+  every entry except a cancelled one), `IN_PLAY`, `PAID` (a payout above zero), `NOT_PAID` or
+  `CANCELLED`; `source` and `agentId` filter by the entry's original author. The same read returns one
+  count per outcome, a summary (paid rate, totals, net, averages) and the agents you can filter by. Page
+  with `nextCursor`.
+- **`get_my_market_grid_entry { sessionId }`** (`mcp:read`) returns your entry in one session — the same
+  record a list row carries. A session you never entered is `NOT_FOUND`.
+- Each entry carries its `entryState` (`WON`, `PLACED`, `NO_WIN`, `VOID_NO_SUBMISSION`, `IN_PLAY` or
+  `CANCELLED`), its `entryFee` and signed `netPnl` (null while in play or cancelled), a cancelled entry's
+  `refundState`, its `originalSource` and original `agent`, and `edited` — true once another author has
+  rewritten the picks. `reasoning` is null on an edited entry, because the record no longer describes the
+  picks. Neither tool accepts a user identity: both read the authenticated account's own entries.
+
+### Narrowed output
+
+- **`get_agent_journal` no longer returns `recentGames`.** An agent's arena entries are read with
+  `list_my_market_grid_entries { agentId }`.
+
+A client that calls a retired tool, or reads `recentGames`, breaks at v99 — hence the MAJOR.
+
 ## Contract history — v98 (a clause can read the bar before)
 
 **Breaking at v98: a condition clause accepts six operators that compare a column with its own previous
