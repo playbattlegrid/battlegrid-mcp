@@ -27,27 +27,33 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 ## Contract history — v102 (your entry history's facets come with the first page)
 
 **Breaking at v102: `list_my_market_grid_entries` moves its counts, summary and agent options under one
-`facets` object, sent with the first page only.** v102 is the contract on top of v101.
+`facets` object, sent with the first page only, and every entry gains a payout state.** v102 is the
+contract on top of v101.
 
-### Reshaped output — something you read has moved
+### Reshaped output — something you read has moved or been added
 
 - **`outcomeCounts`, `summary` and `agentOptions` move under `facets`**, unchanged inside it:
   `facets.outcomeCounts`, `facets.summary`, `facets.agentOptions`.
 - **`facets` comes with the first page only.** A page you read with a `cursor` carries `facets: null`.
   Keep the first page's facets for the whole scroll: every page of one read shares the same filters, so
   the first page's counts, summary and agent options describe all of them.
+- **Every entry gains `payoutState`**, in `list_my_market_grid_entries` and `get_my_market_grid_entry`:
+  `RECORDED` once settlement has recorded both of the entry's payouts, `UNDER_REVIEW` if it left one
+  unrecorded, and `null` while the entry is in play or cancelled.
+- **`facets.summary` gains `payoutsUnderReviewCount`**: how many settled entries the money figures leave
+  out because their payout is under review.
 
 ### Behaviour behind unchanged schemas
 
-- **A settled entry's `netPnl` is always computed from two recorded payouts.** The entries settled before
-  settlement wrote both payouts now record `0` for the payout they never received, so their net reads the
-  same as before. If an entry's settlement ever leaves a payout unrecorded, the read refuses with
-  `INTERNAL_ERROR` instead of treating it as zero.
+- **An entry under review has `netPnl: null`.** It is listed under `PLAYED` only, never under `PAID` or
+  `NOT_PAID`, and the summary leaves both its fee and its payout out of every money figure, so the totals
+  stay consistent. Today no entry is under review: the entries settled before settlement recorded both
+  payouts now record `0` for the payout they never received, so their net reads the same as before.
 - The five filters (`window`, `outcome`, `source`, `agentId`, `cursor`) accept exactly what they
   accepted before. Only the `agentId` description changes: it now points at `facets.agentOptions`.
 
-A client that reads `outcomeCounts`, `summary` or `agentOptions` at the top level, or expects them on
-every page, breaks at v102 — hence the MAJOR.
+A client that reads `outcomeCounts`, `summary` or `agentOptions` at the top level, expects them on every
+page, or rejects unknown entry fields, breaks at v102 — hence the MAJOR.
 
 ## Contract history — v101 (an agent on a radar cannot be archived)
 
