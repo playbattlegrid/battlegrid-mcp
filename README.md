@@ -24,6 +24,36 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v101 (an agent on a radar cannot be archived)
+
+**Breaking at v101: `archive_intelligence_agent` refuses an agent held in any radar deployment, and its
+refusal names a fourth blocker.** v101 is the contract on top of v100.
+
+### Narrowed acceptance — the same request, refused where it was accepted
+
+- **`archive_intelligence_agent` refuses an agent that holds a slot in any radar deployment, paused ones
+  included.** The input schema is unchanged: a call that archived such an agent before now gets the
+  existing `CONFLICT`. A paused radar still holds its slots, so pausing does not clear it. Find the coins
+  with `list_radar_deployments`, then commit a radar draft without the agent or call
+  `delete_radar_deployment`, and archive again.
+
+### Widened enum
+
+- **`details.archiveBlockers[].reason` gains `RADAR_DEPLOYED`**, after `DEPLOYED`, `OPEN_TRADES` and
+  `ACTIVE_SESSION`. Its `detail` reads `in N radar deployment(s)`, counting every radar deployment that
+  holds the agent.
+
+### Behaviour behind unchanged schemas
+
+- An archived agent holds no deployment slot in either venue, so `activate_intelligence_agent` arms
+  nothing: the agent trades again only once you deploy it.
+- A `commit_radar_deployment_draft` or `commit_deployment_policy_draft` that races an archive of one of its
+  agents is refused with the existing `CONFLICT`. Read the draft again; its diagnostics name the archived
+  agent.
+
+A client that reads `archiveBlockers[].reason` as a closed set, or expects an archive of a radar-deployed
+agent to succeed, breaks at v101 — hence the MAJOR.
+
 ## Contract history — v100 (what one bar did: level interaction, candle patterns, gaps, runs)
 
 **Breaking at v100: the `bandTouch` transform is retired and `levelInteraction` takes its place; a column
