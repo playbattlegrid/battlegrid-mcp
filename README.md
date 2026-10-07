@@ -28,7 +28,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **Breaking at v103: a transform entry drops `sideRequired` and `operandRequired`, and
 `get_strategy_column_contract` validates its ticker as a coin symbol.** v103 is the contract on top of
-v102.1.
+v102.1.1, which changed only two deployment-draft input descriptions.
 
 ### Reshaped output — something you read has moved or been removed
 
