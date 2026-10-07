@@ -24,6 +24,60 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v100 (what one bar did: level interaction, candle patterns, gaps, runs)
+
+**Breaking at v100: the `bandTouch` transform is retired and `levelInteraction` takes its place; a column
+gains a `buffer` knob; the catalog gains twelve bar-geometry metrics.** v100 is the contract on top of
+v99.
+
+### Rejected input — something you send is no longer accepted
+
+- **A column naming `bandTouch` is refused** by every tool that takes a column — `stage_strategy_draft`,
+  `preview_strategy_report`, `derive_strategy_rule_view`, `get_strategy_column_contract` and
+  `get_metric_construction_hints` — as any unknown transform id is. Where you want "where the close sits
+  in the bands", read `BB_TOUCH × value`; where you want "what the bar's range did at a band", use
+  `levelInteraction` below.
+
+### Widened input — something new you can send
+
+- **`levelInteraction`** classifies the newest bar of a column against a price level as
+  `touch_from_below`, `touch_from_above`, `reject_from_below`, `reject_from_above` or `none`. The side is
+  where the prior close stood against the prior bar's level. A reject — the range pierced the level and
+  the close came back — reports reject, never touch, so "touched or rejected" is an `in` clause over both
+  labels of a side. A close through the level reads `none`: the break is `distance crossesAbove 0` (or
+  `crossesBelow 0`) over the same level.
+  - It is offered on a level with a value at both bars it reads: a candle-homed level (a band, `VWAP`, a
+    moving average, `ST_LINE`, `PSAR`, the Ichimoku lines) or a prior-session level or pivot (`PDH`,
+    `PDL`, `PDO`, the floor pivots, `PRIOR_TPO_*`). A prior-session level is a single read and takes no
+    hold. It is not offered on a price fact (`CLOSE`, `MARK`, `HLC3`), a developing-session level
+    (`TPO_*`), the naked points of control, or the Donchian rails.
+  - The header is `{code}_lvl` — `bbUpper_lvl`.
+- **`buffer`**, a column knob declared by `levelInteraction` only: whole basis points of the level,
+  `0`–`500`, default `0`. Only a touch reads it. A non-zero buffer names the header (`bbUpper_lvl_b25`),
+  so two buffers are two columns. `buffer` on any other transform is refused as an undeclared parameter.
+- **Twelve metrics**, all in the `price` family:
+  - candle patterns — `CANDLE_DOJI` (boolean), `CANDLE_PIN` (`lower_wick` / `upper_wick` / `none`),
+    `CANDLE_ENGULFING` (`bullish` / `bearish` / `none`), `BAR_CONTAINMENT` (`inside` / `outside` /
+    `none`), each judged against the ten bars before it at TA-Lib's default settings;
+  - gaps — `GAP` and `GAP_RANGE_CLEAR` (`up` / `down` / `none`) and `GAP_PCT`, the signed % from the
+    prior close to the open;
+  - run lengths — `CLOSE_RUN` and `CANDLE_RUN`, consecutive bars one way, capped at ±20;
+  - price sources — `HL2`, `HLC3`, `OHLC4`, price facts that take every transform a close takes
+    (`HLC3 × aggregate(20)` is the 20-bar SMA of typical price).
+
+  The patterns, gaps and runs compose `value` only, and none of the twelve is ranked.
+
+### Reshaped output
+
+- **`effectiveParameters` gains `buffer`** — the declared default `0` or your value on a
+  `levelInteraction` column, `null` where no transform in the chain declares it.
+- A transform's authoring parameters may declare `buffer`, and the transform and section column-role
+  vocabularies read `levelInteraction` where they read `bandTouch`.
+- The authoring contract digest's `metricKeys` gains the twelve keys.
+
+A client that sends `bandTouch`, or reads `effectiveParameters` with a closed key set, breaks at v100 —
+hence the MAJOR.
+
 ## Contract history — v99 (your arena entries are one owner-only history)
 
 **Breaking at v99: four tools are retired, two are added, and `get_agent_journal` loses a field.** v99 is
