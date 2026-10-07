@@ -24,6 +24,56 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v98 (a clause can read the bar before)
+
+**Breaking at v98: a condition clause accepts six operators that compare a column with its own previous
+completed bar, and a clause's evidence gains a second shape.** v98 is the contract on top of v97.
+
+### Widened input — something new you can send
+
+- A condition clause on `stage_strategy_draft` and `preview_strategy_report` accepts:
+  - `crossesAbove` / `crossesBelow` with a number `value` — TRUE when the value is above (below) it on the
+    decided bar and was at or below (at or above) it on the bar before. A bar landing exactly on the level
+    has not crossed.
+  - `increased` / `decreased` with **no** literal — strictly above (below) the prior bar's reading. A
+    `value` beside them is refused.
+  - `enters` / `exits` with one `label` — the label read now and not on the bar before, or the reverse.
+- Numeric headers take the crossings and changes; classification, direction and boolean headers take the
+  transitions; event and rank headers take none of them. A strategy's served `conditionOperators`
+  (`preview_strategy_report` at `detail: "detailed"`, and the scalar vocabulary) lists exactly what each
+  header admits on that strategy; `get_strategy_column_contract`, which reads no strategy's stored history,
+  lists the operators the header's kind takes.
+- Each of the six reads two completed bars, never the forming one, on every basis, so its reading is never
+  provisional. A failed read on either bar is `UNRESOLVED`; a bar with no value reads `FALSE`.
+
+### Narrowed acceptance — the same request, refused where it cannot be read
+
+- A header whose stored history keeps only one bar (`conditionHold.maxWindow` 1) admits none of the six:
+  the clause is refused with `CONDITION_OPERATOR_UNSUPPORTED`, and every operator refusal's
+  `allowedDomain` now lists the operators that header admits.
+- `crossesAbove`, `crossesBelow`, `enters` and `exits` are edges: a hold with `atLeast` above 1 is refused
+  (`CONDITION_HOLD_ILLEGAL`) — hold them "within n closes". A prior-bar clause's largest window is one bar
+  less than its header's, and the frame-read budget counts the bar before.
+
+### Reshaped output — a clause's evidence has two shapes
+
+- A prior-bar clause's evidence carries **`priorOperand`** — the same column's reading on the bar before —
+  and a **`decidedBar` that is never null**. It appears on `preview_strategy_report`,
+  `get_radar_close_decisions`, `list_gate_blocks`, `preview_radar_resolution`, `get_signal_log`,
+  `get_agent_coin_qualification` (a condition level's clauses) and the trade register an agent reads.
+- A current-bar clause's evidence is unchanged and carries no `priorOperand`; every record written before
+  v98 reads as it was written.
+- Rendered evidence lines read prior before current: `RSI14_now crosses above 50 (49.6 → 50.4)`.
+
+### Widened output
+
+- A condition series' `BOUND` threshold `op` widens to `crossesAbove` / `crossesBelow`, drawn at the level
+  crossed. A change or a transition draws no threshold.
+- The authoring contract digest gains `domains.conditionOperator`, the thirteen operator names.
+
+A clause reader that assumed one evidence shape, or an operator vocabulary of seven, breaks on the same
+call at v98 — hence the MAJOR.
+
 ## Contract history — v97 (a signal records the evidence it decided on)
 
 **Breaking at v97: an evaluated signal's evidence keys move, `BB_TOUCH` touches by %B, and a crossing is
