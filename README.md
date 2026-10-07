@@ -27,7 +27,7 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 ## Contract history — v97 (a signal records the evidence it decided on)
 
 **Breaking at v97: an evaluated signal's evidence keys move, `BB_TOUCH` touches by %B, and a crossing is
-read on the bar that leaves zero.** v97 is the contract on top of v96. No schema moves.
+read on the bar that leaves zero.** v97 is the contract on top of v96.
 
 ### Changed meaning — the same record, different keys
 
@@ -60,6 +60,12 @@ they were written with, so a reader of history meets both.
   the `RSI14_zone` columns already read it.
 - **Descriptions.** A served rule description states the thresholds that rule evaluates, and the ROC
   descriptions read "positive and rising".
+
+### Widened output
+
+- `get_strategy_signal_definition`'s `indicators[].meta` gains `optional: true` on a key the signal records
+  only when its read is present — `prev_cvd_value` on `CVD_BULLISH` / `CVD_BEARISH`, `prev_mfi14_value` on
+  `MFI_SUSTAINED_*`. Every other key is always recorded when the signal has the data to evaluate.
 
 A key read at v96 is absent at v97 on the same signal, and a touch or a crossing read at v96 can read
 differently on the same bar — hence the MAJOR.
