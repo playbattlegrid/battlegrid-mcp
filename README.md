@@ -24,6 +24,38 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v101.1 (swing highs, swing lows and the structure label)
+
+**Additive at v101.1: the catalog gains three swing-structure metrics.** v101.1 is the contract on top of
+v101; nothing you send today is refused and nothing you read is reshaped.
+
+### Widened input — something new you can send
+
+- **`SWING_FRACTAL_HIGH` and `SWING_FRACTAL_LOW`** — the most recent swing high and swing low: a bar
+  whose high is at or above the two highs before it and strictly above the two after it (Pine's
+  `ta.pivothigh(2, 2)` tie rule), and the mirror on the lows. A swing is published from the bar that
+  completes its right side — never under its own bar, never from a forming bar — and held until the
+  next swing on its side. They are candle price levels: every transform a candle level takes,
+  `levelInteraction` included, and they rank across the board as `dist_fractalHi` / `dist_fractalLo`.
+- **`SWING_FRACTAL_LABEL`** — the most recent swing against the previous one on its side: `HH` / `LH` for
+  a high (an equal high is `LH`), `HL` / `LL` for a low (an equal low is `HL`), `none` when no comparable
+  pair is in reach. A held state, value-only; on too short a history it reads nothing.
+- **Break of structure** is `dist_fractalHi crossesAbove 0` / `dist_fractalLo crossesBelow 0`; a step of
+  the level onto a newly confirmed swing never fires it.
+
+### Widened output
+
+- The catalog and vocabulary surfaces list the three keys, and the authoring digest's `metricKeys` gains
+  them.
+
+### Still refused
+
+- The headers are `fractalHi` / `fractalLo` / `fractalLabel`. The `swingHi` / `swingLo` stems retired at
+  v53 (the Donchian channel's old names) stay refused: `dist_swingHi` is still `CONDITION_COLUMN_UNKNOWN`.
+
+A client that treats the metric vocabulary as a closed set re-reads it; no request is refused — hence
+the MINOR.
+
 ## Contract history — v101 (an agent on a radar cannot be archived)
 
 **Breaking at v101: `archive_intelligence_agent` refuses an agent held in any radar deployment, and its
