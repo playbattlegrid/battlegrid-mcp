@@ -129,12 +129,29 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   it — its own `hold: { atLeast, of }`, which the editor calls **Hold** (Once, In a row, Within, At
   least), counted in completed bars of the column's own timeframe — not to this axis. Every clause
   and group carries `hold`; `{ "atLeast": 1, "of": 1 }` is Once. The `strategy-examples` skill
-  carries the vocabulary, the served hold domain (a crossover is held "within" only; a Developing
-  column cannot be held) and the per-column Confirmed / Developing read.
+  carries the vocabulary, the served hold domain (a crossover or an edge operator — `crossesAbove`,
+  `crossesBelow`, `enters`, `exits` — is held "within" only; a Developing column cannot be held) and
+  the per-column Confirmed / Developing read.
+- **What a bar did is its own vocabulary.** A touch or a rejection of a level, a candle pattern, a
+  gap and a run of bars are composed from the `strategy-examples` skill's **Bar geometry** section —
+  `levelInteraction` over a level with its `buffer` knob, and the pattern, gap, run and price-source
+  metrics. A level BREAK is a `distance` crossing over the same level, never a `levelInteraction`
+  label.
+- **Swing structure is its own section.** Swing highs and lows, the `HH`/`HL`/`LH`/`LL` label and the
+  break-of-structure recipes are in the `strategy-examples` skill's **Swing structure** section.
 - `get_strategy_column_contract` → `outputs[].conditionOperators`. An empty array means that
   rendered header has no comparison semantics and cannot appear in a condition clause at all.
   Legality is per rendered header, not per column: a trajectory's slot header and its `_trend`
   header answer differently.
+- `get_strategy_column_contract` → `lookback`, `measurement` and `seriesHome`. `lookback.used` is
+  the bars the column reads against `lookback.cap`, the column-lookback budget a save holds it to —
+  a column past the cap is refused with `REPORT_COLUMN_LOOKBACK_EXCEEDED` by this tool exactly as by
+  the save, so shrink its window or offset rather than staging it. `measurement` names how the
+  transform (and a chained transform) reads its series: the read shape, the window's unit, the price
+  basis and what an absent bar does. `seriesHome` says where the metric's series is kept — `candle`,
+  `history`, or `null` when the metric has no series, which is why a series transform does not
+  compose on it. Window and offset carry a declared `minimum` and no fixed maximum; the lookback
+  cap is the bound.
 - `get_metric_construction_hints` → `rankOrderings`. Present only when rank is composable on that
   metric, already range-gated server-side — read the offered set rather than deriving one from
   the metric's native output.
@@ -160,7 +177,8 @@ asked to approve.
 the `axes` you propose. It writes those axes into the player's draft — attributed to you, landing in
 their builder as unsaved changes — and commits nothing. Each stage returns the draft's new
 `version`: that is the `draftVersion` your next stage names. Stage each change once, and never fire
-two stages in parallel against one draft.
+two stages in parallel against one draft. Complete stage payloads showing the envelope are in
+`references/strategy-stage-examples.md`.
 
 **A new strategy is a create draft.** Omit `strategyId` and send `draftVersion: 0` on the first
 stage; the response carries the id minted for it, which every later call names. A create needs

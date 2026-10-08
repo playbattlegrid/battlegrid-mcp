@@ -1,6 +1,6 @@
 ---
 name: battlegrid-arena-play
-description: Enter the player into Market Grid sessions — find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have one of their agents generate it, submit it against the session's entry fee, then read the results and the reasoning journal after settlement. Activate whenever the player wants to play, enter, join or submit to a session, wants their agent to enter one, asks what is open to play, or asks how a session they entered turned out.
+description: Enter the player into Market Grid sessions — find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have one of their agents generate it, submit it against the session's entry fee, then read the results and the player's own entry record after settlement. Activate whenever the player wants to play, enter, join or submit to a session, wants their agent to enter one, asks what is open to play, or asks how a session they entered turned out.
 ---
 
 # Arena Play
@@ -108,9 +108,12 @@ reasoning as the player's, and the attribution is part of what was scored.
 - `get_market_grid_results` — available only once the session is SETTLED. Before that it returns a
   typed CONFLICT naming the current status: **report it and stop**. Do not poll it in a loop; the
   op budget is finite and a settling session is not a failure.
-- `get_mcp_reasoning_journal` on request — the player's own submission: the reasoning, confidence
-  and picks as recorded at submit. Compare the outcome against what was actually reasoned, and say
-  where the reasoning was wrong. An agent's record is a different journal, `get_agent_journal`.
+- `get_my_market_grid_entry` on request — the player's own entry in that session: its picks, who
+  authored it, whether another author has rewritten it (`edited`), and the reasoning and confidence
+  recorded at submit. Compare the outcome against what was actually reasoned, and say where the
+  reasoning was wrong. `reasoning` is null once the entry was edited — the record no longer describes
+  the picks, so say that rather than reconstructing one. `list_my_market_grid_entries` is the history
+  across sessions. An agent's decisions are a different record, `get_agent_journal`.
 
 ## Refusals, and what each one means
 
