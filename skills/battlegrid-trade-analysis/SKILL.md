@@ -38,10 +38,10 @@ Not "what were its returns" — whether it did *the thing it was told to do*.
   `exitR`, and `giveBackR` (what it surrendered between its peak and the close). `exitEfficiency` is
   a union — branch on its `state` before reading `efficiencyPercent`. All of them are gross of
   costs; `netPnl` is the after-fee figure.
-- The record around the trades: `get_agent_game_history` and `get_user_agent_game_history` (Market
-  Grid results, one agent or all), `get_agent_thought_log` and `get_user_thought_log` (the
-  reasoning), `get_agent_activity_feed` and `get_user_activity_feed` (what happened), and
-  `get_agent_explorer` for where the agent stands among public agents.
+- The record around the trades: `list_my_market_grid_entries` (the player's Market Grid entries —
+  `agentId` for one agent's, none for every entry), `get_agent_thought_log` and
+  `get_user_thought_log` (the reasoning), `get_agent_activity_feed` and `get_user_activity_feed` (what
+  happened), and `get_agent_explorer` for where the agent stands among public agents.
 - `get_signal_performance` when the question is whether the agent's signals are working, as
   distinct from whether its trades made money.
 

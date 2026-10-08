@@ -113,6 +113,20 @@ is test-routing a regime. Never carry a fact from a radar conversation into it, 
 To try a slot set without touching the draft, preview `{ kind: "SLOTS", slots }` — it resolves
 explicit slots and nothing can commit it.
 
+**Shaping a Radar rule.** A rule carries one or two conditions — never none. Pick the construction
+from what the player asked for:
+
+| The player wants the agent on duty… | Construction |
+|---|---|
+| whenever no rule matches | `DEFAULT_SLOT` — on duty only while no rule matches, so on a coin with no rules it is on duty at every instant |
+| only in named regimes | a rule with a regime condition |
+| only in named hours and days | a rule with an hours condition |
+| in named regimes during named hours | a rule with one hours condition and one regime condition |
+
+When the ask maps to no single row, or a refusal rules out the construction the player asked for,
+ask the player which construction they mean, naming the rows that fit — never stage one they did not
+choose. Complete stage payloads for every row are in `references/radar-stage-examples.md`.
+
 **Arena** — the same shape, keyed on `presetId`:
 
 1. `stage_deployment_policy_draft` with `draftVersion` = the `version` you read (0 when there was no
@@ -126,6 +140,21 @@ explicit slots and nothing can commit it.
 
 A draft that would hold no rule and no catch-all is a withdrawal, which a commit never does — that is
 `delete_deployment_policy` (step 4).
+
+**Shaping an Arena rule.** A rule needs at least one condition by the time it is committed — a draft
+may hold a rule with none while the player is still choosing, and the draft read's diagnostics flag
+it. Pick the construction from what the player asked for:
+
+| The player wants the agent to play… | Construction |
+|---|---|
+| whenever no rule matches | `DEFAULT_SLOT` — plays only when no rule wins the session |
+| only in named regimes | a rule with a regime condition |
+| only at named session starts, or one scheduled occurrence | a rule with one session condition — a start or an occurrence |
+| in named regimes at those sessions | a rule with a regime condition and one session condition |
+
+When the ask maps to no single row, or a refusal rules out the construction the player asked for,
+ask the player which construction they mean, naming the rows that fit — never stage one they did not
+choose. Complete stage payloads for every row are in `references/arena-stage-examples.md`.
 
 Both previews run the **same resolver the live sweep runs**, so the preview is the real outcome, not
 an estimate. Neither writes anything and neither costs the player an LLM call — so previewing

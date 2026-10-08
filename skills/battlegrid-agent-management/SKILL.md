@@ -125,7 +125,8 @@ mid-edit in their form**, and every change you make joins it. Then:
   read you proposed against returned (0 when it found no draft): it lands in their open form,
   labelled as yours. Each axis you send is written WHOLE — BEHAVIOR carries all three of risk,
   outlook and conviction, TRADING_CONFIG the complete configuration (step 6) — and the axes you
-  omit keep their values.
+  omit keep their values. Complete stage payloads — a create, a behavior change, a rebind — are in
+  `references/agent-stage-examples.md`.
 - **Read the stage's diagnostics.** Its `errors` are the refusals the commit would raise, each
   naming its field: fix the axis and stage again before you ask for anything.
 - A staging call refused **`DRAFT_AXIS_CONTESTED`** names an axis the player changed after the
@@ -193,10 +194,13 @@ is voting on a state you have not seen. A commit refused with `nextAct: stage` n
 diagnostics named: fix it in a stage, read, and confirm again.
 
 **A refused archive names its own blockers.** The refusal carries typed `archiveBlockers[]` —
-DEPLOYED / OPEN_TRADES / ACTIVE_SESSION, each with a count. Report each blocker and its count as
-the reason, and name what would clear it (un-deploy via the radar/deployment tools, close or let
-the positions resolve, wait for the session to settle). Never paraphrase the refusal into "it
-didn't work", and never retry it unchanged.
+DEPLOYED / OPEN_TRADES / ACTIVE_SESSION / RADAR_DEPLOYED, each with a count. Report each blocker and
+its count as the reason, and name what would clear it (un-deploy via the deployment tools, close or
+let the positions resolve, wait for the session to settle). RADAR_DEPLOYED counts paused radars too:
+a paused radar still holds the slot, so pausing does not clear it. Clearing it is a radar-deployment
+write, not this arc's: activate `radar-deployment` and let its arc find the coins whose radar holds
+the agent and un-deploy it there — a radar draft committed without the agent, or the coin's
+deployment deleted. Never paraphrase the refusal into "it didn't work", and never retry it unchanged.
 
 ### 5. Halt recovery: offer exactly the served verdict's exits
 
