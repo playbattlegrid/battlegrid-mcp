@@ -24,6 +24,53 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v108 (conditions are the only entry gate; signal rules are removed)
+
+**Breaking at v108: signal rules, the aggregate-score gate and the required-count gate are removed.**
+v108 is the contract on top of v107. A strategy's deterministic entry gate is its conditions: a
+required condition, or a condition that carries a verdict. A strategy that declares neither never
+trades, and its draft says so with the warning `NO_ENTRY_CONDITION`.
+
+### Removed tools
+
+- **`simulate_aggregate_score`, `list_strategy_signals`, `get_strategy_signal_definition`,
+  `derive_strategy_rule_view` and `get_coin_signal_preview`** leave discovery with no alias. A call
+  gets the standard unknown-tool refusal.
+
+### Rejected input — something you send is no longer accepted
+
+- **`stage_strategy_draft` refuses the `SIGNAL_RULES` and `SETUP_GATES` axes** as unrecognized keys.
+  The ATR floor `minAtrPct` is staged in the `TRADE_LEVEL_POLICY` axis, beside the stop-loss multiples
+  and the risk-reward minimum; a `TRADE_LEVEL_POLICY` stage without it is refused.
+- **`decide_trade` cites `entry.conditionChecklist`**: 1–8 items `{ conditionKey, verdict,
+  interpretation }` over the decision's evaluated entry conditions, each key at most once, `CONFIRM`
+  only on a condition that read TRUE. `signalChecklist` and `signalModulesUsed` are refused.
+- **The signal-log and agent-profile filters refuse `dominantBias`.**
+
+### Reshaped output — something you read has moved or been removed
+
+- **Strategies, agents and drafts** lose `signalRules`, `signalRuleTally`, `minAggregateScore` and
+  `minRequiredCount`; the trading-config catalog loses the gate dial steps.
+- **Qualification and scans** (`get_agent_coin_qualification`, `scan_agent_coins`, `scan_coin_agents`)
+  lose the score and required-count gates, the score shortfall and the signal readings. Scan rows rank
+  qualifying first, then by ticker or agent name.
+- **Radar reads** lose every score field: the activity events, the close decision, the curve samples
+  (`{ at, atrPct, qualified }`) and the curve digest.
+- **Entry decisions** carry `conditionChecklist` in place of `signalChecklist` and `signalModulesUsed`.
+  The public signal-log detail serves it as `{ name, outcome }` only.
+- **Signal logs and signal performance** lose the aggregate score, bias, conflict and count fields; a
+  signal-log detail loses its scorecard and serves `candidateLevels`. The agent explorer loses its
+  average score.
+
+### Narrowed enums
+
+- **The qualification and screen reasons lose `AGGREGATE_BELOW_MIN` and `REQUIRED_COUNT_BELOW_MIN`
+  and gain `NO_ENTRY_CONDITION`**, which is the first reason a strategy fails. The attempt reasons lose
+  `NO_ALLOCATED_SIGNALS`, and the error codes lose `REPAIR_REQUIRED`.
+
+A client that stages a signal rule or a gate, cites a signal in `decide_trade`, or reads a score field
+breaks at v108, which is why this is a MAJOR.
+
 ## Contract history — v107.1 (an arena entry is recorded before its fee moves)
 
 **Additive at v107.1: a paid entry can be recorded while its fee confirms.** v107.1 is the contract on top
