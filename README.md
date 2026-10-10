@@ -71,6 +71,31 @@ trades, and its draft says so with the warning `NO_ENTRY_CONDITION`.
 A client that stages a signal rule or a gate, cites a signal in `decide_trade`, or reads a score field
 breaks at v108, which is why this is a MAJOR.
 
+## Contract history — v107.1 (an arena entry is recorded before its fee moves)
+
+**Additive at v107.1: a paid entry can be recorded while its fee confirms.** v107.1 is the contract on top
+of v107. The server now records your entry first, then sends the fee, then settles the entry on the
+venue's answer, so a fee can never move for an entry that was not recorded. No input changes.
+
+### Widened output
+
+- **`submit_market_grid`, `random_submit_market_grid` and `submit_agent_grid` results gain
+  `entryStatus`**: `ENTERED`, or `PAYMENT_PENDING` when the entry is recorded and its fee is still
+  confirming at the venue. A payment-pending entry plays once its fee lands before lock; otherwise it is
+  released, and a fee that lands after that is refunded.
+- **`entryState` gains `PAYMENT_PENDING`** on `get_my_market_grid_entry`. `list_my_market_grid_entries`
+  shares the element schema but never returns one.
+
+### Refusal vocabulary
+
+- **`details.wagerErrorCode` gains `ACCOUNT_NOT_UNIFIED`** on the three submit tools: an entry fee is
+  paid only from a unified-collateral account (`unifiedAccount` or `portfolioMargin`).
+
+### Behaviour behind unchanged schemas
+
+- **`check_market_grid_submission` answers `hasSubmitted: true`** for a payment-pending entry.
+- **`update_market_grid` refuses a payment-pending entry** with `CONFLICT` until it is in play.
+
 ## Contract history — v106 (the Opening Bell: a session starts at its scored candle's open)
 
 **Breaking at v106: Two-Look entry is retired. A deployment slot drops `entryStrategy`, and a
