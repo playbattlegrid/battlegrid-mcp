@@ -24,6 +24,43 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v106 (the Opening Bell: a session starts at its scored candle's open)
+
+**Breaking at v106: Two-Look entry is retired. A deployment slot drops `entryStrategy`, and a
+deployment draft refuses one.** v106 is the contract on top of v105.5. Every automated entry now looks
+once, inside the Opening Bell window: from `startsAt` (the open of the one candle a session scores)
+until `lockAt` (entries close).
+
+### Reshaped output — something you read has moved or been removed
+
+- **`entryStrategy` leaves every deployment slot**: `get_deployment_policy`, `list_deployment_policies`,
+  `get_deployment_policy_draft`, `pause_deployment_policy`, `delete_deployment_policy`,
+  `preview_deployment_resolution` and `test_generate_deployment_grid`.
+
+### Rejected input — something you send is no longer accepted
+
+- **`stage_deployment_policy_draft` refuses `entryStrategy`** on a `RULES` rule and on the
+  `DEFAULT_SLOT`, as an unrecognized key. `preview_deployment_resolution`'s `SLOTS` subject and
+  `test_generate_deployment_grid` no longer publish the key, and they strip it if it is sent.
+
+### Widened output
+
+- **Every Market Grid session surface gains `startsAt`**, the Opening Bell. That covers
+  `get_market_grid_session`, `list_market_grid_sessions`, `get_market_grid_results`, and a deployment's
+  target session and open entries. A Coin Grid summary's `startsAt` equals its `lockAt`.
+- **`get_agent_prompt_context_preview`'s market context gains `startsAt` and
+  `millisecondsSinceOpeningBell`**, both nullable.
+
+### Behaviour behind unchanged schemas
+
+- **`lockAt` keeps its name and now means "entries close"**, the end of the Opening Bell window, a
+  fixed fraction of the session's duration after `startsAt`. Read `startsAt` for when a session starts
+  or what it scores. Submitting, editing and cancelling stay open until `lockAt`.
+- **`SESSION_START` rules match `startsAt`.**
+
+A client that reads `entryStrategy` from a slot, or stages one into a deployment draft, breaks at v106,
+which is why this is a MAJOR.
+
 ## Contract history — v103 (a column's contract carries its read size, measurement and series home)
 
 **Breaking at v103: a transform entry drops `sideRequired` and `operandRequired`, and
