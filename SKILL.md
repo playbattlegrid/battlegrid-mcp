@@ -30,7 +30,7 @@ to connect and to know which one to open.
 
 ## Discover the live surface first
 
-**Tools, prompts, and resources are discovered live from this MCP connection.** Always read the current `tools/list`, `prompts/list`, and `resources/list` before acting — a cached capability list is not authoritative after a server deployment. This skill teaches the workflows and the strict request contracts; it deliberately does not copy the server's tool catalog, metric/transform vocabulary, signal IDs, formulas, or default values. Discover those from the live tools (`list_strategy_categories`, `list_strategy_vocabulary`, `list_strategy_signals`, `get_strategy_signal_definition`, …). Never guess a metric, transform, parameter, template, signal, or enabled-timeframe fact.
+**Tools, prompts, and resources are discovered live from this MCP connection.** Always read the current `tools/list`, `prompts/list`, and `resources/list` before acting — a cached capability list is not authoritative after a server deployment. This skill teaches the workflows and the strict request contracts; it deliberately does not copy the server's tool catalog, metric/transform vocabulary, formulas, or default values. Discover those from the live tools (`list_strategy_categories`, `list_strategy_vocabulary`, `list_strategy_signals`, `get_strategy_signal_definition`, …). Never guess a metric, transform, parameter, template, signal, or enabled-timeframe fact.
 
 ## Single-account vs multi-account request shape
 
