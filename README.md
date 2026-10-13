@@ -24,6 +24,36 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v109 (a player's picks are entered through their entry draft)
+
+**Breaking at v109: `submit_market_grid` and `update_market_grid` are removed.** v109 is the contract on
+top of v108. A player's picks for a session live in their Market Grid entry draft — the same draft their
+builder on the session page writes as they pick — and an entry is placed or changed by committing it.
+
+### Rejected input — something you send is no longer accepted
+
+- **`submit_market_grid` and `update_market_grid`** leave discovery with no alias. A call gets the
+  standard unknown-tool refusal. Play is stage → get → commit:
+  `stage_market_grid_entry_draft({ request: { sessionId, draftVersion, axes } })` with one
+  `CELL_n: { cell: { coinId, prediction } }` per grid position (`CELL_0` is the captain) and a
+  `RATIONALE` carrying the reasoning, confidence, model name and per-cell pick reasoning the removed
+  tools required; `get_market_grid_entry_draft` for the diff, diagnostics and impact; then
+  `commit_market_grid_entry_draft({ request: { sessionId, draftVersion, expectedRevision } })` on the
+  player's word. `random_submit_market_grid` and `submit_agent_grid` are unchanged.
+
+### Added tools
+
+- **`get_market_grid_entry_draft`, `stage_market_grid_entry_draft`, `discard_market_grid_entry_draft`
+  and `list_market_grid_entry_drafts`** (`mcp:read`) read and stage the player's picks for free: no
+  entry, fee, deposit or LLM access. **`commit_market_grid_entry_draft`** (`mcp:wager`) enters a session
+  the player has not entered, charging the session's entry fee (the read's `impact.entryFee`), or
+  replaces a live entry's picks for no fee.
+
+### Refusal vocabulary
+
+- **An entry that already exists is a revision `CONFLICT`** naming the live entry's revision, with
+  `nextAct: get_draft`: read the draft again and commit over the revision it returns.
+
 ## Contract history — v108 (conditions are the only entry gate; signal rules are removed)
 
 **Breaking at v108: signal rules, the aggregate-score gate and the required-count gate are removed.**
