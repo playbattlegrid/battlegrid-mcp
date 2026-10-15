@@ -24,6 +24,22 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v110.9 (the price zone reads the channel of the bars before)
+
+**Served values move at v110.9; no schema moves.** v110.9 is the contract on top of v110.8. Nothing you send
+is refused.
+
+### Behaviour behind unchanged schemas
+
+- **`zone` (`PRICE_ZONE`) classifies the price against the channel of the 20 bars before the classified one**
+  (`DONCHIAN_UPPER_PRIOR` / `DONCHIAN_LOWER_PRIOR`). `breakout high` and `breakdown low` now hold on a close
+  beyond that channel: they are the label form of `dist_donchianHiPrior gt 0` and `dist_donchianLoPrior lt 0`.
+  Against the same-bar channel, which includes the bar's own high and low, they could never be read. A `zone`
+  clause's condition levels are the two prior rails.
+- **`near high` and `near low` are the outer fifth of that channel by position**: at least 0.8 of the way from
+  the low to the high, or at most 0.2. Before, they meant within 1% of price of an edge. The nearer edge wins,
+  and the band widens with the channel. A channel with an absent rail or no width reads `null`.
+
 ## Contract history — v110.6 (the Donchian channel as of the bar before)
 
 **Additive at v110.6: two Donchian metric keys, and level-interaction labels judged against the level in
