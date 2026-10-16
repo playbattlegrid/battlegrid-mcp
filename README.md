@@ -24,6 +24,47 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v113 (one pagination shape: an opaque cursor)
+
+**Breaking at v113: nine reads page by cursor.** v113 is the contract on top of v112. Reconnect the proxy, or restart
+it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **`page` on the nine paginated reads** — `get_agent_thought_log`, `get_user_thought_log`,
+  `get_agent_activity_feed`, `get_user_activity_feed`, `list_gate_blocks`, `list_signal_logs`,
+  `list_entry_decisions`, `get_public_agent_signal_logs` and `get_public_agent_realized_trades`. Omit `cursor` for the
+  first page, then send the `nextCursor` the previous page returned. `page` is refused as an unrecognised key naming
+  it; nothing translates it.
+- **A cursor the server did not write** is refused naming `cursor`, before any read.
+
+### Reshaped output — something you read moved
+
+- **`total` → `nextCursor`** on the nine reads (`null` on the last page); the thought-log, activity-feed and
+  realized-trades reads also drop `page` and `limit`. `list_gate_blocks` keeps `summary`, which still spans every row.
+  Rows come newest first, ties broken by id, so a page boundary never skips or repeats a row.
+
+### Behaviour behind unchanged schemas
+
+- **`list_signal_logs` naming only `signalSource`** now narrows by it; it used to return every source.
+
+## Contract history — v112 (one input name per identity)
+
+**Breaking at v112: three input names retire.** v112 is the contract on top of v111.1. Reconnect the proxy, or restart
+it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **`symbol` on `get_regime_snapshot` and `get_regime_history`** — send `coinTicker` (default `BTC`).
+- **`ticker` on `get_coin_candles` and `get_coin_performance_history`** — send `coinTicker`.
+- **`marketGridSessionId` on `list_session_agent_positions`** — send `sessionId`.
+
+  Each retired name is refused as an unrecognised key naming it; nothing translates it. Responses keep `symbol` and
+  `marketGridSessionId` where they published them.
+- **An unknown coin on two filters.** `list_entry_decisions`' `coinTicker` and the public-profile `filter.coinTicker`
+  facet now resolve like every other coin input — `kPEPE` filters `PEPE`, any casing works — and an unknown coin is
+  refused naming `coinTicker` or `filter.coinTicker[i]`, where it used to answer an empty page.
+
 ## Contract history — v111.1 (every read fits hosted Claude, and a large one says so)
 
 **One refusal is added at v111.1; nothing you send is refused that was accepted.** v111.1 is the contract on top of
