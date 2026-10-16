@@ -21,12 +21,10 @@ on this coin" with no condition named.
 
 ```json stage_radar_deployment_draft
 {
-  "request": {
-    "coinId": "<COIN_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "DEFAULT_SLOT": { "defaultSlot": { "agentId": "<AGENT_ID>", "minConviction": null } }
-    }
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "DEFAULT_SLOT": { "defaultSlot": { "agentId": "<AGENT_ID>", "minConviction": null } }
   }
 }
 ```
@@ -38,21 +36,19 @@ regime condition is the regime-reading floor, and must be a level one of the sel
 
 ```json stage_radar_deployment_draft
 {
-  "request": {
-    "coinId": "<COIN_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConviction": null,
-            "conditions": [
-              { "kind": "regime", "regimes": ["bull_expansion", "bull_ranging"], "minConviction": "high" }
-            ]
-          }
-        ]
-      }
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": null,
+          "conditions": [
+            { "kind": "regime", "regimes": ["bull_expansion", "bull_ranging"], "minConviction": "high" }
+          ]
+        }
+      ]
     }
   }
 }
@@ -64,21 +60,19 @@ Hours are UTC, 0–23. Days run 0 (Sunday) to 6. Each is listed once.
 
 ```json stage_radar_deployment_draft
 {
-  "request": {
-    "coinId": "<COIN_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConviction": null,
-            "conditions": [
-              { "kind": "hours", "hours": [13, 14, 15, 16, 17, 18, 19, 20], "days": [1, 2, 3, 4, 5] }
-            ]
-          }
-        ]
-      }
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": null,
+          "conditions": [
+            { "kind": "hours", "hours": [13, 14, 15, 16, 17, 18, 19, 20], "days": [1, 2, 3, 4, 5] }
+          ]
+        }
+      ]
     }
   }
 }
@@ -88,22 +82,20 @@ Hours are UTC, 0–23. Days run 0 (Sunday) to 6. Each is listed once.
 
 ```json stage_radar_deployment_draft
 {
-  "request": {
-    "coinId": "<COIN_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConviction": 0.6,
-            "conditions": [
-              { "kind": "hours", "hours": [13, 14, 15, 16], "days": [1, 2, 3, 4, 5] },
-              { "kind": "regime", "regimes": ["volatile"] }
-            ]
-          }
-        ]
-      }
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": 0.6,
+          "conditions": [
+            { "kind": "hours", "hours": [13, 14, 15, 16], "days": [1, 2, 3, 4, 5] },
+            { "kind": "regime", "regimes": ["volatile"] }
+          ]
+        }
+      ]
     }
   }
 }
@@ -117,21 +109,19 @@ first agent's regimes.
 
 ```json stage_radar_deployment_draft
 {
-  "request": {
-    "coinId": "<COIN_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConviction": null,
-            "conditions": [{ "kind": "regime", "regimes": ["bear_expansion", "bear_ranging"] }]
-          }
-        ]
-      },
-      "DEFAULT_SLOT": { "defaultSlot": { "agentId": "<OTHER_AGENT_ID>", "minConviction": null } }
-    }
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": null,
+          "conditions": [{ "kind": "regime", "regimes": ["bear_expansion", "bear_ranging"] }]
+        }
+      ]
+    },
+    "DEFAULT_SLOT": { "defaultSlot": { "agentId": "<OTHER_AGENT_ID>", "minConviction": null } }
   }
 }
 ```
@@ -144,12 +134,10 @@ returned.
 
 ```json stage_radar_deployment_draft
 {
-  "request": {
-    "coinId": "<COIN_ID>",
-    "draftVersion": 3,
-    "axes": {
-      "DEFAULT_SLOT": { "defaultSlot": null }
-    }
+  "coinId": "<COIN_ID>",
+  "draftVersion": 3,
+  "axes": {
+    "DEFAULT_SLOT": { "defaultSlot": null }
   }
 }
 ```

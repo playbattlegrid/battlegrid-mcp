@@ -105,8 +105,8 @@ is test-routing a regime. Never carry a fact from a radar conversation into it, 
    on duty, whether it trades once committed, and for a first deployment the coin cap
    (`admission.coinCapReached` true means the commit will be refused until a coin is un-deployed).
    Do not confirm a draft whose diagnostics carry an error: stage a fix.
-3. `preview_radar_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version that read
-   returned. It composes the draft over the deployed policy **exactly as the commit will write it**,
+3. `preview_radar_resolution({ coinId, request: { kind: "DRAFT", draftVersion } })` at the version that
+   read returned. It composes the draft over the deployed policy **exactly as the commit will write it**,
    and refuses a draft no longer at that version with `DRAFT_VERSION_MOVED`.
 
 To try a slot set without touching the draft, preview `{ kind: "SLOTS", slots }` — it resolves
@@ -134,8 +134,8 @@ choose. Complete stage payloads for every row are in `references/radar-stage-exa
    and `REGIME_ANCHOR` (the anchor override, or null to inherit the arena's). Pausing is never staged.
 2. `get_deployment_policy_draft` — its `draftVersion`, `committedRevision`, diff, `diagnostics` and
    `impact` (the next session's resolution and whether it will play), exactly as for Radar.
-3. `preview_deployment_resolution` with `request: { kind: "DRAFT", draftVersion }` at the version
-   that read returned.
+3. `preview_deployment_resolution({ presetId, request: { kind: "DRAFT", draftVersion } })` at the
+   version that read returned.
 
 A draft that would hold no rule and no catch-all is a withdrawal, which a commit never does — that is
 `delete_deployment_policy` (step 4).
@@ -239,11 +239,11 @@ the reason — and **names what the change does to the stored policy**, read fro
 
 Then:
 
-- **Radar** → `commit_radar_deployment_draft({ request: { coinId, draftVersion, expectedRevision } })`,
+- **Radar** → `commit_radar_deployment_draft({ coinId, draftVersion, expectedRevision })`,
   naming exactly the `draftVersion` and `committedRevision` your draft read returned — the version
   your preview resolved. Ask with `ask_user` first and commit only after an explicit confirming pick.
   The axes it published leave the draft.
-- **Arena** → `commit_deployment_policy_draft({ request: { presetId, draftVersion, expectedRevision } })`,
+- **Arena** → `commit_deployment_policy_draft({ presetId, draftVersion, expectedRevision })`,
   the same way.
 
 **On `DRAFT_VERSION_MOVED` or a CONFLICT: re-read, re-preview, re-confirm.** In that order, and all
@@ -256,7 +256,7 @@ ask for again.
 
 **Pause a coin's Radar** → `pause_radar_deployment({ coinId })`. No preview and no revision: stopping
 never waits on a read. The player's draft keeps its content and is re-based onto the paused revision.
-**Resume** → preview the deployed policy with `request: { kind: "COMMITTED" }`, tell the player which
+**Resume** → preview the deployed policy with `preview_radar_resolution({ coinId, request: { kind: "COMMITTED" } })`, tell the player which
 agents will go on duty again, and on their word
 `resume_radar_deployment({ coinId, expectedPolicyId, expectedRevision })` naming the `policyId` and
 `revision` that preview returned — so it re-arms the policy the player was shown, or nothing.
@@ -274,8 +274,8 @@ same cancellation and refund as their own Cancel button. Say nothing is cancelle
 
 **Discard a draft** only on the player's word. Read it first and tell the player what it holds and
 when and from where it was last written; then
-`discard_radar_deployment_draft({ request: { coinId, draftVersion } })` or
-`discard_deployment_policy_draft({ request: { presetId, draftVersion } })` at **the version you read**.
+`discard_radar_deployment_draft({ coinId, draftVersion })` or
+`discard_deployment_policy_draft({ presetId, draftVersion })` at **the version you read**.
 If the draft moved since, it is refused with `DRAFT_VERSION_MOVED` and nothing is removed — read it
 again and show them.
 

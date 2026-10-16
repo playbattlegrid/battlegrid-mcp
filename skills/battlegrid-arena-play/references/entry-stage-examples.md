@@ -21,23 +21,21 @@ enter, each citing the market context you read.
 
 ```json stage_market_grid_entry_draft
 {
-  "request": {
-    "sessionId": "<SESSION_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "CELL_0": { "cell": { "coinId": "<COIN_ID>", "prediction": "UP" } },
-      "CELL_1": { "cell": { "coinId": "<SECOND_COIN_ID>", "prediction": "DOWN" } },
-      "CELL_2": { "cell": { "coinId": "<THIRD_COIN_ID>", "prediction": "UP" } },
-      "RATIONALE": {
-        "reasoning": "The leader is breaking out on rising volume while the second coin rejects its range high.",
-        "confidenceScore": 0.7,
-        "modelName": "your-model-name",
-        "pickReasoning": [
-          { "coinId": "<COIN_ID>", "reasoning": "Breaking resistance on rising volume.", "confidence": 0.8 },
-          { "coinId": "<SECOND_COIN_ID>", "reasoning": "Bearish divergence at the range high.", "confidence": 0.6 },
-          { "coinId": "<THIRD_COIN_ID>", "reasoning": "Holding its trend above the session open.", "confidence": 0.6 }
-        ]
-      }
+  "sessionId": "<SESSION_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "CELL_0": { "cell": { "coinId": "<COIN_ID>", "prediction": "UP" } },
+    "CELL_1": { "cell": { "coinId": "<SECOND_COIN_ID>", "prediction": "DOWN" } },
+    "CELL_2": { "cell": { "coinId": "<THIRD_COIN_ID>", "prediction": "UP" } },
+    "RATIONALE": {
+      "reasoning": "The leader is breaking out on rising volume while the second coin rejects its range high.",
+      "confidenceScore": 0.7,
+      "modelName": "your-model-name",
+      "pickReasoning": [
+        { "coinId": "<COIN_ID>", "reasoning": "Breaking resistance on rising volume.", "confidence": 0.8 },
+        { "coinId": "<SECOND_COIN_ID>", "reasoning": "Bearish divergence at the range high.", "confidence": 0.6 },
+        { "coinId": "<THIRD_COIN_ID>", "reasoning": "Holding its trend above the session open.", "confidence": 0.6 }
+      ]
     }
   }
 }
@@ -51,12 +49,10 @@ that coin changed.
 
 ```json stage_market_grid_entry_draft
 {
-  "request": {
-    "sessionId": "<SESSION_ID>",
-    "draftVersion": 4,
-    "axes": {
-      "CELL_1": { "cell": { "coinId": "<SECOND_COIN_ID>", "prediction": "UP" } }
-    }
+  "sessionId": "<SESSION_ID>",
+  "draftVersion": 4,
+  "axes": {
+    "CELL_1": { "cell": { "coinId": "<SECOND_COIN_ID>", "prediction": "UP" } }
   }
 }
 ```
@@ -65,21 +61,19 @@ that coin changed.
 
 ```json stage_market_grid_entry_draft
 {
-  "request": {
-    "sessionId": "<SESSION_ID>",
-    "draftVersion": 5,
-    "axes": {
-      "CELL_1": { "cell": { "coinId": "<SECOND_COIN_ID>", "prediction": "UP" } },
-      "RATIONALE": {
-        "reasoning": "The second coin reclaimed its range high, so it now runs with the leader.",
-        "confidenceScore": 0.65,
-        "modelName": "your-model-name",
-        "pickReasoning": [
-          { "coinId": "<COIN_ID>", "reasoning": "Breaking resistance on rising volume.", "confidence": 0.8 },
-          { "coinId": "<SECOND_COIN_ID>", "reasoning": "Reclaimed the range high on the last close.", "confidence": 0.6 },
-          { "coinId": "<THIRD_COIN_ID>", "reasoning": "Holding its trend above the session open.", "confidence": 0.6 }
-        ]
-      }
+  "sessionId": "<SESSION_ID>",
+  "draftVersion": 5,
+  "axes": {
+    "CELL_1": { "cell": { "coinId": "<SECOND_COIN_ID>", "prediction": "UP" } },
+    "RATIONALE": {
+      "reasoning": "The second coin reclaimed its range high, so it now runs with the leader.",
+      "confidenceScore": 0.65,
+      "modelName": "your-model-name",
+      "pickReasoning": [
+        { "coinId": "<COIN_ID>", "reasoning": "Breaking resistance on rising volume.", "confidence": 0.8 },
+        { "coinId": "<SECOND_COIN_ID>", "reasoning": "Reclaimed the range high on the last close.", "confidence": 0.6 },
+        { "coinId": "<THIRD_COIN_ID>", "reasoning": "Holding its trend above the session open.", "confidence": 0.6 }
+      ]
     }
   }
 }
