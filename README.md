@@ -24,6 +24,23 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v112 (one input name per identity)
+
+**Breaking at v112: three input names retire.** v112 is the contract on top of v111.1. Reconnect the proxy, or restart
+it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **`symbol` on `get_regime_snapshot` and `get_regime_history`** — send `coinTicker` (default `BTC`).
+- **`ticker` on `get_coin_candles` and `get_coin_performance_history`** — send `coinTicker`.
+- **`marketGridSessionId` on `list_session_agent_positions`** — send `sessionId`.
+
+  Each retired name is refused as an unrecognised key naming it; nothing translates it. Responses keep `symbol` and
+  `marketGridSessionId` where they published them.
+- **An unknown coin on two filters.** `list_entry_decisions`' `coinTicker` and the public-profile `filter.coinTicker`
+  facet now resolve like every other coin input — `kPEPE` filters `PEPE`, any casing works — and an unknown coin is
+  refused naming `coinTicker` or `filter.coinTicker[i]`, where it used to answer an empty page.
+
 ## Contract history — v111.1 (every read fits hosted Claude, and a large one says so)
 
 **One refusal is added at v111.1; nothing you send is refused that was accepted.** v111.1 is the contract on top of
