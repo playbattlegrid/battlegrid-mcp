@@ -24,6 +24,25 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v114 (every paginated read takes the same cursor)
+
+**Breaking at v114: the radar close-decision read pages by cursor, and old cursors expire.** v114 is the contract on
+top of v113. Reconnect the proxy, or restart it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **`before` on `get_radar_close_decisions`.** Omit `cursor` for the first page, then send the `nextCursor` the
+  previous page returned. `before` is refused as an unrecognised key naming it; nothing translates it.
+- **A cursor another read served, or one served before v114,** is refused naming `cursor`. Every cursor is accepted
+  only by the read that wrote it; restart a held listing from its first page. Every cursor input is bounded at 2,048
+  characters.
+
+### Reshaped output — something you read moved
+
+- **`nextBefore` → `nextCursor`** on `get_radar_close_decisions` (`null` on the last page). A page now holds at most
+  `limit` records — it no longer runs past `limit` to finish its oldest bar — and records within one bar order by
+  record id. The tool declares a large result narrowed by `limit`.
+
 ## Contract history — v113 (one pagination shape: an opaque cursor)
 
 **Breaking at v113: nine reads page by cursor.** v113 is the contract on top of v112. Reconnect the proxy, or restart
