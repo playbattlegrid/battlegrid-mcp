@@ -24,10 +24,36 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v111.1 (every read fits hosted Claude, and a large one says so)
+
+**One refusal is added at v111.1; nothing you send is refused that was accepted.** v111.1 is the contract on top of
+v111. Reconnect the proxy, or restart it, so discovery reads the new schemas and the new resource.
+
+### Refusal vocabulary
+
+- **`RESULT_TOO_LARGE`.** A read-only tool whose result would serialize past the server's result-character cap
+  (at most 150,000, hosted Claude's tool-result cap) is refused whole, never cut, with details
+  `{ limit: "result_chars", actual, maximum }`. `get_market_context` (fewer `modules`), and `get_agent_journal`,
+  `list_gate_blocks` and `list_market_grid_sessions` (a smaller `limit`) add `nextAct: "narrow"`; a read with no
+  input that asks for less adds none. A tool that writes is never refused this way. The code also joins the draft
+  diagnostics' `code` enum.
+
+### Behaviour behind unchanged schemas
+
+- **The server instructions are an index within 4,096 characters**, the length Claude reads: the rules every session
+  needs, then one routing line per workflow naming its entry tool and skills. The workflow cards move to the
+  `battlegrid://guide/workflows` resource, and the grid format stays in `battlegrid://reference/grid-format`.
+- **Ten large reads declare `_meta["anthropic/maxResultSizeChars"]`** equal to the server's cap, so Claude Code keeps
+  their results in the conversation rather than moving them to a file.
+- **Input schemas hold each reused or recursive shape once, under named `$defs`**, where they pointed into a sibling
+  property; they accept exactly what they accepted. No schema publishes `{ "not": {} }`, and four strategy outputs
+  stop publishing `conditionVerdicts`, a property no response carried.
+- **Descriptions name their parameters instead of listing the members of an input enum**; the enum is the list.
+
 ## Contract history — v111 (the draft tools take their arguments at the top level)
 
 **Breaking at v111: every draft-lifecycle tool takes its id, `draftVersion` and payload as top-level
-arguments.** v111 is the contract on top of v110.12. Reconnect the proxy, or restart it, so discovery
+arguments.** v111 is the contract on top of v110.13. Reconnect the proxy, or restart it, so discovery
 reads the new schemas.
 
 ### Rejected input — something you send is no longer accepted
@@ -3635,8 +3661,9 @@ you reach over MCP:
 > fails CI on a hand edit. Change the skill upstream and let the export lane bring it here.
 
 A client connected to BattleGrid's remote server directly receives its `initialize` instructions:
-the rules that span tools and one routing card per workflow, each naming the `battlegrid-*` skill
-above that holds the full procedure. This proxy does not relay those instructions; the skills
+the rules that span tools and one routing line per workflow, each naming the `battlegrid-*` skill
+above that holds the full procedure, with the workflow cards in the `battlegrid://guide/workflows`
+resource. This proxy does not relay those instructions; the skills
 installed beside it carry the same workflows.
 
 ## License
