@@ -48,8 +48,10 @@ the enablement path there.
 
 ### 2. Workflow A reads, in order
 
-1. `list_market_grid_sessions` with status `PENDING` — the sessions still enterable. **The
-   `sessionId` you use comes from here; never fabricate one.**
+1. `list_market_grid_sessions` with status `PENDING`. A session accepts entries while it is PENDING
+   **and** its `lockAt` is still ahead — the status turns LIVE some time after the lock, so a session
+   can still read PENDING once entries have closed. **The `sessionId` you use comes from here; never
+   fabricate one.**
 2. `get_market_grid_session` — the coin pool (note each coin's `id`), the entry fee, the pool and
    the session's three instants: `startsAt` (the **Opening Bell** — the open of the one candle it
    scores), `lockAt` (entries close) and `settleAt` (the candle closes). Entries stay open through
@@ -60,13 +62,21 @@ the enablement path there.
 4. `check_market_grid_submission` — **before composing anything.** If a submission already exists,
    report it (with its id and time); while the session is still PENDING, a commit of the draft
    replaces its picks. Never compose a duplicate.
-5. `get_market_grid_entry_draft({ request: { sessionId } })` — what the draft holds now, the player's
+5. `get_market_grid_entry_draft({ sessionId })` — what the draft holds now, the player's
    own picks included, with the `draftVersion` and `committedRevision` your stage and commit name.
    Answer "what does my grid look like" from this read, never from a pick count.
 
+**Know the window before you spend it.** The first read already carries each session's `lockAt`:
+compare it with the current time — in Commander, every player turn carries the time it was sent — and
+tell the player how long remains before the rest of the reads use it up. A staged grid still needs the
+player's PLACE ENTRY, or your commit, before the lock. A `lockAt` already behind the current time
+means the session is **closed to entries even though it reads PENDING**: say so and point at the next
+session rather than composing for it — a stage or commit there is refused `CONFLICT` as closed to
+entries.
+
 ### 3. Compose — stage into the draft, and the reasoning is yours to get right
 
-`stage_market_grid_entry_draft({ request: { sessionId, draftVersion, axes } })`, naming the
+`stage_market_grid_entry_draft({ sessionId, draftVersion, axes })`, naming the
 `draftVersion` the read returned. Each cell axis is `{ cell: { coinId, prediction } }` — `coinId` the
 pool coin's `id` — or `{ cell: null }` to empty it. **Compose on top of what the draft holds**: a cell
 you do not stage keeps the player's pick, and you never discard their picks to start over unless they
@@ -103,7 +113,7 @@ say that rather than inventing a bar), whether it meets the threshold, and the p
 `impact` — `ENTER` with the `entryFee` the commit charges, or `REPLACE` for none. One confirmation
 naming **the session, that fee, and the confidence** — then commit on an explicit pick.
 
-- Direct → `commit_market_grid_entry_draft({ request: { sessionId, draftVersion, expectedRevision } })`,
+- Direct → `commit_market_grid_entry_draft({ sessionId, draftVersion, expectedRevision })`,
   naming exactly the `draftVersion` and `committedRevision` the last read returned (`null` with no
   entry). A refusal naming `get_draft` means the draft or the entry moved: read again and confirm
   again — never retry with a bumped number.
@@ -126,7 +136,8 @@ player's, and the attribution is part of what was scored.
 ### 5. After settlement
 
 - A session moves PENDING → LIVE → RESOLVING → SETTLED. It stays PENDING through the Opening Bell
-  window and goes LIVE at `lockAt`. Two states sit off that path: CANCELLED
+  window and turns LIVE once its lock has passed; entries close at `lockAt` itself, whatever the
+  status reads. Two states sit off that path: CANCELLED
   (entry fees refunded) and SETTLEMENT_QUARANTINED (settlement exhausted its retries and awaits an
   operator). Either one is the answer — report it as the status.
 - `get_market_grid_results` — available only once the session is SETTLED. Before that it returns a

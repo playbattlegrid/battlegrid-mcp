@@ -1,10 +1,11 @@
 # Strategy stage examples
 
-`strategyId` and `draftVersion` sit beside `axes`, inside `request` — never inside `axes`. Every example below is
-checked in CI against the live `stage_strategy_draft` schema; a create example is also checked for the axes a new
-strategy needs. Its shape is current.
+Each example is the tool's whole input: `strategyId` and `draftVersion` sit at the top level beside `axes`, never
+inside `axes`. Every example below is checked in CI against the live
+`stage_strategy_draft` schema; a create example is also checked for the axes a new strategy needs. Its shape is
+current.
 
-These examples show the envelope and the small axes. A full composition (report sections, conditions, trade
+These examples show the input's shape and the small axes. A full composition (report sections, conditions, trade
 levels) is in `strategy-examples`' playbooks, which have their own compile gate.
 
 Every `<UPPER_SNAKE>` value is a placeholder: `<STRATEGY_ID>` is the id a read returned. Never send a placeholder as
@@ -19,16 +20,14 @@ and TIMEFRAME_PROFILE before it can be created.
 
 ```json stage_strategy_draft
 {
-  "request": {
-    "draftVersion": 0,
-    "axes": {
-      "IDENTITY": {
-        "name": "Squeeze Breakout",
-        "description": "Enters when a volatility squeeze resolves upward on rising volume.",
-        "tagline": "Buys the release of a tight range"
-      },
-      "TIMEFRAME_PROFILE": { "timeframe": "1h" }
-    }
+  "draftVersion": 0,
+  "axes": {
+    "IDENTITY": {
+      "name": "Squeeze Breakout",
+      "description": "Enters when a volatility squeeze resolves upward on rising volume.",
+      "tagline": "Buys the release of a tight range"
+    },
+    "TIMEFRAME_PROFILE": { "timeframe": "1h" }
   }
 }
 ```
@@ -40,16 +39,14 @@ a coin must clear before any condition is read; the other three are the stop-los
 
 ```json stage_strategy_draft
 {
-  "request": {
-    "strategyId": "<STRATEGY_ID>",
-    "draftVersion": 2,
-    "axes": {
-      "TRADE_LEVEL_POLICY": {
-        "minStopLossAtrMultiple": 1,
-        "maxStopLossAtrMultiple": 2,
-        "minRiskRewardRatio": 1.5,
-        "minAtrPct": 0.8
-      }
+  "strategyId": "<STRATEGY_ID>",
+  "draftVersion": 2,
+  "axes": {
+    "TRADE_LEVEL_POLICY": {
+      "minStopLossAtrMultiple": 1,
+      "maxStopLossAtrMultiple": 2,
+      "minRiskRewardRatio": 1.5,
+      "minAtrPct": 0.8
     }
   }
 }

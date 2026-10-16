@@ -17,13 +17,11 @@ axis you omit keeps the value the draft already has.
 
 ```json stage_deployment_policy_draft
 {
-  "request": {
-    "presetId": "<PRESET_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "DEFAULT_SLOT": {
-        "defaultSlot": { "agentId": "<AGENT_ID>", "minConfidence": null }
-      }
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "DEFAULT_SLOT": {
+      "defaultSlot": { "agentId": "<AGENT_ID>", "minConfidence": null }
     }
   }
 }
@@ -33,19 +31,17 @@ axis you omit keeps the value the draft already has.
 
 ```json stage_deployment_policy_draft
 {
-  "request": {
-    "presetId": "<PRESET_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConfidence": null,
-            "conditions": [{ "kind": "regime", "regimes": ["bull_expansion", "bull_ranging"] }]
-          }
-        ]
-      }
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConfidence": null,
+          "conditions": [{ "kind": "regime", "regimes": ["bull_expansion", "bull_ranging"] }]
+        }
+      ]
     }
   }
 }
@@ -58,21 +54,19 @@ session occurrence, never both.
 
 ```json stage_deployment_policy_draft
 {
-  "request": {
-    "presetId": "<PRESET_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConfidence": 0.6,
-            "conditions": [
-              { "kind": "session_start", "startTimes": ["14:00:00", "15:00:00"], "days": [1, 2, 3, 4, 5] }
-            ]
-          }
-        ]
-      }
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConfidence": 0.6,
+          "conditions": [
+            { "kind": "session_start", "startTimes": ["14:00:00", "15:00:00"], "days": [1, 2, 3, 4, 5] }
+          ]
+        }
+      ]
     }
   }
 }
@@ -82,22 +76,20 @@ session occurrence, never both.
 
 ```json stage_deployment_policy_draft
 {
-  "request": {
-    "presetId": "<PRESET_ID>",
-    "draftVersion": 0,
-    "axes": {
-      "RULES": {
-        "rules": [
-          {
-            "agentId": "<AGENT_ID>",
-            "minConfidence": null,
-            "conditions": [
-              { "kind": "regime", "regimes": ["volatile"] },
-              { "kind": "session_start", "startTimes": ["14:00:00"], "days": [1, 2, 3, 4, 5] }
-            ]
-          }
-        ]
-      }
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConfidence": null,
+          "conditions": [
+            { "kind": "regime", "regimes": ["volatile"] },
+            { "kind": "session_start", "startTimes": ["14:00:00"], "days": [1, 2, 3, 4, 5] }
+          ]
+        }
+      ]
     }
   }
 }
@@ -110,12 +102,10 @@ come together, or not at all.
 
 ```json stage_deployment_policy_draft
 {
-  "request": {
-    "presetId": "<PRESET_ID>",
-    "draftVersion": 2,
-    "axes": {
-      "REGIME_ANCHOR": { "regimeAnchor": { "regimeReferenceCoinId": "<COIN_ID>", "regimeTimeframe": "4h" } }
-    }
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 2,
+  "axes": {
+    "REGIME_ANCHOR": { "regimeAnchor": { "regimeReferenceCoinId": "<COIN_ID>", "regimeTimeframe": "4h" } }
   }
 }
 ```
@@ -126,12 +116,10 @@ The arena's own anchor applies again.
 
 ```json stage_deployment_policy_draft
 {
-  "request": {
-    "presetId": "<PRESET_ID>",
-    "draftVersion": 2,
-    "axes": {
-      "REGIME_ANCHOR": { "regimeAnchor": null }
-    }
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 2,
+  "axes": {
+    "REGIME_ANCHOR": { "regimeAnchor": null }
   }
 }
 ```

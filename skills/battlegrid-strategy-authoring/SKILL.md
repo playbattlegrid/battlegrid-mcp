@@ -185,13 +185,13 @@ skill stays the authority on the flow.
 
 ### 4. Stage, and iterate on the diagnostics
 
-**Every change goes through the strategy's draft.** `stage_strategy_draft` takes, inside its
-`request`, the `strategyId`, the `draftVersion` your last read returned (0 when there was none) and
-the `axes` you propose. It writes those axes into the player's draft — attributed to you, landing in
-their builder as unsaved changes — and commits nothing. Each stage returns the draft's new
-`version`: that is the `draftVersion` your next stage names. Stage each change once, and never fire
-two stages in parallel against one draft. Complete stage payloads showing the envelope are in
-`references/strategy-stage-examples.md`.
+**Every change goes through the strategy's draft.**
+`stage_strategy_draft({ strategyId, draftVersion, axes })` takes the `strategyId`, the `draftVersion`
+your last read returned (0 when there was none) and the `axes` you propose. It writes those axes into
+the player's draft — attributed to you, landing in their builder as unsaved changes — and commits
+nothing. Each stage returns the draft's new `version`: that is the `draftVersion` your next stage
+names. Stage each change once, and never fire two stages in parallel against one draft. Complete
+stage payloads are in `references/strategy-stage-examples.md`.
 
 **A new strategy is a create draft.** Omit `strategyId` and send `draftVersion: 0` on the first
 stage; the response carries the id minted for it, which every later call names. A create needs

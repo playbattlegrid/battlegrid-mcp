@@ -21,14 +21,12 @@ platform seed.
 
 ```json stage_agent_draft
 {
-  "request": {
-    "draftVersion": 0,
-    "axes": {
-      "IDENTITY": { "displayName": "Breakout Scout" },
-      "BEHAVIOR": { "behavior": { "risk": "MODERATE", "outlook": "REALIST", "conviction": "MEASURED" } },
-      "MODEL": { "modelId": "<MODEL_ID>" },
-      "STRATEGY_BINDING": { "strategyId": "<STRATEGY_ID>" }
-    }
+  "draftVersion": 0,
+  "axes": {
+    "IDENTITY": { "displayName": "Breakout Scout" },
+    "BEHAVIOR": { "behavior": { "risk": "MODERATE", "outlook": "REALIST", "conviction": "MEASURED" } },
+    "MODEL": { "modelId": "<MODEL_ID>" },
+    "STRATEGY_BINDING": { "strategyId": "<STRATEGY_ID>" }
   }
 }
 ```
@@ -39,12 +37,10 @@ BEHAVIOR is sent whole: all three of risk, outlook and conviction, even when onl
 
 ```json stage_agent_draft
 {
-  "request": {
-    "agentId": "<AGENT_ID>",
-    "draftVersion": 4,
-    "axes": {
-      "BEHAVIOR": { "behavior": { "risk": "CONSERVATIVE", "outlook": "REALIST", "conviction": "CAUTIOUS" } }
-    }
+  "agentId": "<AGENT_ID>",
+  "draftVersion": 4,
+  "axes": {
+    "BEHAVIOR": { "behavior": { "risk": "CONSERVATIVE", "outlook": "REALIST", "conviction": "CAUTIOUS" } }
   }
 }
 ```
@@ -53,12 +49,10 @@ BEHAVIOR is sent whole: all three of risk, outlook and conviction, even when onl
 
 ```json stage_agent_draft
 {
-  "request": {
-    "agentId": "<AGENT_ID>",
-    "draftVersion": 4,
-    "axes": {
-      "STRATEGY_BINDING": { "strategyId": "<STRATEGY_ID>" }
-    }
+  "agentId": "<AGENT_ID>",
+  "draftVersion": 4,
+  "axes": {
+    "STRATEGY_BINDING": { "strategyId": "<STRATEGY_ID>" }
   }
 }
 ```
