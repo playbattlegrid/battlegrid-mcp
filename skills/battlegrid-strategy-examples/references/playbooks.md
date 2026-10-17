@@ -36,11 +36,14 @@ anything failing {LIQUID_FLOOR}."
 Custom `Positioning`: `FUNDING_RATE value`→`rate`, `aggregate w24`→`rate_mean24`,
 `FUNDING_ANN value`→`ann`, `OI_CHG value`→`oiChg`, `OI_PX_REGIME value`→`oiRegime` (vocab:
 new longs / new shorts / short covering / long liquidation), `MARK spread ORACLE`→
-`mark_oracle_spread`, `RSI14 value`, `CHG_24H value`→`chg24h`; plus `includeCvd`. Conditions:
+`mark_oracle_spread`, `RSI14 value`, `CLOSE_CHANGE value @ {abs: 1d}`→`closeChg_1d` (Confirmed, the
+default above the strategy timeframe); plus `includeCvd`. Conditions:
 `NO_LIQUIDATION_TAPE` required NOT-veto (`NOT [oiRegime is "long liquidation"]`);
 `CROWDED_LONGS` building block (`ann gte 25` + `oiChg gte 3` + `oiRegime is "new longs"`);
-`FADE_SHORT` verdict DOWN (ref + `RSI14 gte 65` + `chg24h gte 5`); mirrored `SQUEEZED_SHORTS`
-/ `SQUEEZE_LONG` verdict UP. Levels 1.0–2.5 ATR, RR 1.5, ATR floor 0.5%. PM: BE 0.8R, no trail, timeDecay ON (120/60, 10→40, stale 25).
+`FADE_SHORT` verdict DOWN (ref + `RSI14 gte 65` + `closeChg_1d gte 5`); mirrored `SQUEEZED_SHORTS`
+/ `SQUEEZE_LONG` verdict UP (`closeChg_1d lte -5`). The confirmation is the prior completed UTC day's
+move, not today's: today's (`chg24h`) is a 1d bar still in progress at every 1h close, a developing
+read no verdict may carry. Levels 1.0–2.5 ATR, RR 1.5, ATR floor 0.5%. PM: BE 0.8R, no trail, timeDecay ON (120/60, 10→40, stale 25).
 
 ### 3 · Relative-Strength Rotation with a Benchmark Gate — 4h cross-sectional
 
