@@ -107,7 +107,12 @@ is test-routing a regime. Never carry a fact from a radar conversation into it, 
    Do not confirm a draft whose diagnostics carry an error: stage a fix.
 3. `preview_radar_resolution({ coinId, request: { kind: "DRAFT", draftVersion } })` at the version that
    read returned. It composes the draft over the deployed policy **exactly as the commit will write it**,
-   and refuses a draft no longer at that version with `DRAFT_VERSION_MOVED`.
+   and refuses a draft no longer at that version with `DRAFT_VERSION_MOVED`. Its `ruleCloseCoverage`
+   counts, for each hours rule, the closes of its agent's `strategyTimeframe` bar the rule's hours let
+   it decide through `windowEndAt`. Before asking the player to commit, name every rule whose
+   `decidableCloses` is 0: its agent's timeframe, the served `windowEndAt`, and that it is this rule's
+   hours alone that hold no close — not the agent, which still decides closes it is on duty for through
+   another rule or the default. Never tell the player the agent will not trade.
 
 To try a slot set without touching the draft, preview `{ kind: "SLOTS", slots }` — it resolves
 explicit slots and nothing can commit it.
@@ -121,6 +126,13 @@ from what the player asked for:
 | only in named regimes | a rule with a regime condition |
 | only in named hours and days | a rule with an hours condition |
 | in named regimes during named hours | a rule with one hours condition and one regime condition |
+
+When the player names an exchange session — New York, the New York open, London, Tokyo — call
+`get_radar_market_hours` and stage that session's `hours` exactly as served, merged with any other
+session they name; never work session hours out yourself, because New York and London shift with
+daylight saving on their own dates. The days stay the player's choice. Tell the player the staged
+hours are UTC, that an hour is on duty from :00 through :59, and, when the session carries a
+`nextShift`, the date its hours change and that the rule keeps the hours it was given.
 
 When the ask maps to no single row, or a refusal rules out the construction the player asked for,
 ask the player which construction they mean, naming the rows that fit — never stage one they did not
@@ -352,8 +364,9 @@ Four reads, cheapest first. Stop as soon as the player's question is answered.
    refused it and nothing was traded. It is the only history of not-qualifying closes: the journal
    writes no row for one, and `resolvesNow` keeps only each agent's last decision — the one
    `reading.lastClose` (step 1) carries; this read holds every decision before it. Narrow with
-   `agentId`; page back by passing the response's `nextBefore` as `before`, and stop when
-   `nextBefore` is null — that is the end of the history. A bar still
+   `agentId`. Each record carries its whole evidence, so keep `limit` small; page back by passing
+   the response's `nextCursor` as `cursor`, and stop when `nextCursor` is null — that is the end of
+   the history. A bar still
    waiting inside its window has no record yet (`resolvesNow` shows its `closeDecision.state` as
    `DEFERRED`), and records are kept 90 days.
 4. **`get_radar_activity`** only for what steps 2 and 3 cannot do: more rows than its ten, a
