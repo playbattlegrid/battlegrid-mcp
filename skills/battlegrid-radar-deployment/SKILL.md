@@ -127,12 +127,18 @@ from what the player asked for:
 | only in named hours and days | a rule with an hours condition |
 | in named regimes during named hours | a rule with one hours condition and one regime condition |
 
-When the player names an exchange session — New York, the New York open, London, Tokyo — call
-`get_radar_market_hours` and stage that session's `hours` exactly as served, merged with any other
-session they name; never work session hours out yourself, because New York and London shift with
-daylight saving on their own dates. The days stay the player's choice. Tell the player the staged
-hours are UTC, that an hour is on duty from :00 through :59, and, when the session carries a
-`nextShift`, the date its hours change and that the rule keeps the hours it was given.
+When the player names an exchange session — New York, the New York open, London, the London open,
+the London–New York overlap, Tokyo, the Tokyo open — call `get_radar_market_hours` and stage that session's `hours`
+exactly as served, merged with any other session they name; never work session hours out yourself,
+because New York and London shift with daylight saving on their own dates and the overlap changes
+shape on each of those dates. The three opens are one hour wide, so they suit agents on 1h bars or
+faster. The days stay the player's choice. Tell the player the staged hours are UTC, that an hour is
+on duty from :00 through :59, and, when the session carries a `nextShift`, the date its hours change
+and that the rule keeps the hours it was given.
+
+Session closes are not presets. Asked for "the New York close" or any other session close, stage only
+the hours the player names, or raise flattening before the session ends as a separate idea — never
+work a close window out yourself.
 
 When the ask maps to no single row, or a refusal rules out the construction the player asked for,
 ask the player which construction they mean, naming the rows that fit — never stage one they did not
