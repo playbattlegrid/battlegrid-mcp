@@ -72,8 +72,9 @@ than about authoring:
   `expectedPolicyId` and `expectedRevision` a `COMMITTED` preview returned.
 - **The proxy forwards numbers and `null` unchanged.** It never fills in a version, never retries a
   refused call and never rebuilds a request. A `DRAFT_VERSION_MOVED` or `DRAFT_AXIS_CONTESTED` refusal
-  carries `details.nextAct` from every tool, and a revision `CONFLICT` or validation refusal carries it
-  from a stage or commit; the next act is the caller's.
+  carries `details.nextAct` from every tool, and a revision `CONFLICT` or a refusal of the staged content
+  carries it from a stage or commit. A refused argument (`VALIDATION_ERROR` with `details.issues`)
+  carries none: make the same call with the arguments corrected. The next act is the caller's.
 
 `fork_strategy` copies a revision into a new create draft and creates nothing until that draft is
 committed. An agent binds to a strategy through its draft's `STRATEGY_BINDING` axis, on a create or

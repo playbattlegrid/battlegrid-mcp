@@ -38,6 +38,37 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v117 (a refused argument is the house error envelope)
+
+**Breaking at v117: an argument refusal is JSON, and the scope check comes first.** v117 is the contract on top of
+v116. No schema moves, so nothing you send is refused that v116 accepted. Code that read the SDK's refusal sentence
+must read the envelope instead.
+
+### Reshaped output — something you read has a new shape
+
+- **A call whose arguments the tool's schema refuses** is an `isError` result whose text is the same JSON envelope
+  every other refusal uses: `{ "code": "VALIDATION_ERROR", "message", "details": { "issueCount", "issues" } }`. It
+  was the SDK's `Input validation error: …` sentence.
+
+### Refusal vocabulary
+
+- **`details.issues`** holds the first 20 issues in the order the parse found them. Each is `{ path, message }`:
+  - `path` is where the issue is, as segments within the arguments object, and `[]` is the arguments object itself;
+  - `message` is the schema's own text, so a remedy the schema appends to an issue reaches you unchanged.
+- **`details.issueCount`** is how many issues the parse found. It exceeds the length of `issues` when more than 20
+  were found.
+- **An unrecognised key** is reported at the path of the object it was sent on, by an issue whose message names the
+  key. A retired argument therefore shows up as an issue on its parent object, not as a path ending in its own name.
+- **`message`** is the first issue's message.
+- **The refusal carries no `details.nextAct`.** Recover by making the same call with corrected arguments. A refusal of
+  a draft's staged content still carries `nextAct: "stage"`, so the two are told apart by `details.issues`.
+
+### Behaviour behind unchanged schemas
+
+- **The required scope is checked before the arguments are parsed.** A credential without the tool's scope is refused
+  `FORBIDDEN` with `details.requiredScope` whatever it sends. Before, an argument object the schema refused was
+  answered by the parse first.
+
 ## Contract history — v116 (the server moves to MCP SDK v2 and protocol 2026-07-28)
 
 **Breaking at v116: `test_generate_deployment_grid` takes its payload at the top level.** v116 is the contract on top
