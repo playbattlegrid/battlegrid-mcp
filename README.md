@@ -38,9 +38,9 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v117.1 (a server fault says whether repeating is safe)
+## Contract history — v118.1 (a server fault says whether repeating is safe)
 
-**Nothing you send is refused that v117 accepted.** v117.1 is the contract on top of v117. No input schema moves.
+**Nothing you send is refused that v118 accepted.** v118.1 is the contract on top of v118. No input schema moves.
 Reconnect the proxy, or restart it, so discovery reads the new annotation below.
 
 ### Added fields
@@ -64,10 +64,10 @@ Reconnect the proxy, or restart it, so discovery reads the new annotation below.
 - **`reset_agent_drawdown_baseline` declares `idempotentHint: false`.** Each call moves the drawdown baseline to now,
   so a repeat forgives any loss realized in between.
 
-## Contract history — v117 (a refused argument is the house error envelope)
+## Contract history — v118 (a refused argument is the house error envelope)
 
-**Breaking at v117: an argument refusal is JSON, and the scope check comes first.** v117 is the contract on top of
-v116. No schema moves, so nothing you send is refused that v116 accepted. Code that read the SDK's refusal sentence
+**Breaking at v118: an argument refusal is JSON, and the scope check comes first.** v118 is the contract on top of
+v117. No schema moves, so nothing you send is refused that v117 accepted. Code that read the SDK's refusal sentence
 must read the envelope instead.
 
 ### Reshaped output — something you read has a new shape
@@ -94,6 +94,26 @@ must read the envelope instead.
 - **The required scope is checked before the arguments are parsed.** A credential without the tool's scope is refused
   `FORBIDDEN` with `details.requiredScope` whatever it sends. Before, an argument object the schema refused was
   answered by the parse first.
+
+## Contract history — v117 (decided changes read at their horizon bar)
+
+**Breaking at v117, behind unchanged schemas.** v117 is the contract on top of v116; no input or output schema moves.
+
+### Rejected input — something you send is no longer accepted
+
+- **A verdict carrier or hold that reads a change over a horizon above the strategy timeframe is refused.** That is
+  `chg4h` and `chg24h` on a `1h` strategy, and `oiRegime` (the `1h` change) below `1h`. Such a change is a developing
+  read whatever its selector.
+  - **Where it is refused:** a strategy save, draft stage or preview, refused `CONDITION_VERDICT_READ_ILLEGAL` or
+    `CONDITION_HOLD_ILLEGAL`. Restoring an archived strategy that holds one is refused the same way until it is
+    repaired.
+  - **What the refusal says:** it names the carrier and the column, with a remedy that reads a horizon at or below
+    the strategy timeframe.
+
+### Behaviour behind unchanged schemas
+
+- **A change is the frame's price against its horizon bar's open.** A decided frame reads it exactly where it read
+  UNRESOLVED, and a horizon whose bar was not read is UNRESOLVED where it read FALSE.
 
 ## Contract history — v116 (the server moves to MCP SDK v2 and protocol 2026-07-28)
 
