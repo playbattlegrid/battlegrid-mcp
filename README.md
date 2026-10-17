@@ -38,6 +38,83 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v118.1 (a server fault says whether repeating is safe)
+
+**Nothing you send is refused that v118 accepted.** v118.1 is the contract on top of v118. No input schema moves.
+Reconnect the proxy, or restart it, so discovery reads the new annotation below.
+
+### Added fields
+
+- **`details.correlationId`** is on every error envelope. The server mints it once per call and writes it on that
+  call's one log entry, so quote it when you report a failure.
+- **`details.retryable`** is on a server fault: `SERVICE_UNAVAILABLE` from an unavailable dependency, and every
+  `INTERNAL_ERROR`. It says whether repeating the same call unchanged is safe, never that it will succeed:
+  - `true` means a repeat has no additional effect. If the repeat is then refused, follow that refusal;
+  - `false` on `SERVICE_UNAVAILABLE` means the call may have taken effect, so read the current state before
+    repeating it;
+  - `false` on `INTERNAL_ERROR` means repeating fails the same way;
+  - absent, on any typed refusal, means its message and `nextAct` say whether repeating helps.
+
+### Reclassified
+
+- **A dependency the server could not use answers `SERVICE_UNAVAILABLE`**, where it answered `INTERNAL_ERROR`. That
+  covers a dropped database or Redis connection, a serialization failure or deadlock, a network timeout, and the
+  exchange budget declining to admit a call. `retryable` is `true` for a tool that declares `readOnlyHint` or
+  `idempotentHint`.
+- **`reset_agent_drawdown_baseline` declares `idempotentHint: false`.** Each call moves the drawdown baseline to now,
+  so a repeat forgives any loss realized in between.
+
+## Contract history — v118 (a refused argument is the house error envelope)
+
+**Breaking at v118: an argument refusal is JSON, and the scope check comes first.** v118 is the contract on top of
+v117. No schema moves, so nothing you send is refused that v117 accepted. Code that read the SDK's refusal sentence
+must read the envelope instead.
+
+### Reshaped output — something you read has a new shape
+
+- **A call whose arguments the tool's schema refuses** is an `isError` result whose text is the same JSON envelope
+  every other refusal uses: `{ "code": "VALIDATION_ERROR", "message", "details": { "issueCount", "issues" } }`. It
+  was the SDK's `Input validation error: …` sentence.
+
+### Refusal vocabulary
+
+- **`details.issues`** holds the first 20 issues in the order the parse found them. Each is `{ path, message }`:
+  - `path` is where the issue is, as segments within the arguments object, and `[]` is the arguments object itself;
+  - `message` is the schema's own text, so a remedy the schema appends to an issue reaches you unchanged.
+- **`details.issueCount`** is how many issues the parse found. It exceeds the length of `issues` when more than 20
+  were found.
+- **An unrecognised key** is reported at the path of the object it was sent on, by an issue whose message names the
+  key. A retired argument therefore shows up as an issue on its parent object, not as a path ending in its own name.
+- **`message`** is the first issue's message.
+- **The refusal carries no `details.nextAct`.** Recover by making the same call with corrected arguments. A refusal of
+  a draft's staged content still carries `nextAct: "stage"`, so the two are told apart by `details.issues`.
+
+### Behaviour behind unchanged schemas
+
+- **The required scope is checked before the arguments are parsed.** A credential without the tool's scope is refused
+  `FORBIDDEN` with `details.requiredScope` whatever it sends. Before, an argument object the schema refused was
+  answered by the parse first.
+
+## Contract history — v117 (decided changes read at their horizon bar)
+
+**Breaking at v117, behind unchanged schemas.** v117 is the contract on top of v116; no input or output schema moves.
+
+### Rejected input — something you send is no longer accepted
+
+- **A verdict carrier or hold that reads a change over a horizon above the strategy timeframe is refused.** That is
+  `chg4h` and `chg24h` on a `1h` strategy, and `oiRegime` (the `1h` change) below `1h`. Such a change is a developing
+  read whatever its selector.
+  - **Where it is refused:** a strategy save, draft stage or preview, refused `CONDITION_VERDICT_READ_ILLEGAL` or
+    `CONDITION_HOLD_ILLEGAL`. Restoring an archived strategy that holds one is refused the same way until it is
+    repaired.
+  - **What the refusal says:** it names the carrier and the column, with a remedy that reads a horizon at or below
+    the strategy timeframe.
+
+### Behaviour behind unchanged schemas
+
+- **A change is the frame's price against its horizon bar's open.** A decided frame reads it exactly where it read
+  UNRESOLVED, and a horizon whose bar was not read is UNRESOLVED where it read FALSE.
+
 ## Contract history — v116 (the server moves to MCP SDK v2 and protocol 2026-07-28)
 
 **Breaking at v116: `test_generate_deployment_grid` takes its payload at the top level.** v116 is the contract on top
