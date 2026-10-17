@@ -38,6 +38,32 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v117.1 (a server fault says whether repeating is safe)
+
+**Nothing you send is refused that v117 accepted.** v117.1 is the contract on top of v117. No input schema moves.
+Reconnect the proxy, or restart it, so discovery reads the new annotation below.
+
+### Added fields
+
+- **`details.correlationId`** is on every error envelope. The server mints it once per call and writes it on that
+  call's one log entry, so quote it when you report a failure.
+- **`details.retryable`** is on a server fault: `SERVICE_UNAVAILABLE` from an unavailable dependency, and every
+  `INTERNAL_ERROR`. It says whether repeating the same call unchanged is safe, never that it will succeed:
+  - `true` means a repeat has no additional effect. If the repeat is then refused, follow that refusal;
+  - `false` on `SERVICE_UNAVAILABLE` means the call may have taken effect, so read the current state before
+    repeating it;
+  - `false` on `INTERNAL_ERROR` means repeating fails the same way;
+  - absent, on any typed refusal, means its message and `nextAct` say whether repeating helps.
+
+### Reclassified
+
+- **A dependency the server could not use answers `SERVICE_UNAVAILABLE`**, where it answered `INTERNAL_ERROR`. That
+  covers a dropped database or Redis connection, a serialization failure or deadlock, a network timeout, and the
+  exchange budget declining to admit a call. `retryable` is `true` for a tool that declares `readOnlyHint` or
+  `idempotentHint`.
+- **`reset_agent_drawdown_baseline` declares `idempotentHint: false`.** Each call moves the drawdown baseline to now,
+  so a repeat forgives any loss realized in between.
+
 ## Contract history — v117 (a refused argument is the house error envelope)
 
 **Breaking at v117: an argument refusal is JSON, and the scope check comes first.** v117 is the contract on top of
