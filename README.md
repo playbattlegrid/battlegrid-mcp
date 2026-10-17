@@ -14,7 +14,7 @@ supports no older Node, and dropping a supported runtime is a break in how the p
 how you call it changes.
 
 - **Upstream, it negotiates.** The proxy speaks protocol 2026-07-28 to a server that serves it — BattleGrid does from
-  contract v115 — in one `server/discover` round trip, and falls back to the 2025 `initialize` handshake with one that
+  contract v116 — in one `server/discover` round trip, and falls back to the 2025 `initialize` handshake with one that
   does not. No release is needed when the server moves.
 - **Downstream, nothing changes.** Your local client connects over stdio as before, every argument but `account` is
   forwarded verbatim, and the announced contract is still read from the upstream handshake.
@@ -38,10 +38,10 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v115 (the server moves to MCP SDK v2 and protocol 2026-07-28)
+## Contract history — v116 (the server moves to MCP SDK v2 and protocol 2026-07-28)
 
-**Breaking at v115: `test_generate_deployment_grid` takes its payload at the top level.** v115 is the contract on top
-of v114.3. Reconnect the proxy, or restart it, so discovery reads the new schemas.
+**Breaking at v116: `test_generate_deployment_grid` takes its payload at the top level.** v116 is the contract on top
+of v115.1. Reconnect the proxy, or restart it, so discovery reads the new schemas.
 
 ### Rejected input — something you send is no longer accepted
 
@@ -66,10 +66,11 @@ of v114.3. Reconnect the proxy, or restart it, so discovery reads the new schema
   that name is `battlegrid-proxy`.
 - **Authorization responses carry `iss`** (RFC 9207).
 
-## Contract history — v114.3 (the server's schema library moves to Zod 4)
+## Contract history — v115.1 (the server's schema library moves to Zod 4)
 
-**Nothing you send is refused that was accepted at v114.** v114.3 is the contract on top of v114. Reconnect the proxy,
-or restart it, so discovery reads the re-published schemas.
+**Nothing you send is refused that was accepted at v115.** v115.1 is the contract on top of v115. It deploys together
+with v116, so a connected client reads v116's schemas: the named shapes below sit under `$defs` there. Reconnect the
+proxy, or restart it, so discovery reads the re-published schemas.
 
 ### Behaviour behind unchanged schemas
 
