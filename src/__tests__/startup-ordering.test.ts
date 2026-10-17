@@ -11,9 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { ToolListChangedNotificationSchema, type Implementation } from '@modelcontextprotocol/sdk/types.js';
+import { Client, InMemoryTransport, type Implementation } from '@modelcontextprotocol/client';
 import { createProxyServer, type AccountIdentity, type ProxyServer } from '../index.js';
 
 const UPSTREAM: Implementation = { name: 'battlegrid', version: '49.0.0' };
@@ -242,7 +240,7 @@ describe('a client is told when a failed catalog recovers', () => {
     const { client } = await standUp(proxy);
 
     let notified = 0;
-    client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
+    client.setNotificationHandler('notifications/tools/list_changed', async () => {
       notified += 1;
     });
 

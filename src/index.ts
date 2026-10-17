@@ -37,21 +37,9 @@
  */
 
 import { createHash } from 'crypto';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  type Implementation,
-  type Prompt,
-  type Resource,
-} from '@modelcontextprotocol/sdk/types.js';
+import { Server, type Implementation, type Prompt, type Resource, type Tool } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { Client, SdkHttpError, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 
 /**
  * This package's own version — the proxy's code, and nothing else.
@@ -64,7 +52,7 @@ import {
  * being asked. Move it for a change to THIS package — a proxy fix, a dependency bump, a docs
  * correction. Never move it to track the server.
  */
-export const PACKAGE_VERSION = '31.2.116';
+export const PACKAGE_VERSION = '32.0.0';
 export const DEFAULT_URL = 'https://mcp.battlegrid.trade/mcp';
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000];
@@ -181,36 +169,46 @@ export async function discoverIdentities(
 
 // --- Connection with retry ---
 
-function isAuthError(error: unknown): boolean {
-  // Check error.code for StreamableHTTPError (MCP SDK stores HTTP status as .code)
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code: unknown }).code;
-    if (code === 401 || code === 403) return true;
-  }
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('401') || message.includes('Unauthorized') || message.includes('403');
+/**
+ * The HTTP status an upstream request failed with, or null when the failure carried none (a network error, a
+ * timeout). The one reader of it: MCP SDK v2 reports an HTTP failure as `SdkHttpError`, whose `status` is the response
+ * status and whose `code` is the SDK's own string, never a number.
+ */
+export function httpStatusOf(error: unknown): number | null {
+  return error instanceof SdkHttpError ? error.status : null;
+}
+
+/** An upstream refusal of the credential itself: retrying cannot succeed, so it is reported at once. */
+export function isAuthError(error: unknown): boolean {
+  const status = httpStatusOf(error);
+  return status === 401 || status === 403;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function connectWithRetry(client: Client, transport: StreamableHTTPClientTransport, apiUrl: string, apiKey: string): Promise<void> {
+/**
+ * Connect a fresh client and transport per attempt: a v2 `Client` closes its transport when `connect` fails, and a
+ * closed transport cannot be started again, so reusing one would fail every retry with "already started".
+ */
+export async function connectWithRetry(
+  createClient: () => { client: Client; transport: StreamableHTTPClientTransport },
+  apiUrl: string,
+  apiKey: string,
+): Promise<Client> {
   const keyPrefix = apiKey.substring(0, 12);
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const { client, transport } = createClient();
     try {
       await client.connect(transport);
-      return;
+      return client;
     } catch (error) {
-      // Log full error detail for diagnostics
-      const errorCode = error && typeof error === 'object' && 'code' in error
-        ? (error as { code: unknown }).code
-        : undefined;
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (isAuthError(error)) {
         throw new Error(
-          `Authentication failed for key ${keyPrefix} (HTTP ${errorCode ?? 'unknown'}): ${errorMessage}\n` +
+          `Authentication failed for key ${keyPrefix} (HTTP ${httpStatusOf(error)}): ${errorMessage}\n` +
           'This means the server rejected your API key. Possible causes:\n' +
           '  1. Key was revoked (a new key invalidates all previous keys)\n' +
           '  2. Key was corrupted during copy-paste\n' +
@@ -236,20 +234,10 @@ async function connectWithRetry(client: Client, transport: StreamableHTTPClientT
       await sleep(delay);
     }
   }
+  throw new Error('unreachable: the last attempt either returns or throws');
 }
 
 // --- Multi-account tool augmentation ---
-
-export interface ToolDefinition {
-  name: string;
-  description?: string;
-  inputSchema: {
-    type: string;
-    properties?: Record<string, unknown>;
-    required?: string[];
-    [key: string]: unknown;
-  };
-}
 
 /**
  * Add a required `account` enum to every discovered tool, as a sibling of the
@@ -257,7 +245,7 @@ export interface ToolDefinition {
  * `additionalProperties:false` and every existing property (unions, required
  * fields, bounds) are preserved by reference, never rewritten.
  */
-export function injectAccountParam(tools: ToolDefinition[], accountNames: string[]): ToolDefinition[] {
+export function injectAccountParam(tools: Tool[], accountNames: string[]): Tool[] {
   return tools.map(tool => ({
     ...tool,
     inputSchema: {
@@ -294,15 +282,16 @@ export function injectAccountParam(tools: ToolDefinition[], accountNames: string
  * `websiteUrl`, `icons`, …). Passing the object through means a field the server adds later reaches
  * local clients without an edit here — the same reason the tool catalog is never enumerated.
  *
- * FAILS CLOSED. `serverInfo` is required in a successful MCP `initialize` result, so a connected
- * client holding none is a protocol violation rather than a case to design around. Falling back to
- * PACKAGE_VERSION here would reintroduce the exact fiction this function exists to remove, and would
- * do it silently, at the one moment the truth was unavailable.
+ * FAILS CLOSED. The BattleGrid server announces `serverInfo` on both protocol eras: in the `initialize`
+ * result a 2025-era handshake requires, and in the `_meta` of the `server/discover` result a 2026-07-28
+ * connection reads. A connected client holding none is therefore a server fault rather than a case to
+ * design around. Falling back to PACKAGE_VERSION here would reintroduce the exact fiction this function
+ * exists to remove, and would do it silently, at the one moment the truth was unavailable.
  */
 export function announcedIdentityOf(serverInfo: Implementation | undefined): Implementation {
   if (serverInfo === undefined) {
     throw new Error(
-      'Upstream MCP server completed initialize without announcing serverInfo, so there is no ' +
+      'Upstream MCP server connected without announcing serverInfo, so there is no ' +
       'contract version to relay to local clients. This is a protocol violation by the server — ' +
       'not a configuration problem, and not something this proxy will substitute a guess for.'
     );
@@ -344,7 +333,7 @@ export interface ProxyCatalog {
   identities: AccountIdentity[];
   accountNames: string[];
   keyByAccount: Map<string, string>;
-  tools: ToolDefinition[];
+  tools: Tool[];
   prompts: Prompt[];
   resources: Resource[];
 }
@@ -378,11 +367,13 @@ export interface ProxyServer {
  * Build the local stdio-facing MCP server that proxies to the remote BattleGrid server.
  *
  * ORDERING IS THE POINT. Exactly one upstream operation happens here: the handshake that yields the
- * identity this proxy relays. `serverInfo` is captured by the SDK at `Server` construction and read
- * when `initialize` is answered, with no setter, so relaying the upstream's identity verbatim makes
- * one round trip inherent. Everything else — identity discovery and the three catalog calls —
+ * identity this proxy relays — a `server/discover` round trip with a server that serves 2026-07-28, the
+ * probe followed by the 2025-era `initialize` exchange with one that does not. `serverInfo` is captured
+ * by the SDK at `Server` construction and read when the local handshake (`initialize` or
+ * `server/discover`) is answered, with no setter, so relaying the upstream's identity verbatim makes
+ * that handshake inherent. Everything else — identity discovery and the three catalog calls —
  * resolves lazily, after the caller has bound the transport, because none of it is needed to answer
- * `initialize` and every unit of work placed ahead of the bind is paid by every client on every
+ * the handshake and every unit of work placed ahead of the bind is paid by every client on every
  * start.
  */
 export async function createProxyServer(options: CreateProxyServerOptions): Promise<ProxyServer> {
@@ -476,13 +467,11 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
       primaryClient.listResources(),
     ]);
 
-    const discovered = toolsResult.tools as ToolDefinition[];
-
     return {
       identities,
       accountNames,
       keyByAccount,
-      tools: isMultiAccount ? injectAccountParam(discovered, accountNames) : discovered,
+      tools: isMultiAccount ? injectAccountParam(toolsResult.tools, accountNames) : toolsResult.tools,
       prompts: promptsResult.prompts,
       resources: resourcesResult.resources,
     };
@@ -535,12 +524,12 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
   // Throws on rejection: ListToolsResult carries only `tools`, so the tools/call in-band
   // `{content, isError}` shape would ship as a SUCCESSFUL result that fails the client's own parse.
   // The SDK maps a thrown handler error to a proper JSON-RPC error.
-  localServer.setRequestHandler(ListToolsRequestSchema, async () => {
+  localServer.setRequestHandler('tools/list', async () => {
     const catalog = await catalogOrThrow();
     return { tools: catalog.tools };
   });
 
-  localServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+  localServer.setRequestHandler('tools/call', async (request) => {
     try {
       let targetKey = primaryKey;
       const args = { ...request.params.arguments } as Record<string, unknown>;
@@ -579,12 +568,12 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
 
   // --- Proxy: prompts ---
 
-  localServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+  localServer.setRequestHandler('prompts/list', async () => {
     const catalog = await catalogOrThrow();
     return { prompts: catalog.prompts };
   });
 
-  localServer.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  localServer.setRequestHandler('prompts/get', async (request) => {
     return await primaryClient.getPrompt({
       name: request.params.name,
       arguments: request.params.arguments,
@@ -593,12 +582,12 @@ export async function createProxyServer(options: CreateProxyServerOptions): Prom
 
   // --- Proxy: resources ---
 
-  localServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+  localServer.setRequestHandler('resources/list', async () => {
     const catalog = await catalogOrThrow();
     return { resources: catalog.resources };
   });
 
-  localServer.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  localServer.setRequestHandler('resources/read', async (request) => {
     return await primaryClient.readResource({
       uri: request.params.uri,
     });
@@ -639,20 +628,25 @@ async function main(): Promise<void> {
     );
   }
 
-  // Connect a remote MCP client for a given API key, with retry + auth diagnostics.
-  const connect = async (apiKey: string): Promise<Client> => {
-    const transport = new StreamableHTTPClientTransport(
-      new URL(config.apiUrl),
-      { requestInit: { headers: { Authorization: `Bearer ${apiKey}` } } }
+  // Connect a remote MCP client for a given API key, with retry + auth diagnostics. `auto` negotiates protocol
+  // 2026-07-28 with a server that serves it and falls back to the 2025-era `initialize` handshake with one that
+  // does not, so the proxy reaches either without a release.
+  const connect = (apiKey: string): Promise<Client> =>
+    connectWithRetry(
+      () => ({
+        transport: new StreamableHTTPClientTransport(
+          new URL(config.apiUrl),
+          { requestInit: { headers: { Authorization: `Bearer ${apiKey}` } } }
+        ),
+        // Upstream is told which proxy build is calling — the one question PACKAGE_VERSION answers.
+        client: new Client(
+          { name: 'battlegrid-proxy', version: PACKAGE_VERSION },
+          { capabilities: {}, versionNegotiation: { mode: 'auto' } }
+        ),
+      }),
+      config.apiUrl,
+      apiKey,
     );
-    // Upstream is told which proxy build is calling — the one question PACKAGE_VERSION answers.
-    const client = new Client(
-      { name: 'battlegrid-proxy', version: PACKAGE_VERSION },
-      { capabilities: {} }
-    );
-    await connectWithRetry(client, transport, config.apiUrl, apiKey);
-    return client;
-  };
 
   let proxy: ProxyServer;
   try {
@@ -681,7 +675,7 @@ async function main(): Promise<void> {
   // --- Start stdio transport, BEFORE any catalog work ---
   //
   // Everything above is the single upstream handshake the relayed serverInfo requires. From here the
-  // process answers `initialize`; identity discovery and the three catalog calls happen behind it.
+  // process answers a local handshake; identity discovery and the three catalog calls happen behind it.
 
   const stdioTransport = new StdioServerTransport();
   await proxy.server.connect(stdioTransport);
@@ -690,7 +684,7 @@ async function main(): Promise<void> {
 
   // Warm the catalog so the first tools/list joins an in-flight resolution rather than starting one.
   // Deliberately NOT awaited, and the rejection handler is the whole of the guarantee that a
-  // background failure cannot kill a process that has already answered `initialize`. The failure is
+  // background failure cannot kill a process that has already answered its handshake. The failure is
   // reported and absorbed; the next request that needs the catalog retries it.
   void proxy.warm().then(
     (summary) => {
