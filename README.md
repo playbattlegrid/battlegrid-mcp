@@ -24,6 +24,34 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v114.3 (the server's schema library moves to Zod 4)
+
+**Nothing you send is refused that was accepted at v114.** v114.3 is the contract on top of v114. Reconnect the proxy,
+or restart it, so discovery reads the re-published schemas.
+
+### Behaviour behind unchanged schemas
+
+- **A reused or recursive input shape is named under the root `definitions`**, referenced as `#/definitions/<name>`,
+  where it was `#/$defs/<name>`: `marketGridEntryCellAxis` (the 25 `CELL_n` axes of
+  `stage_market_grid_entry_draft`), `conditionNode` (the recursive condition tree), `conditionColumn` and
+  `conditionHold`. A described or optional use publishes as `{ description?, allOf: [{ $ref }] }`.
+- **Schemas spell more of what they already checked:** a uuid, date-time or email field adds its `pattern`, an
+  integer its bounds at ±9,007,199,254,740,991, a discriminated union is `oneOf` and a literal union `anyOf` of
+  `const`s. Acceptance does not move.
+- **The slot and condition members of a slot set** (`preview_radar_resolution` and `preview_deployment_resolution`
+  `SLOTS`, `test_generate_deployment_grid`) publish without `additionalProperties: false`. They always dropped an
+  unknown key, so a slot you read can be sent back as it is.
+- **Validation messages take Zod 4's wording**, in the argument errors and a refusal's `message`: `Required` becomes
+  `Invalid input: expected string, received undefined`, and `Unrecognized key(s) in object: 'x'` becomes
+  `Unrecognized key: "x"`. Codes, fields and envelope keys do not move.
+
+### Widened output
+
+- **`get_market_grid_results.playerGrids` states its numeric grid-position keys, and `reasonCodeDetails` on
+  `get_signal_log` and `get_public_agent_signal_log_detail` its reason-code keys, as `propertyNames`.** The results
+  always carried exactly these keys.
+- **`stage_agent_draft`'s `STRATEGY_BINDING.strategyId`** no longer carries the agent id's description.
+
 ## Contract history — v114 (every paginated read takes the same cursor)
 
 **Breaking at v114: the radar close-decision read pages by cursor, and old cursors expire.** v114 is the contract on
