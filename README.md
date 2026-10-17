@@ -7,6 +7,20 @@ MCP server for [BattleGrid](https://battlegrid.trade) — play crypto prediction
 
 It is a thin, authenticated **stdio proxy** to BattleGrid's remote MCP server (Stripe `@stripe/mcp` pattern — no business logic). It discovers tools, prompts, and resources live from the server and re-exposes them to local MCP clients (Claude Desktop, Claude Code, Cursor). Capabilities are always **discovered live** — this package never hardcodes the tool catalog.
 
+## v32 — MCP SDK v2, both protocol eras, Node 20
+
+**The proxy now runs on MCP SDK v2 and requires Node.js 20 or newer.** That is the whole reason for the MAJOR: SDK v2
+supports no older Node, and dropping a supported runtime is a break in how the proxy runs, even though nothing about
+how you call it changes.
+
+- **Upstream, it negotiates.** The proxy speaks protocol 2026-07-28 to a server that serves it — BattleGrid does from
+  contract v116 — in one `server/discover` round trip, and falls back to the 2025 `initialize` handshake with one that
+  does not. No release is needed when the server moves.
+- **Downstream, nothing changes.** Your local client connects over stdio as before, every argument but `account` is
+  forwarded verbatim, and the announced contract is still read from the upstream handshake.
+- **A transient failure is retried on a fresh connection**, and an authentication failure (HTTP 401 or 403) is
+  reported at once, read from the HTTP status rather than from the error's wording.
+
 ## v31 — the announced contract is read from the server, not declared here
 
 **The package version no longer tracks the server's contract, and no longer claims to.** Through v30 it did: the proxy announced `battlegrid@<package version>` downstream, so the published number was read as the contract a client would reach, and keeping the two in step was a manual release chore. It did not hold — the package sat at `11.0.0` against a deployed contract of `19.3.0` for ten days, `5.1.0` was declared here and never published at all, and four of the last five releases were version bumps carrying no code change.
@@ -23,6 +37,63 @@ From v31 the proxy reads the contract version out of the upstream handshake at c
 Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **behind** the contract — is the system working, not a missed release. That is the pair that looks alarming and is not: the contract moved, and no release here was needed. Both numbers are printed to stderr at startup, labelled.
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
+
+## Contract history — v116 (the server moves to MCP SDK v2 and protocol 2026-07-28)
+
+**Breaking at v116: `test_generate_deployment_grid` takes its payload at the top level.** v116 is the contract on top
+of v115.1. Reconnect the proxy, or restart it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **`test_generate_deployment_grid` takes `presetId`, `slots`, `simulatedRegime?`, `regimeReferenceCoinId?` and
+  `regimeTimeframe?` as top-level arguments.** A call that still wraps them in `request` is refused naming `request`.
+  `preview_deployment_resolution`, `preview_radar_resolution` and `get_strategy_section_template` keep their `request`.
+
+### Behaviour behind unchanged schemas
+
+- **Schemas are JSON Schema 2020-12**, the 2026-07-28 default dialect, and still declare no `$schema`. A named shape
+  (`marketGridEntryCellAxis`, `conditionNode`, `conditionColumn`, `conditionHold`) moves from the root `definitions`
+  to the root `$defs`, referenced as `#/$defs/<name>`, and a described or optional use publishes as
+  `{ $ref, description? }` rather than `{ description?, allOf: [{ $ref }] }`. Acceptance does not move.
+- **The endpoint's own refusals carry new JSON-RPC codes:** `-31401` (no valid credential), `-31403` (no `mcp:read`),
+  `-31405` (any method but `POST`) and `-31429` (over the request budget), where each carried `-32000`. The HTTP status
+  and `Retry-After` do not move.
+- **An unknown tool name is a JSON-RPC `-32602` error**, where it was an `isError` result, and argument errors name
+  each issue as `path: message`.
+- **A 2025-era HTTP client receives each response as a one-event `text/event-stream`**, where it received
+  `application/json`; a 2026-07-28 client receives JSON. `GET` and `DELETE` on `/mcp` answer 405.
+- **A random submit that carries reasoning records your client's declared name** on its journal row. Through this proxy
+  that name is `battlegrid-proxy`.
+- **Authorization responses carry `iss`** (RFC 9207).
+
+## Contract history — v115.1 (the server's schema library moves to Zod 4)
+
+**Nothing you send is refused that was accepted at v115.** v115.1 is the contract on top of v115. It deploys together
+with v116, so a connected client reads v116's schemas: the named shapes below sit under `$defs` there. Reconnect the
+proxy, or restart it, so discovery reads the re-published schemas.
+
+### Behaviour behind unchanged schemas
+
+- **A reused or recursive input shape is named under the root `definitions`**, referenced as `#/definitions/<name>`,
+  where it was `#/$defs/<name>`: `marketGridEntryCellAxis` (the 25 `CELL_n` axes of
+  `stage_market_grid_entry_draft`), `conditionNode` (the recursive condition tree), `conditionColumn` and
+  `conditionHold`. A described or optional use publishes as `{ description?, allOf: [{ $ref }] }`.
+- **Schemas spell more of what they already checked:** a uuid, date-time or email field adds its `pattern`, an
+  integer its bounds at ±9,007,199,254,740,991, a discriminated union is `oneOf` and a literal union `anyOf` of
+  `const`s. Acceptance does not move.
+- **The slot and condition members of a slot set** (`preview_radar_resolution` and `preview_deployment_resolution`
+  `SLOTS`, `test_generate_deployment_grid`) publish without `additionalProperties: false`. They always dropped an
+  unknown key, so a slot you read can be sent back as it is.
+- **Validation messages take Zod 4's wording**, in the argument errors and a refusal's `message`: `Required` becomes
+  `Invalid input: expected string, received undefined`, and `Unrecognized key(s) in object: 'x'` becomes
+  `Unrecognized key: "x"`. Codes, fields and envelope keys do not move.
+
+### Widened output
+
+- **`get_market_grid_results.playerGrids` states its numeric grid-position keys, and `reasonCodeDetails` on
+  `get_signal_log` and `get_public_agent_signal_log_detail` its reason-code keys, as `propertyNames`.** The results
+  always carried exactly these keys.
+- **`stage_agent_draft`'s `STRATEGY_BINDING.strategyId`** no longer carries the agent id's description.
 
 ## Contract history — v114 (every paginated read takes the same cursor)
 
@@ -3562,7 +3633,7 @@ Tools, prompts, and resources are **discovered live** from the connected server 
 ## Rediscovery & versioning
 
 - **The announced contract is relayed, not declared.** The proxy reads the upstream server's identity from the handshake it just completed and re-announces it verbatim to the local client. A local client therefore always reads the contract it will actually reach, and the package version is free to mean only what it should: this proxy's own code. **There is no pairing rule to keep, and no publish-time deploy gate** — a released package makes no claim about the server, so there is no ordering between a release here and a deploy there. This replaces the `MAJOR.MINOR` pairing that held through v11; see [v12](#v12--the-announced-contract-is-read-from-the-server-not-declared-here).
-- **Fails closed, never falls back.** If a connected server announced no `serverInfo` — a protocol violation, since it is required in a successful `initialize` result — the proxy refuses to start rather than substituting its own version. There is no honest number to announce in that case, and announcing a dishonest one silently is the failure this design removes.
+- **Fails closed, never falls back.** If a connected server announced no `serverInfo` — a server fault, since BattleGrid announces it on both protocol eras: in the `initialize` result of a 2025-era handshake and in the `server/discover` result of a 2026-07-28 connection — the proxy refuses to start rather than substituting its own version. There is no honest number to announce in that case, and announcing a dishonest one silently is the failure this design removes.
 - **Rediscover after a server cutover.** The proxy resolves its catalog on first use and then caches it for the life of the process; a resolution that *failed* is retried on the next request, but a server deploy is never noticed. Package publication does not refresh it either. Restart/reconnect the proxy and re-run `tools/list`, `prompts/list`, and `resources/list` after the server deploys.
 - **Restart after key rotation.** API keys are read once at process startup; rotate a key, then restart the proxy.
 
@@ -3720,7 +3791,8 @@ you reach over MCP:
 > request; `skills/EXPORT.json` records a hash per file and `src/__tests__/skill-provenance.test.ts`
 > fails CI on a hand edit. Change the skill upstream and let the export lane bring it here.
 
-A client connected to BattleGrid's remote server directly receives its `initialize` instructions:
+A client connected to BattleGrid's remote server directly receives its instructions in the handshake — the
+`server/discover` result on protocol 2026-07-28, the `initialize` result on a 2025 revision:
 the rules that span tools and one routing line per workflow, each naming the `battlegrid-*` skill
 above that holds the full procedure, with the workflow cards in the `battlegrid://guide/workflows`
 resource. This proxy does not relay those instructions; the skills

@@ -269,9 +269,9 @@ hand-publish with no tag is the exact silence this workflow was built to remove.
 
 ```
 src/index.ts           the entire proxy
-src/__tests__/         announced-version, hand-authored-docs, identity, shipped-paths,
-                       skill-contract, skill-package, skill-provenance, startup-ordering,
-                       strategy-authoring-proxy, validate-env
+src/__tests__/         announced-version, connect-retry, hand-authored-docs, identity,
+                       shipped-paths, skill-contract, skill-package, skill-provenance,
+                       startup-ordering, strategy-authoring-proxy, validate-env
 src/__fixtures__/      the vendored authoring-contract digest (generated — see above)
 AGENTS.md              discovery file for external agents — how to CONNECT
 README.md              user docs + contract history; SHIPS in the tarball

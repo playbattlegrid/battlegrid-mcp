@@ -99,5 +99,5 @@ repository, and `skill-provenance.test.ts` fails CI on a hand edit.
 Wagers are bounded by a daily operation count and a daily wager volume that the server configures,
 with per-user overrides. A refused wager names the limit it hit; no number is restated here, because
 a copy of a configured limit is eventually wrong where being wrong costs money. Every request also
-spends from a request budget the server announces in its `initialize` instructions and in the
+spends from a request budget the server announces in its handshake instructions and in the
 `RateLimit-*` headers of each response.

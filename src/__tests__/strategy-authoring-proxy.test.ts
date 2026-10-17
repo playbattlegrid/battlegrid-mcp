@@ -28,8 +28,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { createProxyServer, type AccountIdentity } from '../index.js';
 
 // --- Canonical server-owned schemas (mirror of the live authoring contract) ---

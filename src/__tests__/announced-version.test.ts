@@ -14,9 +14,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import type { Implementation } from '@modelcontextprotocol/client';
 import {
   createProxyServer,
   announcedIdentityOf,
@@ -105,8 +104,8 @@ describe('announced identity — read from the upstream handshake', () => {
 
 describe('announcedIdentityOf — fails closed', () => {
   it('throws when a connected upstream announced no serverInfo', () => {
-    // `serverInfo` is required in a successful `initialize` result, so this is a protocol
-    // violation. The tempting repair — fall back to PACKAGE_VERSION — is the bug being removed.
+    // The server announces `serverInfo` on both protocol eras, so this is a server fault. The
+    // tempting repair — fall back to PACKAGE_VERSION — is the bug being removed.
     expect(() => announcedIdentityOf(undefined)).toThrow(/serverInfo/);
   });
 
