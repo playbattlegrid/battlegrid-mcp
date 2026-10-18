@@ -38,6 +38,30 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v120 (the readiness ladder is three milestones)
+
+**Breaking at v120: `get_onboarding_requirements` reshapes its rungs and re-specifies its counts.** v120 is the
+contract on top of v119. No input schema moves, so nothing you send is refused that v119 accepted. Reconnect the
+proxy, or restart it, so discovery reads the new schema.
+
+### Reshaped output — something you read moved
+
+- **Each rung's `lane` is gone; `milestone` takes its place.** Every entry of `requirements[]` names one of
+  `ACCOUNT` (trading wallet, USDC deposit, agent brain), `AUTHORIZE` (agent trading, agent wagers, unified-account
+  activation) or `DEPLOY` (playbook, agent, armed radar, arena deployment). A strict client that reads `lane` fails
+  to parse the response.
+- **`milestones[]` is added**, one per milestone in ladder order: `id`, `complete`, `completedRungCount`,
+  `requiredRungCount` and `progressPercent`, an integer from 0 to 100 that the server computes.
+
+### Re-specified values — same field, new meaning
+
+- **`completedCount` / `totalCount` count milestones** — complete milestones out of three — not spine rungs.
+- **Agent wagers and unified-account activation are required.** `battleReady` (and `status: BATTLE_READY`) now
+  needs every milestone; only the arena deployment is optional, and it is what `nextBranch` names while open.
+- **`next` is the first open required rung.** Under `NEEDS_ATTENTION` (armed agents, a known gap) it is the first
+  open rung armed trading depends on, so an unsigned wagers consent or an unactivated account is setup, never an
+  alert.
+
 ## Contract history — v119 (an array names its scope once)
 
 **Breaking at v119: a field every row repeated moves to the response, and three repeated fields are gone.** v119 is
@@ -2287,7 +2311,7 @@ with it.
   with (`AGENT_NOT_ACTIVE`, `MODEL_INACTIVE`, `AGENT_HALTED`). `rank` is global across the four.
   Rate-limited per user: a refusal is `RATE_LIMITED` with `retryAfterSeconds`.
 - **`get_onboarding_requirements`** (no input; `mcp:read`) — the caller's readiness ladder: every
-  rung, the spine counts and the next rung.
+  rung, the ladder's counts and the next rung (counted over three milestones from v120).
 
 ### Reshaped output — `get_strategy_draft` (v66.1)
 
