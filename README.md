@@ -38,6 +38,43 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v119 (an array names its scope once)
+
+**Breaking at v119: a field every row repeated moves to the response, and three repeated fields are gone.** v119 is
+the contract on top of v118.1. No input schema moves, so nothing you send is refused that v118.1 accepted. Reconnect
+the proxy, or restart it, so discovery reads the new schemas.
+
+### Reshaped output — something you read moved
+
+- **The agent and its owner** move from each row to the response as `agentId` and `userId`, on `list_gate_blocks`,
+  `get_agent_thought_log` and `list_entry_decisions` (`entries[]`), `get_agent_activity_feed` (`events[]`),
+  `get_agent_journal` (`recentThoughts[]`, `recentActivity[]`) and `list_trade_outcomes` (`outcomes[]`).
+- **The agent** moves to the response as `agentId` on `list_signal_logs` and `get_public_agent_signal_logs`
+  (`entries[]`) and on `get_agent_automation_status` (`assignments[]`).
+- **The owner** moves to the response as `userId` on `get_user_thought_log` (`entries[]`), `get_user_activity_feed`
+  (`events[]`), `list_pending_approvals` (`approvals[]`) and `list_intelligence_agents` (`agents[]`). Each row keeps
+  the agent it belongs to, and each agent keeps its own capabilities.
+- **The screened agent** moves to the response as `agentId`, `agentName` and `strategyTimeframe` on
+  `get_agent_coin_qualification`; each of its `verdicts[]` drops them.
+- **The session** moves off each row: `list_session_agent_positions` drops `marketGridSessionId` from every position,
+  flat and grouped, and carries it once on the response. `get_market_grid_results` drops `sessionId` from each of
+  `resolutions[]` and `players[]`; read `session.id`.
+- An empty page still names its scope.
+
+### Removed fields — something you read is gone
+
+- **A trade outcome's `createdAt`** on `list_trade_outcomes` and `get_trade_outcome_by_decision`. Read `closedAt`,
+  which carried the same instant.
+- **A public realized trade's `outcomeId`** on `get_public_agent_realized_trades`. Read `positionId`, which is now
+  never null.
+- **A score breakdown captain's `symbol`** on `get_market_grid_results` (under `players[]` and `playerGrids`). Read
+  `coinId`, which named the same coin.
+
+### Behaviour behind unchanged schemas
+
+- **A UUID you send is read in its lower-case spelling,** so the id a response names is the id each of its rows
+  answers to, whatever case you sent it in.
+
 ## Contract history — v118.1 (a server fault says whether repeating is safe)
 
 **Nothing you send is refused that v118 accepted.** v118.1 is the contract on top of v118. No input schema moves.
