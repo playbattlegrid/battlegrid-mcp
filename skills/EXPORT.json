@@ -2,7 +2,7 @@
   "generator": "battlegrid-app/server/scripts/export-mcp-skills.mjs",
   "contractVersion": "120.3.0",
   "files": {
-    "battlegrid-agent-management/SKILL.md": "fd8f123e1225153d6c4bf64b38abf21190f5abb56add8e8564762939a7c0e329",
+    "battlegrid-agent-management/SKILL.md": "d152986abdf9421aaba1a240ed6b7007fec15216c978a9b392a6f94fc0c3e72b",
     "battlegrid-agent-management/references/agent-stage-examples.md": "dffcc353d61dfc7b5bb6a2b3077fc6bf8c760a34c287cafb3b59b99306f24195",
     "battlegrid-agent-management/references/officer-stage-examples.md": "a5a42792a8aa8f4af8cbf424d7c9aadbaa23df382ce17691a40a8d0e5447db63",
     "battlegrid-arena-play/SKILL.md": "2e37970a66b8738ffbc445a23da90651c1f41b56ce4eef551582ab123517ef74",
