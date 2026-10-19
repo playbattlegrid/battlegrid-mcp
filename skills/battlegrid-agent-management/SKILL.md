@@ -293,11 +293,12 @@ player's LLM credit — so it goes through its own draft, exactly as an agent do
   words: at most 2,000 characters, naming no tool and no id — the commit refuses either.
 - **Show, then commit on the player's word.** Read `get_officer_draft` and show the diff, the
   diagnostics and the impact — `nextRunAt` is when it first runs, and a create's `admission` says
-  how many officers the player holds against the limit. Commit with `commit_officer_draft` naming
+  how many officers the player holds against the limit and how many more it admits (`officersRemaining`). Commit with `commit_officer_draft` naming
   exactly the `draftVersion` and `committedRevision` the read returned, and only when the player says
   so. A cadence of `OFF` keeps the setup and runs nothing.
-- An officer's reviews and their Apply, Push and Dismiss live in the Agents Hub inbox; they are not
-  this flow's.
+- An officer's reviews and their Apply, Push and Dismiss live on the Officers page's inbox; they are not
+  this flow's. In the app, the player sets an officer up in its own console, where this conversation may be
+  docked beside the form — stage into the officer it is scoped to.
 
 ## When a write's outcome is unknown
 
