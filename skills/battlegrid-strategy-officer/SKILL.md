@@ -39,7 +39,7 @@ the review record is your whole output.
 
 A scheduled brief names the officer and the agent. When the player asks instead ("have my officer review my
 agent"), resolve both first: `list_officers` for the officer — none means telling them to add one from the
-Hub's officers panel and stopping there; one is the officer; several, take the one the ask names, else the one
+Officers page and stopping there; one is the officer; several, take the one the ask names, else the one
 whose `scope.agents` covers the agent, else ask which. The agent is the one the ask names, read with
 `list_intelligence_agents`. Then run the sequence below exactly as a scheduled run would.
 
