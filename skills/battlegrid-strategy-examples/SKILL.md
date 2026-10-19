@@ -228,12 +228,9 @@ column selecting Developing above the strategy timeframe (`CONDITION_VERDICT_REA
 closure is what the condition reads directly plus everything reached through `conditionRef`,
 transitively: a referenced condition contributes what IT reads, so moving the clause into a building
 block does not launder it. A closure whose candle columns all read Confirmed — or whose operands no
-bar moves at all, such as a published regime label or a funding rate — admits a verdict at every
-decision, because a decision reads the completed strategy bar and a level is compared against that
-bar's close. A change over a horizon above the strategy timeframe — `chg4h` or `chg24h` on a `1h`
-strategy, and `oiRegime`, which reads the `1h` change, below `1h` — is a developing read whatever its
-selector: its bar is still in progress at the close, so it carries no verdict. Read a horizon at or
-below the strategy timeframe instead, or a Confirmed `CLOSE_CHANGE` on the higher timeframe.
+bar moves at all, such as a published regime label, an open-interest regime or a published rolling
+change — admits a verdict at every decision, because a decision reads the completed strategy bar and
+a level is compared against that bar's close.
 
 Evaluation is three-valued: UNRESOLVED never collapses to FALSE; a developing read is provisional,
 and so is any reading taken on the display lane's forming bar.
@@ -269,11 +266,10 @@ the served domain is refused (`CONDITION_HOLD_ILLEGAL`, the domain in `allowedDo
 a header admits only Once:
 
 - `NOT_REWINDABLE` — the value is stored for the current bar only (session and universe scalars,
-  ranks, zone entities, enrichment metrics, a change at or below the strategy timeframe). **Worked liquidity floor:**
+  ranks, zone entities, enrichment metrics, published rolling changes). **Worked liquidity floor:**
   `LIQUID_FLOOR` holds Once because `vol24hUsd` is a bundle scalar.
-- `DEVELOPING` — the column reads a bar still forming: a Developing candle column above the strategy
-  timeframe, or a change over a horizon above it. **Developing columns cannot be held**; set a candle
-  column Confirmed to count closes, or read a change at or below the strategy timeframe.
+- `DEVELOPING` — the column reads the bar still forming. **Developing columns cannot be held**; set
+  the column Confirmed to count closes.
 - `OFFSET` — the column already reads an earlier bar; remove the offset to count closes.
 - `BAR_STATE` — the header describes only the bar being decided.
 - `HISTORY` — not enough history is stored on that timeframe to count more than one close.
@@ -304,10 +300,8 @@ anchor's own close — so Developing there is legal and changes no decision. A c
 developing bar is single-frame: its clause holds Once (a Developing column cannot be held), it
 carries no verdict and it cannot be an exit rule. One exception overrides both the stored value and the default: a column reading a metric with
 no live value (itself, or a `spread` operand) reads completed bars at every rung, because the forming
-bar publishes nothing for it. A change (`chg5m` … `chg24h`, and `oiRegime`'s `1h` change) carries its
-horizon in the metric, so above the strategy timeframe it is Developing at every rung and under every
-selector. The resolved answer for a column is served on `effectiveParameters.bars`, and it states both
-exceptions.
+bar publishes nothing for it. The resolved answer for a column is served on
+`effectiveParameters.bars`, and it states that exception.
 
 **A higher-timeframe level is measured from the current strategy-bar price.** The distance to a `4h`
 Donchian band, and every candle label classifier (`MA_ALIGN`, `PRICE_ZONE`, `BB_TOUCH`), compares
