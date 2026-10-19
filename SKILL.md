@@ -7,10 +7,10 @@ description: MCP skill for BattleGrid — play crypto prediction games (Market G
 
 BattleGrid is a real-time cryptocurrency prediction gaming and trading platform. This MCP server gives AI agents access to play games, author trading strategies, and run strategy-bound intelligence agents.
 
-## The other nine skills
+## The other skills
 
 This skill covers **connection**: how to reach BattleGrid, the `account` argument, and what each scope
-grants. Everything about *using* the platform lives in the nine skills installed beside it, exported
+grants. Everything about *using* the platform lives in the skills installed beside it, exported
 from BattleGrid's own server so they name exactly the tools you reach here:
 
 | For | Activate |
@@ -24,8 +24,13 @@ from BattleGrid's own server so they name exactly the tools you reach here:
 | Reading your own position, agents, and open trades | `battlegrid-trade-analysis` |
 | Finding and staging a trade for one of your agents — scan its coins, propose on one, approve or decline on your word | `battlegrid-trade-proposal` |
 | Working out why an agent has not traded or has stopped | `battlegrid-strategy-doctor` |
+| Setting up a Strategy Officer, running it now, and applying, pushing or dismissing what it proposes | `battlegrid-officers` |
 
-Those nine carry the working arcs and the exact contracts. What follows here is the minimum needed
+`battlegrid-strategy-officer` is not one to activate: it is the review procedure a Strategy Officer runs on
+BattleGrid's own server, whose review tools no external client is published, and the next skills export removes it.
+To work with officers, activate `battlegrid-officers`.
+
+Those skills carry the working arcs and the exact contracts. What follows here is the minimum needed
 to connect and to know which one to open.
 
 ## Discover the live surface first

@@ -38,6 +38,27 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v122 (only an officer's own turn records a review)
+
+**Breaking at v122: two officer review tools leave the catalog you discover.** v122 is the contract on top of v121.
+Reconnect the proxy, or restart it, so discovery reads the new catalog.
+
+### Removed tools — something you called is gone
+
+- **`get_officer_review_context` and `submit_officer_review`** are published only to a Strategy Officer's own turn,
+  which runs on BattleGrid's server. A call naming either through this proxy is answered as an unknown tool. A second
+  opinion on an officer's review is your own reading, never a record.
+
+### Added tool and fields
+
+- **`run_officer({ officerId })`** runs one of your officers now, as its schedule would, and answers before any
+  review starts: `QUEUED` with `agentCount`, `NOTHING_TO_REVIEW` (nothing queued or billed) or `ALREADY_QUEUED`. It
+  follows `commanderAccess` from `get_account_state`, not `llmAccess`.
+- **`pendingRun`** on each officer `list_officers` and `get_officer` serve: `{ state, queuedAt }` while a run is
+  waiting or running, otherwise null. **`presets`** on `list_officers`: the starting points a new officer is
+  staged from.
+- The **Officers** workflow routes from `list_officers` to the `battlegrid-officers` skill.
+
 ## Contract history — v120 (the readiness ladder is three milestones)
 
 **Breaking at v120: `get_onboarding_requirements` reshapes its rungs and re-specifies its counts.** v120 is the
@@ -3903,12 +3924,12 @@ Install the BattleGrid skills for AI agent instructions:
 npx skills add playbattlegrid/battlegrid-mcp
 ```
 
-Nine skills ship from this repo, all inside the npm tarball (`SKILL.md`, `skills/`).
+The skills ship from this repo, all inside the npm tarball (`SKILL.md`, `skills/`).
 
 **`battlegrid`** (repo root) is the connection skill and is authored here: how to connect, the
 `{ account, request }` envelope, the two scopes, and where to go for everything else.
 
-The nine `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
+The `skills/battlegrid-*` are **exported from BattleGrid's server repository** — they are the
 same instructions BattleGrid's own in-app Commander runs on, which is why they name the same tools
 you reach over MCP:
 
@@ -3916,6 +3937,7 @@ you reach over MCP:
 |---|---|
 | `battlegrid-agent-management` | Commission and govern intelligence agents: interview and create one against a committed strategy and an approved model, change configuration and risk limits, rebind, halt, resume, archive, and act on live positions |
 | `battlegrid-arena-play` | Enter Market Grid sessions: find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have an agent generate it, submit, then read results and the reasoning journal |
+| `battlegrid-officers` | Set up and govern Strategy Officers: create or change one through its draft, run one now, read when each runs and what is waiting, and apply, push or dismiss the proposals its reviews carry — never writing a review |
 | `battlegrid-market-analysis` | Read the current crypto market — regime, funding and open interest, leaders and laggards, a deep-dive on any named coin — and close with the levels worth watching |
 | `battlegrid-radar-deployment` | Put agents on standing duty: per-coin Radar policies that fire on confirmed regime flips, and per-preset Arena deployment policies, previewed before they are written and un-deployed with the blast radius stated |
 | `battlegrid-strategy-authoring` | Build a strategy from a plain-English idea: gather evidence, lock the spec, stage it into the strategy's draft, review the diff, diagnostics and impact, commit only on confirmation. Also fork, tune, restore, archive, preview |
