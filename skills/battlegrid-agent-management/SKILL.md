@@ -266,39 +266,10 @@ These tools carry no consent gate on either door: they are ownership-gated and b
 in chat and through an external MCP client. Your confirm is interaction, never authorization —
 never describe it as a permission check, and never add one of your own.
 
-### 8. Strategy Officers: configure one like an agent
+### 8. Strategy Officers are the officers skill's
 
-A Strategy Officer is a platform review the player schedules: on its hour it reads each in-scope agent's
-record and records at most one proposal per agent for the player to apply or dismiss. It writes no draft
-and commits nothing. Setting one up is configuration, and every run it schedules is billed to the
-player's LLM credit — so it goes through its own draft, exactly as an agent does.
-
-- **Read first.** `list_officers` for the roster (each officer's schedule, scope, last and next run),
-  `list_officer_drafts` for setups part-way through, `get_officer_draft` for one draft.
-- **Create.** `stage_officer_draft` with **no** `officerId` and `draftVersion: 0` mints a new create
-  draft; every later call names the minted id. Stage only what the player asked for — every axis the
-  draft does not hold starts at its default (name "Strategy Officer", the catalog's default model, no
-  instructions, `DAILY` at 03:00 UTC, all active agents, all three levers). "Add an officer that
-  reviews my agents every morning at six and focuses on stops" is `NAME`, `SCHEDULE`
-  `{ cadence: 'DAILY', hourUtc: 6, weekdayUtc: null }` and `INSTRUCTIONS` `{ focusText }` in the
-  player's words — and ask which timezone "six" means before converting it to a UTC hour. Worked
-  inputs: `references/officer-stage-examples.md`.
-- **Presets are starting points, staged as ordinary axes.** When the player names one — an exits
-  officer (levers `strategy`), a regime officer (`radar-deployment`), a rails officer (`agent`) or a
-  general one (all three) — stage its `NAME`, `INSTRUCTIONS` and `SCOPE`; the officer remembers no
-  preset.
-- **Axes are whole.** `SCHEDULE` carries `cadence`, `hourUtc` and `weekdayUtc` (`0` Sunday … `6`
-  Saturday, for `WEEKLY` only, otherwise null); `SCOPE` carries both `agents` (`'ALL'` or agent ids
-  from `list_intelligence_agents`) and `levers`. `INSTRUCTIONS` are the player's brief in their own
-  words: at most 2,000 characters, naming no tool and no id — the commit refuses either.
-- **Show, then commit on the player's word.** Read `get_officer_draft` and show the diff, the
-  diagnostics and the impact — `nextRunAt` is when it first runs, and a create's `admission` says
-  how many officers the player holds against the limit and how many more it admits (`officersRemaining`). Commit with `commit_officer_draft` naming
-  exactly the `draftVersion` and `committedRevision` the read returned, and only when the player says
-  so. A cadence of `OFF` keeps the setup and runs nothing.
-- An officer's reviews and their Apply, Push and Dismiss live on the Officers page's inbox; they are not
-  this flow's. In the app, the player sets an officer up in its own console, where this conversation may be
-  docked beside the form — stage into the officer it is scoped to.
+Setting up, running and reviewing a Strategy Officer, and acting on its proposals, is the `officers` skill's flow:
+activate it for any officer ask.
 
 ## When a write's outcome is unknown
 
