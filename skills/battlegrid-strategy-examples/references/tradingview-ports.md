@@ -13,6 +13,7 @@ engine) and names its substitutions where the catalog lacks a primitive.
 - Donchian / Turtle breakout
 - ICT / SMC (FVG + order blocks)
 - Pivot highs / lows, HH-HL structure and break of structure
+- Chaikin Money Flow
 - Now native, formerly substituted
 
 ## TradingView ports — familiar processes, studio vocabulary
@@ -34,7 +35,7 @@ rules about the columns themselves, not about porting — they live in the skill
   `BB_LOWER spread KC_LOWER` still express the same reading at a threshold you choose. Release
   direction from the MACD trajectory, `bollinger_squeeze` Critical-required.
   Its selectivity is anchor-dependent — see `## Conditions` in the skill body before gating on it.
-  (`bbWidthPct_rank_lo` + `ADX lt 20` remains a serviceable board-relative compression proxy, but it
+  (`bbWidthPct_rank_lo` + `ADX14 lt 20` remains a serviceable board-relative compression proxy, but it
   is no longer the only option.)
 - **Supertrend / UT Bot / Chandelier Exit** → `ST_LINE` and `ST_DIR` are native, so the regime
   half is a direct port: `ST_DIR is "bullish"` as the persistent state, `dist_ST_LINE` for
@@ -58,16 +59,16 @@ rules about the columns themselves, not about porting — they live in the skill
   reading while the literal is a threshold the author can see and tune. Use the zone as a report
   column, never as the substitute for the gate.
 - **VWAP reversion** → `dist_VWAP` band + `dist_VWAP_rank_far lte 5` for board-relative
-  stretch; required `NOT [ADX_state in ["trending","extreme"]]` veto; scalp geometry +
+  stretch; required `NOT [ADX14_state in ["trending","extreme"]]` veto; scalp geometry +
   aggressive timeDecay (VWAP anchors daily at 00:00 UTC).
-- **Donchian / Turtle breakout** (`close > ta.highest(high, 20)[1]`) → `dist_donchianHiPrior crossesAbove 0`
-  over `DONCHIAN_UPPER_PRIOR × distance` (the breakout bar; `dist_donchianHiPrior gt 0` holds on every
-  close of the run) + `RVOL gte 1.5`; turtle exits = trend preset (trail from 1R, giveback 50). Mirror with
-  `dist_donchianLoPrior crossesBelow 0`. The same-bar rail (`dist_donchianHi`) includes the breakout bar's
+- **Donchian / Turtle breakout** (`close > ta.highest(high, 20)[1]`) → `dist_donchianHiPrior20 crossesAbove 0`
+  over `DONCHIAN_UPPER_PRIOR × distance` (the breakout bar; `dist_donchianHiPrior20 gt 0` holds on every
+  close of the run) + `RVOL20 gte 1.5`; turtle exits = trend preset (trail from 1R, giveback 50). Mirror with
+  `dist_donchianLoPrior20 crossesBelow 0`. The same-bar rail (`dist_donchianHi20`) includes the breakout bar's
   own high, so it can never confirm a close-based break — do not AND it in. `zone is "breakout high"` reads
-  the prior-bar rail: it is the label form of the `dist_donchianHiPrior gt 0` state, holds on every close of
+  the prior-bar rail: it is the label form of the `dist_donchianHiPrior20 gt 0` state, holds on every close of
   the run, and adds nothing to the crossing; `"breakdown low"` mirrors it.
-  **Daily-breakout variant on any anchor:** pin the rail at 1d — `dist_donchianHiPrior_1d crossesAbove 0`
+  **Daily-breakout variant on any anchor:** pin the rail at 1d — `dist_donchianHiPrior20_1d crossesAbove 0`
   (`gt 0` for the held state).
   **Literal previous-day levels are native**: `dist_PDH gte 0` composes directly. They are TIMELESS
   and take `{rel: 'anchor'}` — see `## Header grammar` in the skill body.
@@ -85,8 +86,20 @@ rules about the columns themselves, not about porting — they live in the skill
   not), and each level is the stepped, non-repainting series — held from the bar that completes the
   pivot's right side, not plotted back on the pivot bar. Break of structure is
   `dist_fractalHi crossesAbove 0` / `dist_fractalLo crossesBelow 0`; "structure is bullish" is
-  `fractalLabel in ["HH","HL"]`. Only two bars each side is native: a `ta.pivothigh(5, 5)` or longer
-  script ports onto the two-bar swing, and the spec-lock question says so.
+  `fractalLabel in ["HH","HL"]`. The pivot each latest one is compared with is native too:
+  `PRIOR_SWING_FRACTAL_HIGH` / `PRIOR_SWING_FRACTAL_LOW` (`pFractalHi` / `pFractalLo`, Pine's
+  `ta.valuewhen(not na(ph), ph, 1)`) are price levels held while the prior pivot is in reach, so
+  `dist_pFractalHi crossesAbove 0` is a close through the swing high before the last one. A pivot's age is
+  `SWING_FRACTAL_HIGH_BARS_AGO` / `SWING_FRACTAL_LOW_BARS_AGO` (`fractalHiAgo` / `fractalLoAgo`), counted
+  from the pivot's own bar: 2 on the bar that completes it, so it reads Pine's
+  `ta.barssince(not na(ph)) + 2`, and `fractalLoAgo lte 5` keeps a setup to a fresh swing low. Only two
+  bars each side is native: a `ta.pivothigh(5, 5)` or longer script ports onto the two-bar swing, and the
+  spec-lock question says so.
+- **Chaikin Money Flow** (TradingView's built-in "Chaikin Money Flow" script, length 20; Pine has no
+  `ta.cmf`) → `CMF20` is native: each bar's volume weighted by where it closed in its range, summed over
+  20 closed bars and divided by their volume, −1 to +1. `CMF20 gt 0` is the accumulation state and
+  `CMF20_cross is "Bullish"` the zero-line cross; a flat bar weighs 0, and a window that traded no volume
+  reads no value, so a clause over it reads FALSE. It reads closed bars only, never the forming one.
 - **Now native, formerly substituted** — WaveTrend (`WT1`/`WT2`), QQE (`QQE_RSI_MA`/`QQE_STOP`),
   Hull (`HMA20`), Ichimoku (`ICHI_CONV`/`ICHI_BASE`/`ICHI_SPAN_A`/`ICHI_SPAN_B`/`ICHI_LAG`),
   Parabolic SAR (`PSAR`), Keltner (`KC_UPPER`/`KC_LOWER`, its basis is `EMA20`), the MACD and PPO lines
@@ -95,7 +108,10 @@ rules about the columns themselves, not about porting — they live in the skill
   line minus signal), the 15-bar rate of change (`ROC15`), the Donchian break memory
   (`DONCHIAN_BROKEN_HI`/`DONCHIAN_BROKEN_LO`), daily pivots
   (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), Williams %R (`WILLR14`), Stochastic RSI
-  (`STOCH_RSI14`), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 9/21/50 EMAs
-  (`EMA9`/`EMA21`/`EMA50`), literal previous-session levels (`PDH`/`PDL`/`PDO`), and fractal swing
-  structure (`SWING_FRACTAL_HIGH`/`SWING_FRACTAL_LOW`/`SWING_FRACTAL_LABEL`). Port these directly —
-  do not offer a substitute for a primitive the catalog serves.
+  (`STOCH_RSI14`), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 8/9/21/50 EMAs
+  (`EMA8`/`EMA9`/`EMA21`/`EMA50` — `ta.ema(close, 8)` is `EMA8`, its distance `dist_EMA8`), literal
+  previous-session levels (`PDH`/`PDL`/`PDO`), fractal swing structure
+  (`SWING_FRACTAL_HIGH`/`SWING_FRACTAL_LOW`/`SWING_FRACTAL_LABEL`, the prior pivots
+  `PRIOR_SWING_FRACTAL_HIGH`/`PRIOR_SWING_FRACTAL_LOW` and their ages
+  `SWING_FRACTAL_HIGH_BARS_AGO`/`SWING_FRACTAL_LOW_BARS_AGO`), and Chaikin Money Flow (`CMF20`). Port
+  these directly — do not offer a substitute for a primitive the catalog serves.
