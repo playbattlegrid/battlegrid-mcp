@@ -46,7 +46,7 @@ and is null otherwise:
 
 An event column is a trigger inside a carrier, never a standing state; pair it with a persistent
 state for regime. The skill body's `## Header grammar` states that rule and is the authority on it —
-a condition that reads a `crossDetect` column as a state is UNRESOLVED on nearly every bar.
+a condition that reads a `crossDetect` column as a state reads FALSE on nearly every bar, because a null reads FALSE.
 
 ## Board-relative rank recipes
 
