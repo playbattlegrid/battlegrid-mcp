@@ -32,7 +32,7 @@ Before committing a CREATE, every "no" here is a decision to state, not an omiss
 
 | Transform | Header | Validated example |
 |---|---|---|
-| `value` | `<code>` | `bbWidthPct`, `RVOL`, `rate` |
+| `value` | `<code>` | `bbWidthPct`, `RVOL20`, `rate` |
 | `trajectory` w4 | `<code>_t3…_t1`, `_now`, `_trend` (rising/falling/flat) | `RSI14_now`, `RSI14_trend` |
 | `distance` | `dist_<code>` (signed % from price) | `dist_SMA50` |
 | `spread` | `<base>_<operand>_spread` | `mark_oracle_spread` |
@@ -40,8 +40,8 @@ Before committing a CREATE, every "no" here is a decision to state, not an omiss
 | `rank` | `<code>_rank_<hi\|lo\|far\|near>` — ordinal, `lte N` = top-N | `bbWidthPct_rank_lo` |
 | `efficiency` wN | `<code>_er` (1 straight, ~0 chop) | `close_ltf_er` |
 | `maxShare` wN | `<code>_maxShare` | `volBase_ltf_maxShare` |
-| `classifyZone` / `classifyState` | `<code>_zone` / `<code>_state` | `RSI14_zone`, `ADX_state` |
-| `levelInteraction` | `<code>_lvl`, `<code>_lvl_b<N>` at a buffer of N bps | `bbUpper_lvl`, `bbUpper_lvl_b25` |
+| `classifyZone` / `classifyState` | `<code>_zone` / `<code>_state` | `RSI14_zone`, `ADX14_state` |
+| `levelInteraction` | `<code>_lvl`, `<code>_lvl_b<N>` at a buffer of N bps | `bbUpper20_lvl`, `bbUpper20_lvl_b25` |
 | any, stored `"bars": "all"` | `<code>_dev`, then the transform's suffix | `RSI14_dev_t1` |
 | `value` at `offset` N > 0 | `<code>_o<N>` | `RSI14_1d_o1` |
 
@@ -151,16 +151,16 @@ Recipes — each one clause:
   `dist_SMA20` is the close's distance from the average, so crossing 0 is the close crossing it.
 - **RSI entered overbought** — `RSI14_zone enters "overbought"` (the RSI module).
 - **Squeeze released** — `kcSqueeze exits "on"`, over a `KC_SQUEEZE` value column.
-- **New 20-bar high** — `donchianHi increased`, over a `DONCHIAN_UPPER` value column: the 20-bar
+- **New 20-bar high** — `donchianHi20 increased`, over a `DONCHIAN_UPPER` value column: the 20-bar
   upper channel rises exactly when the decided bar's high exceeds every high of the 20 bars before it.
-- **Close above the prior 20-bar high (Donchian / Turtle breakout)** — `dist_donchianHiPrior crossesAbove 0`,
+- **Close above the prior 20-bar high (Donchian / Turtle breakout)** — `dist_donchianHiPrior20 crossesAbove 0`,
   over a `DONCHIAN_UPPER_PRIOR × distance` column: Pine's `ta.crossover(close, ta.highest(high, 20)[1])`,
-  TRUE on the first close of a breakout run. `dist_donchianHiPrior gt 0` is Pine's
+  TRUE on the first close of a breakout run. `dist_donchianHiPrior20 gt 0` is Pine's
   `close > ta.highest(high, 20)[1]` and holds on every close of the run. Mirror with
-  `dist_donchianLoPrior crossesBelow 0` / `lt 0` over `DONCHIAN_LOWER_PRIOR`.
-- **Failed breakout of the prior 20-bar high** — `donchianHiPrior_lvl is "reject_from_below"`, over a
+  `dist_donchianLoPrior20 crossesBelow 0` / `lt 0` over `DONCHIAN_LOWER_PRIOR`.
+- **Failed breakout of the prior 20-bar high** — `donchianHiPrior20_lvl is "reject_from_below"`, over a
   `DONCHIAN_UPPER_PRIOR × levelInteraction` column: the high pierced the prior 20-bar high and the close
-  came back under it. `dist_donchianHiPrior crossesBelow 0` is NOT "fell back into the channel": the rail
+  came back under it. `dist_donchianHiPrior20 crossesBelow 0` is NOT "fell back into the channel": the rail
   rises to each breakout bar's high, so it fires once on the first bar of a breakout run that does not
   close above the raised rail — the run of new closing highs ended.
 - **RSI crossed above 50 within the last 3 closes** — `RSI14_now crossesAbove 50` holding
@@ -218,8 +218,8 @@ Inline it when:
   `conditionRef`, so "together on 3 closes in a row" over a sub-rule needs its clauses inline.
 
 Inlining a `NOT` is not always a flipped operator. A clause whose read ran and found no value reads
-FALSE, so `NOT [dist_donchianHi gt -0.52]` reads TRUE on a coin with no channel value while
-`dist_donchianHi lte -0.52` reads FALSE; `NOT [CVD_state is "bearish"]` and
+FALSE, so `NOT [dist_donchianHi20 gt -0.52]` reads TRUE on a coin with no channel value while
+`dist_donchianHi20 lte -0.52` reads FALSE; `NOT [CVD_state is "bearish"]` and
 `CVD_state in ["bullish", "neutral"]` part the same way. Flip only a header that always carries a
 value, or choose deliberately which answer a missing value gives.
 
@@ -370,7 +370,7 @@ refuses a commit or a rebind.
 reads the same on every bar of a trend, so `ST_DIR is "bullish"` is a regime filter and never an
 entry signal. The flip is `ST_DIR enters "bullish"`: TRUE on the one completed bar the direction
 turned, with no event column needed. The same distinction applies to every persisting
-classification: `MAalign`, `ADX_state`, `zone` — `is` for the regime, `enters` / `exits` for the
+classification: `MAalign`, `ADX14_state`, `zone` — `is` for the regime, `enters` / `exits` for the
 bar it changed.
 
 **Name the anchor when a metric is calibrated for one.** `KC_SQUEEZE is "on"` reads *on* about 57% of
@@ -397,12 +397,12 @@ reached the level and whose close came back under it is `reject_from_below`; a b
 within the buffer of the level is `touch_from_below`. From above is the mirror on the low.
 
 - **A reject bar reports reject.** It is never also reported as a touch, so "touched or rejected" is
-  an `in` clause over both labels of a side: `bbUpper_lvl in ["touch_from_below","reject_from_below"]`.
+  an `in` clause over both labels of a side: `bbUpper20_lvl in ["touch_from_below","reject_from_below"]`.
 - **`buffer`** is whole basis points of the level, 0–500, default 0 — `buffer: 25` is 0.25%. Only the
-  touch reads it: a reject must pierce the level itself. Two buffers are two columns (`bbUpper_lvl`,
-  `bbUpper_lvl_b25`).
+  touch reads it: a reject must pierce the level itself. Two buffers are two columns (`bbUpper20_lvl`,
+  `bbUpper20_lvl_b25`).
 - **A break is a crossing, never a label.** The break of a level is `distance` over the same level
-  crossing 0: `dist_bbUpper crossesAbove 0` from below, `crossesBelow 0` from above. On the strategy's
+  crossing 0: `dist_bbUpper20 crossesAbove 0` from below, `crossesBelow 0` from above. On the strategy's
   own rung a `…_from_below` label never holds on a bar where `crossesAbove 0` holds.
 - **Which levels take it.**
   - **Offered:** a candle-homed level — a band (`BB_UPPER`, `BB_LOWER`, `KC_UPPER`, `KC_LOWER`),
@@ -420,9 +420,9 @@ within the buffer of the level is `touch_from_below`. From above is the mirror o
     (`DONCHIAN_UPPER`, `DONCHIAN_LOWER`), each the extreme of the window ending at the very bar it would
     classify, which a close can never pass — read `DONCHIAN_UPPER_PRIOR` / `DONCHIAN_LOWER_PRIOR`. A
     price fact (`CLOSE`, `HLC3`, `MARK`) is refused: it is the price, not a level.
-- **A higher-rung level reads that rung's completed bar.** `bbUpper_htf_lvl` classifies the last
+- **A higher-rung level reads that rung's completed bar.** `bbUpper20_htf_lvl` classifies the last
   completed regime-rung bar from its own high, low and close, never the strategy bar's price — so
-  compose its break on the same rung, `dist_bbUpper_htf crossesAbove 0`.
+  compose its break on the same rung, `dist_bbUpper20_htf crossesAbove 0`.
 
 **`BB_TOUCH` and `BB_UPPER × levelInteraction` answer different questions.** `BB_TOUCH` (`BBtouch`)
 says where the CLOSE sits in %B — inside the band edge or not. `BB_UPPER × levelInteraction` says what
@@ -464,7 +464,7 @@ within N reads each of the N bars against its own predecessor.
 Recipes — the level recipes on candle-homed levels:
 
 - **Price rejected the upper Bollinger band** — a `BB_UPPER × levelInteraction` column, header
-  `bbUpper_lvl`; the clause `bbUpper_lvl is "reject_from_below"`.
+  `bbUpper20_lvl`; the clause `bbUpper20_lvl is "reject_from_below"`.
 - **Price touched or rejected VWAP from above** — `VWAP_lvl in ["touch_from_above","reject_from_above"]`,
   with `buffer: 10` for a touch within 0.1% (header `VWAP_lvl_b10`).
 - **Price broke the 20 EMA** — `dist_EMA20 crossesAbove 0`, the `distance` column over the same level.

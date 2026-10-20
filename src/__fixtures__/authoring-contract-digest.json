@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "122.0.0"
+    "contractVersion": "123.1.0"
   },
   "axes": {
     "create": [
@@ -216,7 +216,9 @@
     "CHG_5M",
     "CLOSE",
     "CLOSE_CHANGE",
+    "CLOSE_LOCATION",
     "CLOSE_RUN",
+    "CMF20",
     "CONFIDENCE",
     "CROWD_ACC",
     "CROWD_ACC_LIVE",
@@ -240,6 +242,7 @@
     "EMA21",
     "EMA5",
     "EMA50",
+    "EMA8",
     "EMA9",
     "EMA_CROSS",
     "FLOW_ALIGN",
@@ -301,6 +304,8 @@
     "PPO_LINE",
     "PPO_SIGNAL",
     "PRICE_ZONE",
+    "PRIOR_SWING_FRACTAL_HIGH",
+    "PRIOR_SWING_FRACTAL_LOW",
     "PRIOR_TPO_IB_HIGH",
     "PRIOR_TPO_IB_LOW",
     "PRIOR_TPO_POC",
@@ -352,8 +357,10 @@
     "ST_DIR",
     "ST_LINE",
     "SWING_FRACTAL_HIGH",
+    "SWING_FRACTAL_HIGH_BARS_AGO",
     "SWING_FRACTAL_LABEL",
     "SWING_FRACTAL_LOW",
+    "SWING_FRACTAL_LOW_BARS_AGO",
     "TPO_IB_HIGH",
     "TPO_IB_LOW",
     "TPO_POC",
