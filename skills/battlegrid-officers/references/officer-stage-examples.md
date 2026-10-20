@@ -29,23 +29,11 @@ the player's "six" to a UTC hour only after asking which timezone they mean; thi
 }
 ```
 
-## Start from the regime preset, weekly on Monday
+## Start from a preset
 
-A preset is staged as ordinary axes: its name, its brief and its scope.
-
-```json stage_officer_draft
-{
-  "draftVersion": 0,
-  "axes": {
-    "NAME": { "name": "Regime Officer" },
-    "INSTRUCTIONS": {
-      "focusText": "Read the record by the regime each decision was scored against. Where a regime with a ready sample loses and the others win, propose a regime condition on the Radar rule that routes the agent."
-    },
-    "SCOPE": { "agents": "ALL", "levers": ["radar-deployment"] },
-    "SCHEDULE": { "cadence": "WEEKLY", "hourUtc": 7, "weekdayUtc": 1 }
-  }
-}
-```
+A preset is a starting point, staged as ordinary axes: take its `name`, `focusText` and `scope` from the `presets`
+`list_officers` serves, and stage them as `NAME`, `INSTRUCTIONS` and `SCOPE`, beside any `SCHEDULE` the player asks for.
+The officer remembers no preset.
 
 ## Narrow an existing officer to two agents and the rails lever
 
