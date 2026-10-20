@@ -59,6 +59,35 @@ Reconnect the proxy, or restart it, so discovery reads the new catalog.
   staged from.
 - The **Officers** workflow routes from `list_officers` to the `battlegrid-officers` skill.
 
+## Contract history — v123 (a metric's code states its indicator's length)
+
+**Breaking at v123: eighteen report header stems are renamed.** v123 is the contract on top of v122. Reconnect the
+proxy, or restart it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **A condition column or a `{…}` Market Read marker naming a retired header is refused.** A metric's code now ends
+  with its indicator's single length: `CCI` → `CCI20`, `ADX` → `ADX14`, `ATR` → `ATR14`, `BBwidth` → `BBwidth20`,
+  `pctB` → `pctB20`, `donchianHi` / `donchianLo` → `donchianHi20` / `donchianLo20`, `donchianHiPrior` /
+  `donchianLoPrior` → `donchianHiPrior20` / `donchianLoPrior20`, `donchianBrkHi` / `donchianBrkLo` →
+  `donchianBrkHi20` / `donchianBrkLo20`, `bbUpper` / `bbLower` → `bbUpper20` / `bbLower20`, `willR` → `willR14`,
+  `stochRSI` → `stochRSI14`, `DIplus` / `DIminus` → `DIplus14` / `DIminus14`, `RVOL` → `RVOL20`. Every suffix and
+  prefix is kept (`ADX14_state`, `dist_donchianLo20`, `RVOL20_rank_hi`). Metric **keys** do not move (`ADX`, `RVOL`,
+  `DONCHIAN_UPPER`), so a column you author by key is unchanged. Stored strategies, agents, drafts and open
+  positions are rewritten on the server.
+
+### Reshaped output — something you read moved
+
+- **Rendered headers, condition columns, glossary entries and catalog `code` values serve the new stems.** A client
+  that matches a header by its old text no longer finds it.
+- **`list_strategy_vocabulary`'s `budgets` gains required `marketReadChars`**, the Market Read bound. A strategy's
+  `marketReadText` now runs to 4,000 characters, where 2,000 was the bound.
+
+### Widened input
+
+- **Seven metric keys are added:** `CLOSE_LOCATION`, `PRIOR_SWING_FRACTAL_HIGH`, `PRIOR_SWING_FRACTAL_LOW`,
+  `SWING_FRACTAL_HIGH_BARS_AGO`, `SWING_FRACTAL_LOW_BARS_AGO`, `CMF20` and `EMA8`.
+
 ## Contract history — v120 (the readiness ladder is three milestones)
 
 **Breaking at v120: `get_onboarding_requirements` reshapes its rungs and re-specifies its counts.** v120 is the
