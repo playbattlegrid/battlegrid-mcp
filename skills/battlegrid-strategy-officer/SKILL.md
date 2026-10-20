@@ -125,19 +125,39 @@ the draft kind that applies it:
 | Break-even, trailing, time decay, invalidation exits | `strategy` | `POSITION_MANAGEMENT` |
 | A cited condition that confirms losers, a missing gate | `strategy` | `CONDITIONS` |
 | When an entry may be taken (confirmation, trigger) | `strategy` | `ENTRY` |
+| The losing pattern needs data no report section carries; a section no condition or decision uses | `strategy` | `REPORT` |
 | Rail refusals, exposure, leverage, daily limits, drawdown | `agent` | `TRADING_CONFIG` |
+| Win rate flat across conviction bands; a posture the drawdown record does not support | `agent` | `BEHAVIOR` |
+| LLM spend outrunning realized net on the agent's model | `agent` | `MODEL` |
+| Losses across regimes no condition change fixes; a strategy the owner did not author; another strategy that fits the market better | `agent` | `STRATEGY_BINDING` |
 | A regime or hours slice that loses while the others win | `radar-deployment` | `RULES` |
+| Losses in hours or regimes no rule covers, routed by the catch-all | `radar-deployment` | `DEFAULT_SLOT` |
 
 A regime or hours finding routes to the agent's **Radar rule** — a `REGIME` condition excluding the losing
 regime, or an `HOURS` condition — never to the strategy. The second-best lever is recorded as a finding
 without a lever, never as a second proposal.
 
+**A rail refusal is routed by the setting it names, never by its gate stage.** Each `railRefusals` row of the
+review read carries `tradingConfigMember`: the agent setting the owner moves to clear it. A row with a member is
+a `TRADING_CONFIG` lever on that member, inside the agent lever — `EXPOSURE_BUDGET_EXHAUSTED` names
+`maxConcurrentExposureUsd`, `DAILY_TRADE_LIMIT_REACHED` names `maxDailyTrades`, `INSUFFICIENT_EQUITY` names
+`balanceThresholdUsd`. Its `gateStage` reading `ACCOUNT` says where the gate runs, not whose setting it is: never
+say an exposure limit is outside your scope while you hold the agent lever. Lowering `balanceThresholdUsd` lowers
+a safety floor, so weigh it as a risk-increasing change and say so. A row with a null member is a halt: it ends on
+the owner's resume, and the read's `halt` names the stop that tripped it — a finding naming the owner's step,
+never a lever.
+
+**Rebind or edit.** A rebind replaces everything the agent reads and trades by — report, conditions, entry, trade
+levels, exit policy and timeframe — while each open position keeps the rules it opened under. Propose one only
+when no single strategy field would change the losing figures, or when the agent runs a strategy the owner did not
+author; otherwise edit the strategy the agent runs.
+
 - **A kind outside `scope.levers` is not yours.** Record the finding; if no in-scope lever is supported, submit
   lever `NONE`, reason `LEVER_NOT_ALLOWED`, and say which out-of-scope lever the figures pointed at.
-- **A strategy the owner did not author is not a lever.** When `strategyOwnedByOwner` is false, record the
-  finding, state that the strategy must be forked from the library before a strategy lever can be proposed —
-  forking is the owner's step, never yours — and consider the agent and Radar levers within your scope
-  instead. If none is supported, submit lever `NONE`, reason `TARGET_NOT_OWNED`.
+- **A strategy the owner did not author is not a strategy lever.** When `strategyOwnedByOwner` is false, record
+  the finding, state that the strategy must be forked from the library before a strategy lever can be proposed —
+  forking is the owner's step, never yours — and consider a rebind and the other agent and Radar levers within
+  your scope instead. If none is supported, submit lever `NONE`, reason `TARGET_NOT_OWNED`.
 - **No ready figure, no lever.** When every figure a lever would rest on reads `INSUFFICIENT_DATA`, submit lever
   `NONE`, reason `INSUFFICIENT_DATA`, naming the figure and its sample.
 - **Nothing to change is an answer.** When the ready figures read as a playbook doing what it should, submit
@@ -148,11 +168,17 @@ without a lever, never as a second proposal.
 A proposal carries **exactly one axis, whole**, in the kind's own vocabulary — the complete current value of
 that axis with your one change in it. So read the current value first:
 
-- a strategy axis → `get_strategy` on the agent's `strategyId`;
+- a strategy axis → `get_strategy` on the agent's `strategyId`; for `REPORT`, `list_strategy_categories` for the
+  platform sections a report may carry — the whole section list is sent, with your change in it;
 - `TRADING_CONFIG` → `get_intelligence_agent` for the agent's current `tradingConfig`, and
   `get_trading_config_catalog` for the bounds every member must sit inside;
-- `RULES` → `get_radar_deployment` on the coin the target names (`list_radar_deployments` shows which coins
-  route this agent); every rule is sent, in priority order, with the one rule changed.
+- `BEHAVIOR` → `get_intelligence_agent` for the current `behavior`; all three members are sent;
+- `MODEL` → `list_approved_models` for the models the account may select now, by `modelId`;
+- `STRATEGY_BINDING` → `list_strategies` (active strategies only) for the owner's own strategies and the
+  library's, by `strategyId`; a rebind carries no `TRADING_CONFIG`, since the timeframes follow the strategy;
+- `RULES` and `DEFAULT_SLOT` → `get_radar_deployment` on the coin the target names (`list_radar_deployments`
+  shows which coins route this agent); every rule is sent, in priority order, with the one rule changed, and a
+  rule or the catch-all names only agents the coin already routes.
 
 The complete shape of every axis — which members it must carry and where each comes from — is in
 `references/proposal-shapes.md`. The proposal is `{ kind, targetId, axes, baseRevision }`, where `targetId` and
@@ -176,7 +202,7 @@ get past a `PROPOSAL_INVALID`: the record says what was refused, and the next re
 **The review is written in every case** — no new decisions, out of scope, not enough data, nothing to change.
 
 Close with the review, not a question. In a scheduled run that is the whole close. When the player is in the
-conversation, add one sentence: the change is proposed and waiting on their Agents Hub card, where Apply
+conversation, add one sentence: the change is proposed and waiting on its card on the Officers page, where Apply
 publishes it, Push places it in the editor beside their own edits, and Dismiss closes it.
 
 ## Negatives

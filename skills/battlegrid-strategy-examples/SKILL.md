@@ -78,10 +78,10 @@ add. Either way you never invent one. To section-qualify a duplicated header, re
 `CONDITION_COLUMN_AMBIGUOUS` refusal offers.
 
 **Event columns print only on their event.** `MACDhist_cross` and `EMA5_13` (Bullish/Bearish) carry a
-value on the crossing bar and are null on every other one, which reads as UNRESOLVED. Use an event
+value on the crossing bar and are null on every other one, and a null reads FALSE. Use an event
 column as a TRIGGER inside a carrier, and pair it with a persistent state — a spread sign,
-`MAalign` — for regime. A condition that treats an event column as a standing state is unresolved on
-nearly every bar, which is a gate that never gates.
+`MAalign` — for regime. A condition that treats an event column as a standing state reads FALSE on
+nearly every bar, so it is TRUE only on the crossing bar itself.
 
 **The previous-session levels are TIMELESS.** `PDH`, `PDL`, `PDO` and the seven floor pivots
 (`pivotP`, `pivotR1`–`R3`, `pivotS1`–`S3`) read the session profile, not a candle rung, so they take
