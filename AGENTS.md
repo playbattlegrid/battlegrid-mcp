@@ -75,13 +75,14 @@ Strategies, intelligence agents, Arena and radar deployments, and a player's Mar
 npx skills add playbattlegrid/battlegrid-mcp
 ```
 
-Nine skills ship from this repo (and inside the npm tarball, under `SKILL.md` + `skills/`):
+The skills ship from this repo (and inside the npm tarball, under `SKILL.md` + `skills/`):
 
 | Skill | Teaches |
 |---|---|
 | `battlegrid` (repo root) | Connection, the multi-account `account` argument, scopes, and where the rest lives — authored here |
 | `battlegrid-agent-management` | Commission and govern intelligence agents: interview and create one against a committed strategy and an approved model, change configuration and risk limits, rebind, halt, resume, archive, and act on live positions |
 | `battlegrid-arena-play` | Enter Market Grid sessions: find an open session, read its coin pool and live market context, compose a grid with real per-coin reasoning or have an agent generate it, submit, then read results and the reasoning journal |
+| `battlegrid-officers` | Set up and govern Strategy Officers: create or change one through its draft, run one now, read when each runs and what is waiting, and apply, push or dismiss the proposals its reviews carry — never writing a review |
 | `battlegrid-market-analysis` | Read the current crypto market — regime, funding and open interest, leaders and laggards, a deep-dive on any named coin — and close with the levels worth watching |
 | `battlegrid-radar-deployment` | Put agents on standing duty: per-coin Radar policies that fire on confirmed regime flips, and per-preset Arena deployment policies, previewed before they are written and un-deployed with the blast radius stated |
 | `battlegrid-strategy-authoring` | Build a strategy from a plain-English idea: gather evidence, lock the spec, stage it into the strategy's draft, review the diff, diagnostics and impact, commit only on confirmation. Also fork, tune, restore, archive, preview |
@@ -90,7 +91,7 @@ Nine skills ship from this repo (and inside the npm tarball, under `SKILL.md` + 
 | `battlegrid-trade-analysis` | Read your own trading position: where the money is, whether each agent is doing its job, what is open and how close it sits to its protections, and whether the automation is actually running |
 | `battlegrid-trade-proposal` | Find and stage a trade for one of your agents: check what is already held, scan every active coin against the agent's own gates, propose on one through the agent's own conversational turn, present the outcome with its conviction, and approve or decline only on your word |
 
-The nine `skills/battlegrid-*` are exported from BattleGrid's server repository, so they describe
+The `skills/battlegrid-*` are exported from BattleGrid's server repository, so they describe
 the same tools this proxy forwards. They are generated files: they are never edited in this
 repository, and `skill-provenance.test.ts` fails CI on a hand edit.
 
