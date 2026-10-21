@@ -38,6 +38,93 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v129 (every record list takes one time window)
+
+**Breaking at v129: `get_public_agent_realized_trades` renames its `timeframe` input to `window`, and sixteen list
+tools accept the same window.** v129 is the contract on top of v128.1. No output moves. Reconnect the proxy, or
+restart it, so discovery reads the new schemas.
+
+### Rejected input — a key you sent is refused
+
+- **`get_public_agent_realized_trades` no longer takes `timeframe`.** Send the same value as `window` (`1D`, `7D`,
+  `30D` or `LIFETIME`; default `LIFETIME`). The input is strict: a call that still sends `timeframe` is refused as
+  invalid arguments.
+
+### Widened input — a window you can now ask for
+
+- **One window on every record list paged by `cursor`:** `list_signal_logs`, `list_agent_trades`, `list_gate_blocks`,
+  `get_radar_activity`, `get_radar_close_decisions`, `get_public_agent_signal_logs`,
+  `get_public_agent_realized_trades`, `get_agent_thought_log`, `get_agent_activity_feed`,
+  `list_my_market_grid_entries`, and `list_strategy_drafts`, `list_agent_drafts`, `list_radar_deployment_drafts`,
+  `list_deployment_policy_drafts`, `list_officer_drafts` and `list_market_grid_entry_drafts`.
+- **Either a trailing preset or explicit bounds, never both.** `window: '1D' | '7D' | '30D'` is the last 24 hours,
+  7 days or 30 days, measured by the server on every page you read. Or leave `window` at `LIFETIME` and send
+  `since` (inclusive) and/or `until` (exclusive), each an ISO-8601 date-time with an offset (`Z` or `±hh:mm`).
+- **The window is over the instant the list is ordered by:** a signal log's or thought's creation, a trade's close,
+  a radar event's occurrence, a close decision's bar open, an entry's original submission, a draft's last update.
+- **Refused before any read, naming the field:** `since` not strictly before `until` (names `since`); a preset other
+  than `LIFETIME` beside `since` or `until` (names `window`); a bound with no offset, or before year 0001 (names the
+  bound).
+- **Summaries follow the window.** `list_agent_trades`' `summary` and `resultSummary`, `list_signal_logs`' `summary`,
+  `list_gate_blocks`' `summary` and `list_my_market_grid_entries`' facets cover the windowed scope, not all history.
+- **Cursors are unchanged.** A `nextCursor` you already hold still pages. Read the next page with the same window;
+  a cursor read under a different window serves the rows after its key that lie inside the window you send now.
+
+### Not windowed
+
+`list_market_grid_sessions`, `list_officer_reviews`, the live-state reads (positions, open orders), catalogs,
+rankings and bar series take no window; sending `window` to them is refused as an unknown input, as before.
+
+## Contract history — v128.1 (a signal's debrief reads through MCP)
+
+**Additive at v128.1: two read tools.** v128.1 is the contract on top of v128. Nothing a client sends
+is refused and nothing it reads is reshaped.
+
+### Added tools
+
+- **`get_signal_debrief`** — `{ agentId, logId }`: the debrief of a signal log of your own agent.
+- **`get_public_agent_signal_debrief`** — `{ agentId, logId }`: the same debrief for a signal log on an
+  agent's public profile.
+
+Both answer `{ debrief }`, a `DecisionDebriefDTO` or `null`. The debrief's verdict is `null` until its
+24-hour mark resolves; read again after that.
+
+## Contract history — v128 (an agent's stop and take-profit move through the agent's own protection)
+
+**Breaking at v128: `override_agent_protection` takes new input and returns a new answer, and two tools announce
+that they are destructive and reach the exchange.** v128 is the contract on top of v127. Reconnect the proxy, or
+restart it, so discovery reads the new schemas and annotations.
+
+### Rejected input — a key you sent is refused
+
+- **`override_agent_protection` no longer takes `effectiveStopLoss` or `effectiveStopLossOrderId`.** Send
+  `{ decisionId, stopLossPrice?, takeProfitPrice? }` — each price a positive decimal string, at least one of the two.
+  The input is strict: a call that still sends `effectiveStopLossOrderId` is refused as invalid arguments. You name
+  levels, never orders; the server finds the live leg itself.
+- **A level the live mark has already crossed is refused** — a stop must sit on the loss side of the mark and a
+  take-profit on its profit side. Read `decisionId`, `effectiveStopLoss` and `effectiveTakeProfit` from
+  `list_user_active_positions` or `get_agent_decision_context`. To exit now, call `close_agent_position`.
+
+### Reshaped output — the answer you read changed
+
+- **`override_agent_protection` answers `{ decisionId, success, result }`.** `success` is true only when every leg you
+  asked to move committed. `result.kind` is one of:
+  - `level-crossed` — `{ leg, markPrice }`: that leg (`SL` or `TP`) would fill at once against the mark; nothing was
+    written;
+  - `mark-unavailable` — the live mark is stale or missing; nothing was written;
+  - `rate-limited` — `{ retryAfter }` seconds; nothing was written;
+  - `dispatched` — `{ stopLoss, takeProfit }`, each leg's own outcome (`null` for a leg you did not send).
+- **Read each leg on its own.** Only `committed` moved the leg. A stop can come back `queued`: it is recorded and will
+  be placed as soon as the amendment in progress finishes. A take-profit with no resting leg is `execution-not-open`
+  with `observedStatus: "MISSING_TAKE_PROFIT"`. The never-produced `stale-order` outcome is gone. A committed stop is
+  never rolled back because the take-profit failed.
+- **The take-profit moves too.** The tool used to move the stop only.
+
+### Changed annotations
+
+- `close_agent_position` and `override_agent_protection` declare `destructiveHint: true` and `openWorldHint: true`.
+  A client that asks before destructive or open-world calls now asks before both.
+
 ## Contract history — v127 (a read serves what its code computes, and says so)
 
 **Breaking at v127: two answers narrow for calls you could already make, and every radar journal row gains one
