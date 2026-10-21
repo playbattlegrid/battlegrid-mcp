@@ -38,6 +38,207 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v127 (a read serves what its code computes, and says so)
+
+**Breaking at v127: two answers narrow for calls you could already make, and every radar journal row gains one
+field.** v127 is the contract on top of v126. No input you could send is refused. Reconnect the proxy, or restart it,
+so discovery reads the new descriptions and schemas.
+
+### Narrowed answer — a call you made now returns less
+
+- **`get_trade_chart` and `get_public_agent_trade_chart` return `UNAVAILABLE` for a CLOSED trade with no stored
+  chart.** A read used to capture the chart on the spot and answer `READY`; it no longer writes anything or fetches
+  candles. The chart is captured once, by a background job after the trade closes (it retries for about two and a
+  half hours). `UNAVAILABLE` now covers: no entry decision or no position; a position that has not closed; and a
+  closed position whose capture is still waiting out its delay, failed, or predates capture. Trades closed before
+  2026-07-28 without a chart stay `UNAVAILABLE`.
+- **`get_agent_explorer` returns 25 entries by default** (was 100). `limit` still accepts 1-100; pass it to ask for
+  more. A result over the result cap is refused with `nextAct: narrow` — ask again with a smaller `limit`.
+
+### Added output — a field you can read
+
+- **`signalLogId` on every `get_radar_activity` row and every `get_radar_activity_summary` recent row.** On a
+  `FIRE_DISPOSITION` row whose disposition is `FIRED`, it names the signal log that fire's evaluation wrote — open it
+  with `get_signal_log({ agentId, logId })`. It is `null` when that evaluation wrote none (screened out or blocked
+  before a log existed) and on every other row. A strict-schema client accepts the new key on each variant.
+
+### Corrected answers — same shape, true values
+
+- **`get_intelligence_agent`** and the receipts of create, update, activate and archive serve your rolling-24h LLM
+  spend on the agent (`last24hCostUsd`), your own active Arena deployments of it (`activeGameCount` — another
+  user's deployments of a platform agent are not counted) and `hasActiveAssignments`, the values
+  `list_intelligence_agents` serves. They used to serve `0`, `0` and `false`.
+- **`get_agent_decision_context`** serves the open position's real `signalLogId` (it served `''`). It answers only
+  for an agent position that is OPEN on the coin; for a coin that did not trade, read `list_gate_blocks` and
+  `get_radar_activity_summary`.
+- **`get_radar_activity`'s `FIRES` filter** keeps each fire's `EVALUATION_OUTCOME` row beside its disposition — the
+  only record of a fire refused before it wrote a signal log.
+
+### Declared sizes — the result cap is announced
+
+- `get_radar_activity` (narrow with `limit`, `detail` or `includeCurve`), `get_agent_explorer` (narrow with `limit`),
+  `get_public_agent_signal_log_detail` and `list_radar_deployments` (read one coin with `get_radar_deployment`)
+  carry `_meta["anthropic/maxResultSizeChars"]`.
+
+### Corrected descriptions
+
+`get_signal_log` names every block with its null case; `get_public_agent_signal_log_detail` states that a FAILED log
+returns `log: null`; `get_radar_deployment` says a null `minConviction` is no floor (never inherited) and
+`resolvedConviction` is the slot's own bar; `get_radar_activity_summary` names `ENTRY_VOID` and its 168-hour window;
+`list_radar_deployments` names `summary.radarPaused`; `get_regime_snapshot`'s 4h is a default only — a Radar slot
+reads its agent's own regime timeframe.
+
+## Contract history — v126 (a queued entry executes at its close; nothing waits for an approval)
+
+**Breaking at v126: three entry-decision tools leave the catalog you discover, two outputs narrow, and one status
+value is renamed.** v126 is the contract on top of v125. Reconnect the proxy, or restart it, so discovery reads the
+new catalog.
+
+A request you queue with `propose_entry_decision` is now an entry the player has already consented to: at the
+agent's decided strategy-bar close, a qualifying entry is placed at once, sized by the agent's own risk budget, with
+no further step. Confirm with the player before calling it — their ask to trade that coin with that agent, or a
+standing instruction to trade for them, is the consent. The `mcp:wager` grant is that standing permission for an MCP
+client, and the consent screen says so.
+
+### Removed tools — something you called is gone
+
+A call naming one is answered as an unknown tool; there is no alias, and none has a replacement call.
+
+- **`accept_entry_decision`**: nothing waits to be accepted. The entry executes at its decided close; consent comes
+  before `propose_entry_decision`.
+- **`cancel_entry_decision`**: a decided entry is not cancelled. Withdraw a queued request with
+  `cancel_entry_request({ requestId })` until its close fires.
+- **`list_pending_approvals`**: read a pending request with `get_entry_request({ requestId })`, and placing and live
+  positions with `list_user_active_positions()`.
+
+### Narrowed output — a shape you read has fewer members
+
+- **`propose_entry_decision`** (now titled *Queue Entry*) returns `result` as `queued | error`. The `recommendation`
+  and `no_trade` members are gone; a decided close's answer lands in the request's conversation, read with
+  `get_trade_conversation`.
+- **`get_agents_hub`** publishes no approval: `hubStatus` is `IN_TRADE`, `RADAR_ARMED`, `ARENA_DEPLOYED` or `IDLE`
+  (in that precedence), rows have no `pendingApprovalCount`, and the summary has no `totalPendingApprovalCount`.
+
+### Renamed value — a word you matched changed
+
+- The execution status **`AWAITING_APPROVAL` is `PROPOSED`** wherever it is published (`get_signal_log`,
+  `get_public_agent_signal_log_detail`): a position whose order is being placed. Match `PROPOSED` where you matched
+  `AWAITING_APPROVAL`.
+
+### Re-specified behavior
+
+- **A queued request's entry executes at its decided close.** Its conversation's `recommendation` card is the entry
+  locator: it names the decision (`get_entry_decision`) and the position the request placed.
+- **Every request that is not withdrawn is answered once.** A request whose deadline passed unanswered is answered by
+  the next sweep — `close_missed` for its bar, or the engine's `EVALUATION_FAULTED` for a fired one whose decision job
+  is gone — and reads as pending through `get_entry_request` until then.
+
+## Contract history — v125 (MCP serves the read the client shows)
+
+**Breaking at v125: nine trade and signal tools leave the catalog you discover, one tool joins it, two outputs
+reshape, one tool refuses three inputs, one output field and three ack fields are gone.** v125 is the contract on top
+of v124. Reconnect the proxy, or restart it, so discovery reads the new catalog.
+
+### Removed tools — something you called is gone
+
+Each was a parallel, narrower or dead read beside the one the web client shows. A call naming one is answered as an
+unknown tool; there is no alias.
+
+- **`list_trade_outcomes`**: call `list_agent_trades({ agentId })`, then
+  `get_trade_outcome_by_decision({ decisionId })` for a trade's fills, fees, gross P&L, slippage, leverage,
+  `closedBy`, duration, excursion and `exitRepriceSource`.
+- **`get_signal_performance`**: call `get_public_agent_signal_performance({ agentId })`. The owner's slice is
+  `list_signal_logs({ agentId }).summary` and `list_agent_trades({ agentId }).summary`.
+- **`get_agent_open_positions`**: call `get_public_agent_open_positions({ agentId, filter: { coinTicker: [...] } })`.
+- **`get_public_agent_unrealized_pnl`**: call `get_public_agent_open_positions({ agentId, filter: { signalSource } })`;
+  its `unrealizedPnlUsd` is the figure.
+- **`list_session_agent_positions`**: call `list_user_active_positions()`; each position carries
+  `marketGridSessionId`.
+- **`get_order_status`**: call `list_agent_open_orders()` for the platform's record, `get_open_orders()` for the
+  venue's.
+- **`get_decision_order_attribution`**: call `list_agent_open_orders()`, `list_user_active_positions()` and
+  `list_agent_trades()`; each row names its `decisionId`.
+- **`list_entry_decisions`**: call `list_signal_logs({ agentId })`, then `get_signal_log({ agentId, logId })`.
+- **`get_agent_fund_allocation`**: call `get_agent_budget({ agentId })` for `haltedAt`, `haltReason` and
+  `perTradePushEnabled`.
+
+### Added tool and fields
+
+- **`get_public_agent_open_positions({ agentId, filter })`** serves an agent's open book, newest open first. Each
+  row carries its decided `stopLoss` and `takeProfit` and its live `mark` (`unrealizedPnlUsd`, `movePercent`,
+  `roePercent`; `null` when the coin has no usable mark), beside the marked rows' `unrealizedPnlUsd` and an
+  `unpricedPositionCount`. The row's open instant is `openedAt`; `leverage` and `signalLogId` are never null, and
+  there is no `timeHorizon`. An archived or unknown agent reads as no positions.
+- **`list_agent_trades`** rows carry `decisionId`, the key `get_trade_outcome_by_decision` takes. The tool accepts
+  `q` (1–64 characters after trimming).
+- **`list_agent_open_orders`** rows carry `exchangeOrderId` (`null` until the venue acknowledges), `cloid` and
+  `decisionId`, so an agent order joins `get_open_orders` and chains to its decision.
+
+### Reshaped output — something you read moved
+
+- **`list_signal_logs`** serves the My Agents Signals tab's read: `{ signals, nextCursor, summary }` across every one
+  of your agents unless `agentId` narrows it. Each row names its agent and carries `rejection`, the reason and detail
+  of the signal's rejected agent position, `null` otherwise.
+- **`list_user_active_positions`** serves every position once, in `positions`. Each `agents` entry keeps its group
+  figures and loses its nested `positions`.
+
+### Rejected input — a key you sent is refused
+
+- **`list_signal_logs`** refuses `direction`, `terminalStatus` and `signalSource` as unrecognised keys. Its `agentId`
+  is optional, and it accepts `coinTicker`, `q`, `cursor` and `limit` (1–50, default 10).
+
+### Removed fields — a value you read is gone
+
+- **`skippedCount`** leaves `get_public_agent_signal_performance`; it was always `0`. `skipCount` counts the SKIP
+  decisions, and `blockedCount` counts the agent's ineligible attempts.
+- **`availableUsd`, `lifetimeAllocatedUsd` and `lifetimeRecalledUsd`** leave the `allocation` that
+  `halt_intelligence_agent`, `resume_intelligence_agent` and `set_agent_per_trade_push` return; it is now
+  `{ agentId, haltedAt, perTradePushEnabled }`. The three figures were zero on every agent.
+
+### Declared result size
+
+- **`list_signal_logs` and `list_agent_trades` declare the configured result cap.** A page past it is refused with
+  `nextAct: narrow`; ask again with a smaller `limit`.
+
+## Contract history — v124 (an agent's record is its thought log and its activity feed)
+
+**Breaking at v124: three agent-record tools leave the catalog you discover, and a thought-log entry loses a
+field.** v124 is the contract on top of v123.2.0. Reconnect the proxy, or restart it, so discovery reads the new
+catalog.
+
+### Removed tools — something you called is gone
+
+Each was a duplicate door onto the two per-agent reads. A call naming one is answered as an unknown tool; there is
+no alias.
+
+- **`get_agent_journal({ agentId, limit })`**: call `get_agent_thought_log({ agentId, limit })` and
+  `get_agent_activity_feed({ agentId, limit })`. Read the owner's `username` from `get_account_state()`.
+- **`get_user_thought_log`**: call `get_agent_thought_log({ agentId })` for each agent
+  `list_intelligence_agents()` lists. Read a trade's reasoning from `get_signal_log`, and an arena entry's reasoning
+  from `list_my_market_grid_entries` and `get_my_market_grid_entry`.
+- **`get_user_activity_feed`**: call `get_agent_activity_feed({ agentId })` for each agent
+  `list_intelligence_agents()` lists.
+
+### Reshaped output — a field you read is gone
+
+- **`get_agent_thought_log` entries no longer carry `marketSnapshot`.** For an arena decision it held the agent's
+  whole resolved prompt, larger than the result cap, so a page holding one could not be served at all, even at
+  `limit: 1`, and no later entry could be reached. Each entry still carries its outcome, written reasoning, grid pick
+  and parsed picks, confidence and the floor enforced against it, its usage-event link and its creation instant.
+
+### Declared result size
+
+- **`get_agent_thought_log` declares the configured result cap.** A page past it is refused with
+  `nextAct: narrow`; ask again with a smaller `limit`.
+
+### Descriptions
+
+- `get_agent_thought_log` names both decisions it records: an arena grid decision and a trade thesis
+  (`AGENT_TRADE_THESIS`, whose full pipeline is `get_signal_log`).
+- `get_agent_activity_feed` names the event families its rows carry: arena auto-submit triggers and grid outcomes,
+  cost-limit and insufficient-funds blocks, funds committed to a trade or a wager, halts and admission blocks, and
+  lifecycle events.
+
 ## Contract history — v122 (only an officer's own turn records a review)
 
 **Breaking at v122: two officer review tools leave the catalog you discover.** v122 is the contract on top of v121.
