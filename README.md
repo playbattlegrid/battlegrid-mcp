@@ -38,6 +38,36 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v130.1 (your agent's profile header, your account's fills and your trade conversations read through MCP)
+
+**Additive at v130.1: three read tools.** v130.1 is the contract on top of v130. Nothing a client sends is refused
+and nothing it reads is reshaped. Reconnect the proxy, or restart it, so discovery reads the new tools.
+
+### Added tools
+
+- **`get_agent_profile({ agentId, timeframe?, signalSource? })`** (`mcp:read`) — the profile header of one of your
+  agents, as its profile page shows it: identity and run state, then the KPI band over `timeframe` (a trailing
+  performance window, `LIFETIME` by default; not `get_agent_explorer`'s leaderboard timeframe) and the
+  `signalSource` selection (empty, the default, is every source). The open-position figures are priced live. It
+  answers `{ profile }`, or `{ profile: null }` unless the agent is a private agent on your account; archived agents
+  are served. For the P&L from the budget baseline read `get_agent_performance`; for the fixed Decision Quality
+  window and its slices read `get_agent_review_analytics`.
+- **`list_user_fills({ limit? })`** (`mcp:read`) — what the venue filled on your account, newest first: every agent's
+  and every manual order's fills alike, attributed to no agent or decision. `limit` is 1–200, default 50, and
+  narrows a result over the declared size cap. `orderId` is the venue's order id; the BattleGrid attribution fields
+  are `null` on this read. One trade's fills are `get_trade_outcome_by_decision`'s, on a `list_agent_trades` row's
+  `decisionId`. It queries the exchange, so it is slower and can fail when the exchange is unreachable.
+- **`list_trade_conversations({ agentId?, cursor?, limit?, window?, since?, until? })`** (`mcp:read`) — your trade
+  conversations, newest activity first, one keyset page at a time (`limit` 1–50, default 20; page with
+  `nextCursor`), windowed by last activity. A row's `id` is the `conversationId` `get_trade_conversation` reads.
+  `agentId` narrows within your own conversations.
+
+### Corrected descriptions
+
+`get_trade_conversation` names a `list_trade_conversations` row's `id`, beside a `propose_entry_decision` result, as
+where its `conversationId` comes from. `get_agent_review_analytics` names `get_agent_profile` for a window or a signal
+source you choose.
+
 ## Contract history — v130 (one audit-history tool per audience, and a blocked fire names its gate block)
 
 **Breaking at v130: one answer narrows for a call you could already make.** v130 is the contract on top of v129.1.
