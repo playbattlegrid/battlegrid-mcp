@@ -38,6 +38,24 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v129.1 (the activity feed names only events that happen)
+
+**Not breaking.** v129.1 is the contract on top of v129. No input acceptance moves and no served page changes.
+Reconnect the proxy, or restart it, so discovery reads the new schemas.
+
+### Narrowed output — a shape you read has fewer members
+
+- **`get_agent_activity_feed`**'s `eventType` no longer lists `AGENT_UPDATED`, `EARLY_ENTRY_SUBMITTED`,
+  `GRID_SUBMITTED_VIA_TELEGRAM` or `GRID_UPDATED_VIA_TELEGRAM`. Nothing records them and no stored event carries one,
+  so no row you could read changes. The historical values older rows carry — `MULTI_AGENT_DISPATCHED`,
+  `AGENT_OUTCOMPETED`, `AGENT_WON_COMPETITION`, `REASSESSMENT_TRIGGERED`, `AGENT_BLOCKED_NO_ALLOCATION` — are still
+  served.
+
+### Corrected descriptions
+
+`get_agent_activity_feed` no longer names an "updated" lifecycle event. `get_radar_activity`'s `filter` input states
+that `FIRES` keeps each fire's disposition and its evaluation outcome, which is what it has returned since v127.
+
 ## Contract history — v129 (every record list takes one time window)
 
 **Breaking at v129: `get_public_agent_realized_trades` renames its `timeframe` input to `window`, and sixteen list
