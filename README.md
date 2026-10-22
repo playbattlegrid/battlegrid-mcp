@@ -38,6 +38,53 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v131 (an agent's arena decisions and a trade's thesis are read where each is made)
+
+**Breaking at v131: one tool is replaced and some keys you read are gone.** v131 is the contract on top of v130.1. No
+input you send to a surviving tool is refused. Reconnect the proxy, or restart it, so discovery reads the new tool,
+schemas and descriptions.
+
+### Removed tool — something you called is gone
+
+A call naming it is answered as an unknown tool; there is no alias.
+
+- **`get_agent_thought_log`**: call `list_agent_market_grid_decisions({ agentId, cursor?, limit?, window?, since?,
+  until? })` for an agent's arena decisions, and `get_signal_log({ agentId, logId })` for a trade, whose thesis is
+  `thesisReasoning`. `list_signal_logs({ agentId })` finds the trades.
+
+### Added tool
+
+- **`list_agent_market_grid_decisions({ agentId, cursor?, limit?, window?, since?, until? })`** (`mcp:read`) — one of
+  your agents' arena decisions, newest first, one keyset page at a time (`limit` 1–50, default 20; page with
+  `nextCursor`). Each is a decision the agent's model reached in a Market Grid session — submitted, reassessed, stood
+  down after the model was consulted, failed after a model call, or a test generation — with its
+  `marketGridSessionId` (never null), its picks, its reasoning, the model's confidence and the floor enforced
+  against it. A stand-down before any model call (eligibility, cost limit) is not a decision: it is only in
+  `get_agent_activity_feed`. It declares `_meta["anthropic/maxResultSizeChars"]`, narrowed by `limit`.
+
+### Narrowed output — a shape you read has fewer members
+
+- **The decision `outcome`** has the arena vocabulary only: `AGENT_TRADE_THESIS`, `SKIPPED_COST_LIMIT` and
+  `SKIPPED_ALREADY_SUBMITTED` are not members of `list_agent_market_grid_decisions`'s `outcome`. A decision has no
+  `coinGridSessionId`.
+
+### Added output — a field you can read
+
+- **`thesisReasoning` on `get_signal_log`**: the trade thesis the agent's model wrote for that decision, `null` for a
+  log written before theses were recorded. The public signal-log reads never carry it.
+
+### Removed output — a key you read is gone
+
+- **`thoughtLogId` on `get_agent_activity_feed` rows.** An event's `marketGridSessionId` and `createdAt` locate its
+  decision: read `list_agent_market_grid_decisions({ agentId })` and match the session.
+- **`sourceThoughtLogId`** on `get_signal_log`, `get_public_agent_signal_logs` and
+  `get_public_agent_signal_log_detail` rows, and on `list_gate_blocks` rows. A signal log's thesis is its own
+  `thesisReasoning`.
+
+### Renamed field — a key you matched changed
+
+- **`test_generate_deployment_grid`**: `thoughtLogId` is **`marketGridAgentDecisionId`**.
+
 ## Contract history — v130.1 (your agent's profile header, your account's fills and your trade conversations read through MCP)
 
 **Additive at v130.1: three read tools.** v130.1 is the contract on top of v130. Nothing a client sends is refused
