@@ -1,20 +1,22 @@
 ---
 name: battlegrid-trade-proposal
-description: Find and stage a trade for one of the player's agents, for the player to approve. Activate whenever the player asks which coins fit an agent right now, which of their agents fits a coin, wants a trade found or proposed for an agent or on a coin, asks the agent to evaluate a coin, or wants to approve or decline a proposal it made. The scans are the agents' own gates — one agent over every active coin, or one coin over every one of the player's agents; a proposal is QUEUED for the agent's next strategy-bar close and answered into the conversation when that bar is decided; approval is always the player's word.
+description: Find a trade for one of the player's agents and, on the player's consent, queue it to execute at the agent's next strategy-bar close. Activate whenever the player asks which coins fit an agent right now, which of their agents fits a coin, wants a trade found or placed for an agent or on a coin, or asks the agent to evaluate a coin. The scans are the agents' own gates — one agent over every active coin, or one coin over every one of the player's agents; a queued request is decided at the agent's next strategy-bar close, and a qualifying close places the agent's entry at once with no further step; consent is always the player's word, given before the request is queued.
 ---
 
 # Trade Proposal
 
-You are finding and staging a trade for an agent the player configured — never placing one. Every
-step below reads what the server decided and puts it to the player in their terms; nothing here
-re-sorts a list, re-derives a verdict, or approves on the player's behalf.
+You are finding a trade for an agent the player configured and, once the player consents, queueing
+it. Every step below reads what the server decided and puts it to the player in their terms;
+nothing here re-sorts a list, re-derives a verdict, or queues on the player's behalf without their
+word. No decision waits for the player afterwards: consent comes before the queue, and a qualifying
+close executes.
 
 ## 0. What is already held — before anything else
 
-- `list_pending_approvals` and `list_user_active_positions` first, every time.
-- A proposal holds the player's live-position slot for that coin across **all** their agents until
-  it is accepted, cancelled or expires. **Never propose on a coin the player already holds a pending
-  or live position on** — say why, and name the decision or position that holds it.
+- `list_user_active_positions` first, every time.
+- A queued request holds the player's request slot for that coin, and a placing or live position its
+  position slot, across **all** their agents. **Never queue on a coin the player already holds a
+  live position on** — say why, and name the position that holds it.
 
 ## 1. When the player names a coin and not an agent — choose the agent
 
@@ -46,15 +48,23 @@ re-sorts a list, re-derives a verdict, or approves on the player's behalf.
 - A refused scan (`RATE_LIMITED`) is a refusal: say the scan was refused and when it can be retried
   (`retryAfterSeconds`). Never say "nothing fits".
 
-## 3. Queue the request
+## 3. Confirm, then queue the request
 
-- `propose_entry_decision` **only** on the coins the player named, or on the top qualifying row
-  when they asked for the best fit. One coin per call.
+- **Confirm with the player before queueing.** Name the agent, the coin and the bar it will be
+  decided on, and say that a qualifying close places the agent's entry at once, sized by the agent's
+  own risk budget, with no further step. Ask, and queue only on their yes.
+- **The player's own words can already be the consent.** "Trade SOL with Atlas at its next close" is
+  consent: queue without asking again. So is a standing instruction the player gave you to trade for
+  them. Interest is not consent — "what fits SOL right now?" is a question, so report the fit and ask
+  whether to trade it.
+- `propose_entry_decision` **only** on that consent, and only on the coins the player named, or on
+  the top qualifying row when they asked for the best fit. One coin per call.
 - **The call does not decide.** It registers a request against the agent's next strategy-bar close
   and returns immediately; no model runs and nothing is spent. The agent reads that bar on its
   settled close, through the same path its radar deployments use.
-- `userMessage` is the player's own words for the turn. Mint a **fresh UUID** `idempotencyKey` per
-  request; a retry with the same key replays the recorded result and never registers a second one.
+- `userMessage` is the player's own words for the turn; it is recorded in the conversation and read
+  by no model. Mint a **fresh UUID** `idempotencyKey` per request; a retry with the same key replays
+  the recorded result and never registers a second one.
 - **One pending request per coin.** A second is refused with `CONFLICT` / `REQUEST_PENDING` — read
   the one that exists with `get_entry_request` rather than asking again.
 
@@ -64,18 +74,19 @@ re-sorts a list, re-derives a verdict, or approves on the player's behalf.
   (`barStart`), when the answer is due (`decidesBy`), and the deadline past which that bar can no
   longer be decided (`windowEndsAt`). `decidesBy` and `windowEndsAt` are different instants — a bar
   that has already settled is decided at the next sweep, seconds away.
-- Say where the answer will appear: on the delegation card in this conversation, and — if it
-  proposes a trade — in `list_pending_approvals`. Nothing further is needed from the player until
-  then; the card carries the answer to them when the bar closes.
+- Say where the answer will appear: on the delegation card in this conversation. Nothing further is
+  needed from the player; the card carries the answer to them when the bar closes, and a qualifying
+  close's entry is already being placed by then.
 - When the player asks what the agent decided, read the request's conversation with
   `get_trade_conversation({ conversationId })`, using the id the `queued` result carried. It serves
   the whole transcript in stored order — the queued card, the agent's reasoning, its thesis and
-  setups, the recommendation, a no-trade with its reason and next coins, or a close answer.
+  setups, the entry card naming the decision and the position it placed, a no-trade with its reason
+  and next coins, or a close answer.
 - `get_entry_request` re-reads a request until it is answered — including while its close has fired
-  and the decision is being composed. `cancel_entry_request` withdraws it only while it still awaits
-  its close; once the close has fired it is `NOT_FOUND`, and the answer arrives in the conversation.
-  Both are `NOT_FOUND` once it has been answered, cancelled or expired, and that is the honest record:
-  the answer is in the conversation.
+  and the decision is being composed, and past its deadline until its overdue answer lands.
+  `cancel_entry_request` withdraws it only while it still awaits its close; once the close has fired
+  it is `NOT_FOUND`, and the answer arrives in the conversation. Both are `NOT_FOUND` once it has
+  been answered or cancelled, and that is the honest record: the answer is in the conversation.
 - `type: "error"` — the block, with its remedy: `OPEN_POSITION_CONFLICT` means a position already
   holds the slot (see step 0) and nothing was queued; `LLM_CREDITS_EXHAUSTED` means top up when
   `topupAvailable` is true; `ENTRIES_PAUSED` means the platform has paused new entries while market
@@ -84,25 +95,20 @@ re-sorts a list, re-derives a verdict, or approves on the player's behalf.
   itself once the data is back: ask again then, under a fresh `idempotencyKey` — the same key only
   replays this refusal. A refused request (`RATE_LIMITED`) is a refusal with its retry-after.
   Never "nothing to do".
-- `type: "recommendation"` and `type: "no_trade"` arrive only as the **replay** of a request made
-  before the queued contract shipped. Report them as step 5 describes and do not expect them from a
-  fresh call.
 
-## 5. When the answer arrives — approve or decline only on the player's word
+## 5. When the answer arrives — report it
 
-**On a web Commander surface the approval is the card's own.** The decided close lands on the
-delegation card in this conversation, carrying the player's Accept and Decline. `accept_entry_decision`
-and `cancel_entry_decision` remain yours for the external and Telegram doors, and on the web only on
-the player's explicit typed word — never inferred from interest, agreement, or a question about the
-trade.
+Every request that is not withdrawn is answered exactly once, in the conversation.
 
-- A decided close produces one of: a PROPOSED decision awaiting approval; a no-trade with the
-  reason and the next coins worth asking about; a refusal, `close_refused`, which names the gate that
-  failed when the close did not qualify and none when it qualified and the radar's own gates stopped
-  its fire; a window that passed with no sweep; a bar the agent's own radar deployment decided first;
-  or an error carrying the engine's block, with nothing proposed, when admission refused the
-  qualifying close's fire — `ENTRIES_PAUSED` while new entries are paused, an account block, a
-  position already held.
+- A decided close produces one of: an **entry** — the thesis, the setups and the entry card naming
+  the decision and the position it placed, which is already executing; a no-trade with the reason
+  and the next coins worth asking about; a refusal, `close_refused`, which names the gate that failed
+  when the close did not qualify and none when it qualified and the radar's own gates stopped its
+  fire; `close_missed`, naming the bar, when its window passed with no sweep; a bar the agent's own
+  radar deployment decided first; or an error carrying the engine's block, with nothing entered,
+  when admission refused the qualifying close's fire — `ENTRIES_PAUSED` while new entries are
+  paused, an account block, a halted agent, a position already held — or `EVALUATION_FAULTED` when
+  the decision that fired did not finish.
 - A bar the agent's own radar deployment decided first is reported from that deployment's decision,
   never decided again. It arrives as `close_fired_by_radar` — a trade taken in full — only when the
   deployment's fire enqueued a trade decision. Otherwise it arrives as what stopped that fire, and
@@ -111,14 +117,9 @@ trade.
   its hourly cap, post-close suppression, a decision already running on the coin — arrives as
   `close_refused` with no gate, because the close qualified and nothing was entered; and a close
   whose coin another agent's fire took arrives as `close_claimed_by_radar`.
-- On a proposal, state the direction, the entry, stop and take-profit levels, the position size,
-  the **`convictionPercent`**, and the expiry (`expiresAt`). No conviction floor is applied on this
-  surface: the conviction is the agent's own reading, and the player judges it.
-- Present it and **ask**. `accept_entry_decision` only after the player explicitly approves;
-  `cancel_entry_decision` only after they explicitly decline.
-- Never accept because the conviction reads high, because the scan ranked the coin first, or
-  because the player asked you to "find a trade" — finding is not approving. `get_entry_decision`
-  re-reads the row if the conversation moved on before they answered.
-- Only a conversational decision awaits the player: radar fires and arena challenge reactions
-  execute on their own. `list_entry_decisions` with `status: PENDING` lists the ones still waiting
-  for an agent.
+- On an entry, read the decision with `get_entry_decision` and state the direction, the entry, stop
+  and take-profit levels, the position size, the **`convictionPercent`**, and the position's state —
+  placing, working, open, rejected or expired. No conviction floor is applied on this surface: the
+  conviction is the agent's own reading, and the player's consent was the gate.
+- Open positions, once filled, are `list_user_active_positions`'s; closing one happens only on the
+  player's word.

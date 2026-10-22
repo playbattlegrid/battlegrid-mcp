@@ -151,7 +151,7 @@ player's, and the attribution is part of what was scored.
   `reasoning` is null when no record describes the current picks — say that rather than
   reconstructing one, and a pick missing from `reasoning.picks` is one the player chose.
   `list_my_market_grid_entries` is the history across sessions. An agent's decisions are a different
-  record, `get_agent_journal`.
+  record, `get_agent_thought_log`.
 
 ## On the arena's session page
 

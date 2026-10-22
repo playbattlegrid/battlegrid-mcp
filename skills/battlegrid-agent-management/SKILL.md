@@ -1,6 +1,6 @@
 ---
 name: battlegrid-agent-management
-description: Commission and govern the player's intelligence agents — interview and create one against a committed strategy and an approved model, change its configuration and risk limits, rebind it to another strategy, halt and resume it, archive and reactivate it, and act on its live positions (close, or move a stop outside the platform ratchet). Activate whenever the player wants a new agent, wants to change, pause, restart, retire or revive an existing one, asks what an agent is allowed to risk, or wants to intervene in a position an agent has open.
+description: Commission and govern the player's intelligence agents — interview and create one against a committed strategy and an approved model, change its configuration and risk limits, rebind it to another strategy, halt and resume it, archive and reactivate it, and act on its live positions (close one, or move its stop or take-profit outside the platform ratchet). Activate whenever the player wants a new agent, wants to change, pause, restart, retire or revive an existing one, asks what an agent is allowed to risk, or wants to intervene in a position an agent has open.
 ---
 
 # Agent Management
@@ -158,8 +158,8 @@ again only on their word.
 ### 4. Lifecycle verbs: read first, state the radius, then confirm
 
 Every one of a draft commit (an edit or a rebind), halt, resume, activate and archive runs this
-shape. The reads (`get_agent_budget`, `get_agent_fund_allocation`, `get_agent_open_positions`,
-`get_agent_automation_status`, `get_agent_performance`, `get_agent_journal`) need no confirm and
+shape. The reads (`get_agent_budget`, `list_user_active_positions`, `get_agent_automation_status`,
+`get_agent_performance`, `get_agent_thought_log`) need no confirm and
 cost nothing but a call — do them first, always.
 
 State the blast radius **from server fields, as numbers**, before the confirm form:
@@ -244,23 +244,37 @@ partial config and never echo a read config back unchanged: the agent's read sha
 the axis (`strategyTimeframe` and `regimeTimeframe` are strategy-derived and refused as unknown
 keys). The commit holds the configuration to the same risk rules the agent form's Save applies.
 
-### 7. Live positions: present the served state, name the bypass
+### 7. Position management: read, close, move the stop or the take-profit
 
-- `get_agent_open_positions` / `list_user_active_positions` / `get_position_audit_history` first —
-  the `decisionId` these two tools need is discoverable only through those reads.
-- **`close_agent_position`** is irreversible: it submits a reduce-only market order and realizes
-  the P&L. It carries a schema-level `confirm: true`, so present the position, its unrealized
-  P&L and its protections, and confirm before calling. An exchange rejection comes back as a typed
-  trading error — report it; a success means the close order was *accepted*.
-- **`override_agent_protection`** moves the effective stop — the stop-loss only; take-profit is not
-  overridable here. It names the stop it replaces by `effectiveStopLossOrderId`, which
-  `get_position_audit_history` serves. Its confirm must say, in words, that
-  the change **moves the stop outside the platform's protective ratchet** — that is exactly what
-  the tool is for — and name the direction: whether the new level sits further from or closer to
-  price than the one the platform is holding. Present the current protection first, then the
-  requested level, then that sentence. Its `result` is discriminated by `kind`: only `committed`
-  advanced anything; every other branch names why the amendment did not apply — read it, do not
-  assume the write landed.
+1. **Read first.** `list_user_active_positions` serves each open position's `decisionId`, its live
+   `effectiveStopLoss` and `effectiveTakeProfit`, the mark and the trailing state. Those are the
+   only inputs a write needs. Never take a write's inputs from `get_position_audit_history` — it
+   is history, not the live position — and never ask the player for an order id.
+2. **Close.** `close_agent_position({ decisionId, confirm: true })` is irreversible: it submits a
+   reduce-only market order and realizes the P&L. Present the position, its unrealized P&L and its
+   protections, and confirm before calling. An exchange rejection comes back as a typed trading
+   error — report it; a success means the close order was *accepted*.
+3. **Move the stop, the take-profit, or both.**
+   `override_agent_protection({ decisionId, stopLossPrice?, takeProfitPrice? })` — send only the
+   leg the player is moving; no order id. A stop must sit on the loss side of the live mark and a
+   take-profit on its profit side: a level the mark has already crossed would fill on arrival, so
+   the server refuses it as `level-crossed`, naming the mark.
+4. **What automation does after a move.** Trailing, break-even and time decay keep running and only
+   ever tighten from the new stop: a tighter stop stands until a mover beats it, a looser stop holds
+   only until an automated candidate beats it, a break-even that already committed never returns,
+   and time decay steps from the new stop. A moved take-profit changes nothing the movers compute —
+   they keep reading the signal's take-profit.
+5. **Confirm before every write, and read the result leg by leg.** For each leg, name the current
+   level → the requested level and the direction (closer to or further from price). Say, in words,
+   that the change **moves the stop outside the platform's protective ratchet** — that is exactly
+   what the tool is for — and what automation does afterwards (step 4). Present the current
+   protection first, then the requested levels, then those sentences. The answer's `success` is
+   true only when every requested leg committed. `level-crossed`, `mark-unavailable` and
+   `rate-limited` refused the whole request and wrote nothing; on `level-crossed` report the mark
+   it names and, when the player's intent is to exit now, offer `close_agent_position` — never
+   retry the same level. Under `dispatched`, read `stopLoss` and `takeProfit` on their own: only a
+   `committed` leg moved, a `queued` stop is recorded and will apply, and every other outcome names
+   why that leg did not move — do not assume the write landed.
 
 These tools carry no consent gate on either door: they are ownership-gated and behave identically
 in chat and through an external MCP client. Your confirm is interaction, never authorization —
