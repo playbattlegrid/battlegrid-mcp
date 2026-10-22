@@ -38,6 +38,47 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v130 (one audit-history tool per audience, and a blocked fire names its gate block)
+
+**Breaking at v130: one answer narrows for a call you could already make.** v130 is the contract on top of v129.1.
+No input you could send is refused. Reconnect the proxy, or restart it, so discovery reads the new tool, schemas and
+descriptions.
+
+### Narrowed answer — a call you made now returns less
+
+- **`get_position_audit_history` reads your own positions only.** It serves any position your agents opened,
+  archived agents included, and answers `NOT_FOUND` for another user's position, as it answers a missing one. Until
+  v130 it served another user's ACTIVE agent's position and refused your own archived agent's. To read another
+  user's ACTIVE agent's position, call `get_public_agent_position_audit_history` with the same arguments.
+
+### Added tool
+
+- **`get_public_agent_position_audit_history({ agentId, positionId })`** (`mcp:read`) serves the public order-lifecycle
+  audit trail of a position, for an ACTIVE agent only. An archived agent's position is `NOT_FOUND`, as a missing one
+  is. Its result is `get_position_audit_history`'s: one oldest-first `events[]` stream. `get_public_agent_open_positions`
+  now names it as the read of a position's live protection and its reprices.
+
+### Added output — a field you can read
+
+- **`gateBlockId` on every `get_radar_activity` row and every `get_radar_activity_summary` recent row**, at both
+  `detail` levels. On a `FIRE_DISPOSITION` row whose disposition is `FIRED`, it names the gate block that refused that
+  fire's evaluation: find it in `list_gate_blocks({ agentId, since: <the row's occurredAt> })`. It is `null` when that
+  evaluation wrote no gate block (a fire that wrote a signal log names no gate block) and on every other row. A
+  strict-schema client accepts the new key on each variant.
+
+### Declared sizes — the result cap is announced
+
+- `list_agent_open_orders` and `list_user_active_positions` carry `_meta["anthropic/maxResultSizeChars"]`. Neither
+  takes a narrowing input: each serves the whole live set in one result. For one position's orders read
+  `get_position_audit_history`; for one coin's open agent position read `get_agent_decision_context`.
+
+### Corrected descriptions
+
+`get_radar_deployment` names `policyId`, `coinId`, `coinTicker`, `enabled` (false is a pause: skipped at sweep
+discovery, slots kept) and every `resolvesNow` member, `isIdle`, `agentRegimeReadings` and `ruleOutcomes` included;
+`get_agent_thought_log` names `list_signal_logs` as the read of trade decisions alone and
+`list_my_market_grid_entries` as the read of arena entries alone; `get_radar_activity` names `gateBlockId`.
+
 ## Contract history — v129.1 (the activity feed names only events that happen)
 
 **Not breaking.** v129.1 is the contract on top of v129. No input acceptance moves and no served page changes.
