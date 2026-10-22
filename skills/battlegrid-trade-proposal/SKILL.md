@@ -82,6 +82,11 @@ close executes.
   the whole transcript in stored order — the queued card, the agent's reasoning, its thesis and
   setups, the entry card naming the decision and the position it placed, a no-trade with its reason
   and next coins, or a close answer.
+- When the player asks about an earlier request and its `conversationId` is not in this
+  conversation, find it with `list_trade_conversations`: narrow by the agent's `agentId`, and by
+  `window` (or `since` / `until`) when the player names a period. Open the matching row with
+  `get_trade_conversation`, passing the row's `id` as `conversationId`. Never queue a new request to
+  learn what an earlier one decided.
 - `get_entry_request` re-reads a request until it is answered — including while its close has fired
   and the decision is being composed, and past its deadline until its overdue answer lands.
   `cancel_entry_request` withdraws it only while it still awaits its close; once the close has fired

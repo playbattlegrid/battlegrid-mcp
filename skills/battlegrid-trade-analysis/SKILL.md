@@ -34,6 +34,14 @@ Not "what were its returns" — whether it did *the thing it was told to do*.
   by rules it is not running.
 - `get_agent_performance` and `list_agent_trades` narrowed by `agentId` — judge against that mandate. Its
   `summary` and `resultSummary` cover the agent's whole scope on the player's account, not the page.
+- `get_agent_profile` when the question names a period or a signal source — "how did Falcon do this
+  week", "how are its radar trades doing". Pass `timeframe` (`1D`, `7D`, `30D` or `LIFETIME`) and
+  `signalSource`, and quote its KPIs as served — win rate, net P&L, best and worst trade, entry
+  rate, average conviction and risk/reward, durations — recomputing none. `get_agent_performance`
+  measures from the budget baseline, not over a period. A `{ profile: null }` result is
+  **UNDETERMINED** for that agent: the read serves the player's own private agents only. The fixed
+  Decision Quality window and its regime, hour, weekday and coin slices are
+  `get_agent_review_analytics`'s, not this read's.
 - `get_trade_outcome_by_decision` (a trade row's `decisionId`) / `get_trade_chart` when a specific trade
   needs explaining: the outcome carries the fills, fees, slippage, leverage, duration and exit label. A
   measurable trade's `tradeExcursion` reads in R: `mfeR` and `maeR` (the best and worst it reached),
@@ -100,6 +108,10 @@ reading a clean report about a messy account learns nothing.
 - `list_agent_open_orders` is the platform's record of each agent order, naming its `decisionId` and
   the venue's `exchangeOrderId` and `cloid`. `get_open_orders` reads the exchange directly — slower,
   and it fails when the exchange is unreachable; report that as UNDETERMINED, never as no orders.
+- `list_user_fills` is what the venue filled on the account, newest first — every agent's and every
+  manual order's alike, attributed to no agent or decision. One trade's fills are
+  `get_trade_outcome_by_decision`'s, on the trade's `decisionId` from `list_agent_trades`; never
+  assign an account fill to an agent by its coin and time.
 - `get_deployment_policy` / `get_radar_deployment` when the protection state comes from standing
   policy rather than the position itself. `list_gate_blocks` when something looks like it should
   have fired and did not.
