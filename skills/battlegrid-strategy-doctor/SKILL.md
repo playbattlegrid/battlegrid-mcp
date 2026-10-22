@@ -57,8 +57,12 @@ Three reads, and they are not interchangeable:
   — they describe different stages and merging them invents a cause.
 - Render every code through its display meta. A raw `NO_ENTRY_CONDITION` or `OPEN_POSITION_CONFLICT` on
   screen is a system identifier leaking into an explanation.
-- **`get_agent_decision_context` is keyed by COIN**, not by agent. Use it for "why did nothing
-  happen on SOL", once you know which coin the blocks are about.
+- **`get_agent_decision_context` reads the decision behind an OPEN position.** It is keyed by coin
+  and answers only for the agent position open on it; for a coin with nothing open it is `null`, so
+  it never explains a trade that did not happen. For "why did nothing happen on SOL", read
+  `list_gate_blocks` for the pre-model refusals on that coin, and for a Radar coin
+  `get_radar_activity_summary` for its causes, then `get_radar_close_decisions` for the bars it
+  decided.
 - **`get_agent_coin_qualification` answers the forward-looking half.** The reason codes above say
   why an agent did NOT trade in the past; this says whether a coin would route for it RIGHT NOW,
   and which gate stops it — the strategy's entry condition, candidate levels, the ATR% volatility
@@ -80,11 +84,12 @@ Three reads, and they are not interchangeable:
   or `ORPHANED` it is not — the agent runs a materialized copy at its own `strategyRevision` — so
   name the binding state beside the definition rather than letting current rules read as running
   ones.
-- **Gate blocks link to their thought log** through `sourceThoughtLogId` — follow it with
-  `get_agent_thought_log` when the block's reason needs the evaluation behind it.
-- `get_signal_performance` / `list_signal_logs` when the question is whether the signals fired, as
-  distinct from whether the trades made money. `list_trade_outcomes` and `get_agent_journal` for
-  what did happen.
+- **A gate block carries the evaluation that refused it** in its `decisionRecord` — read it there
+  when the block's reason needs the evaluation behind it; there is no id to follow to another read.
+- `list_signal_logs` narrowed by `agentId` when the question is whether the signals fired, as
+  distinct from whether the trades made money: its `summary` counts the evaluations and entries, and a
+  failed row's `rejection` names why its order was refused. `list_agent_trades` narrowed by `agentId`,
+  `get_agent_thought_log` and `get_agent_activity_feed` for what did happen.
 - **`get_agent_conviction_calibration` honours `readiness`.** An `INSUFFICIENT_DATA` calibration
   carries no win rate — report that there is not yet enough history, never a rate derived from a
   handful of trades.

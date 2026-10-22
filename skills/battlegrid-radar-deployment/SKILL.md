@@ -17,8 +17,8 @@ no slot shape, no condition union and no resolution type. Never carry a fact fro
 and never describe them as one thing with two modes.
 
 **Deployments are the autonomous trading switches.** An agent has no trading mode of its own: it
-trades a coin on its own only where a Radar policy puts it on duty, and a proposal the player
-approves needs no deployment. An Arena deployment enters an agent into a preset's sessions and grants
+trades a coin on its own only where a Radar policy puts it on duty, and an entry the player queues
+needs no deployment. An Arena deployment enters an agent into a preset's sessions and grants
 **no** trade permission — to have an agent trade a coin on its own, deploy it on Radar.
 
 ## The five failures this flow exists to prevent
