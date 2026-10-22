@@ -49,6 +49,18 @@ Not "what were its returns" — whether it did *the thing it was told to do*.
   working, as distinct from whether its trades made money: its `summary` counts the evaluations and
   the entries, and a failed row's `rejection` names why its order was refused.
 
+### Time-bounded questions
+
+A question with a period in it — "the last 24 hours", "this week", "since Monday" — narrows the list
+on the server, never by reading pages and filtering their timestamps yourself.
+
+- Pass `list_signal_logs` (and `list_agent_trades`) `window`: `1D` for the last day, `7D` for the
+  week, `30D` for the month. The window trails the request instant, and the `summary` covers the
+  windowed scope, so quote it as that period's figure.
+- For a period that is not a trailing preset, pass `since` and `until` instead: ISO-8601 instants
+  with an offset, half-open (`since` included, `until` excluded), under the default `LIFETIME`.
+- Name the period you asked for beside every figure you quote from it.
+
 ### What past decisions would have done
 
 A question about a skip, an unfilled entry, or "if it had traded, would we be up?" is answered from
