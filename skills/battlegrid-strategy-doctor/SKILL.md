@@ -57,9 +57,11 @@ Three reads, and they are not interchangeable:
   — they describe different stages and merging them invents a cause.
 - Render every code through its display meta. A raw `NO_ENTRY_CONDITION` or `OPEN_POSITION_CONFLICT` on
   screen is a system identifier leaking into an explanation.
-- **`get_agent_decision_context` reads the decision behind an OPEN position.** It is keyed by coin
-  and answers only for the agent position open on it; for a coin with nothing open it is `null`, so
-  it never explains a trade that did not happen. For "why did nothing happen on SOL", read
+- **`get_agent_decision_context` reads the decision behind an OPEN position.** It is keyed by team
+  and coin and answers only for the agent position open there; for a coin with nothing open on that
+  team it is `null`, so it never explains a trade that did not happen. Without a `teamId` it reads
+  Main, so pass the position's team: the `teamId` of its `list_user_active_positions` row, or the
+  agent's `tradingTeamId` on `get_agents_hub`, or a `list_radar_deployments` row's `teamId`. For "why did nothing happen on SOL", read
   `list_gate_blocks` for the pre-model refusals on that coin, and for a Radar coin
   `get_radar_activity_summary` for its causes, then `get_radar_close_decisions` for the bars it
   decided.
@@ -89,7 +91,8 @@ Three reads, and they are not interchangeable:
 - `list_signal_logs` narrowed by `agentId` when the question is whether the signals fired, as
   distinct from whether the trades made money: its `summary` counts the evaluations and entries, and a
   failed row's `rejection` names why its order was refused. `list_agent_trades` narrowed by `agentId`,
-  `get_agent_thought_log` and `get_agent_activity_feed` for what did happen.
+  `list_agent_market_grid_decisions` and `get_agent_activity_feed` for what did happen, and
+  `get_signal_log`'s `thesisReasoning` for why a trade was taken.
 - **`get_agent_conviction_calibration` honours `readiness`.** An `INSUFFICIENT_DATA` calibration
   carries no win rate — report that there is not yet enough history, never a rate derived from a
   handful of trades.
@@ -162,7 +165,7 @@ it is undetermined.
 ## Negatives
 
 - **Never call `test_generate_deployment_grid`.** It runs a billed LLM generation against the
-  player's intelligence credits and writes thought and activity records. It is the deployment
+  player's intelligence credits and writes decision and activity records. It is the deployment
   flow's composition aid for tuning a draft — it is not a diagnostic read, and running it as one
   charges the player to answer a question the journals already answer.
 - **Never name a strategy write tool, even to forbid it.** Reading a rule is not authority to change

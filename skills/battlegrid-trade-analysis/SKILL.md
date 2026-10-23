@@ -48,8 +48,8 @@ Not "what were its returns" — whether it did *the thing it was told to do*.
   `exitR`, and `giveBackR` (what it surrendered between its peak and the close). `exitEfficiency` is
   a union — branch on its `state` before reading `efficiencyPercent`. All of them are gross of
   costs; `netPnl` is the after-fee figure.
-- The record around the trades: `get_agent_thought_log` (an agent's decisions), `get_signal_log` (a
-  trade's reasoning and its pipeline), `list_my_market_grid_entries` / `get_my_market_grid_entry` (an
+- The record around the trades: `list_agent_market_grid_decisions` (an agent's arena decisions),
+  `get_signal_log` (a trade's pipeline, its thesis as `thesisReasoning`), `list_my_market_grid_entries` / `get_my_market_grid_entry` (an
   arena entry's reasoning — `agentId` for one agent's entries, none for every entry),
   `get_agent_activity_feed` (what happened), and `get_agent_explorer` for where the agent stands
   among public agents.
@@ -101,17 +101,21 @@ reading a clean report about a messy account learns nothing.
 
 - `list_user_active_positions` for everything at once: it carries the live mark and P&L
   (`markPrice`, `unrealizedPnlUsd`, `roePct`) — check `pricingStatus` and `generatedAtMs` before
-  calling a mark current. Every position is served once, in `positions`, naming its `agentId` and
-  `marketGridSessionId`; `agents` carries each agent's group figures.
+  calling a mark current. Every position is served once, in `positions`, naming its `agentId`,
+  `marketGridSessionId` and `teamId` — the team whose wallet it trades on; `agents` carries each
+  agent's group figures.
 - For each open position, report its protections **and how far the live mark sits from each
   trigger** — a stop is a number the player cannot act on; "3.1% from the stop" is one they can.
 - `list_agent_open_orders` is the platform's record of each agent order, naming its `decisionId` and
-  the venue's `exchangeOrderId` and `cloid`. `get_open_orders` reads the exchange directly — slower,
-  and it fails when the exchange is unreachable; report that as UNDETERMINED, never as no orders.
-- `list_user_fills` is what the venue filled on the account, newest first — every agent's and every
-  manual order's alike, attributed to no agent or decision. One trade's fills are
-  `get_trade_outcome_by_decision`'s, on the trade's `decisionId` from `list_agent_trades`; never
-  assign an account fill to an agent by its coin and time.
+  the venue's `exchangeOrderId` and `cloid`. `get_open_orders` reads one team's wallet on the
+  exchange directly — Main unless you pass a `teamId`, taken from a `list_user_active_positions`,
+  `get_agents_hub` (`tradingTeamId`) or `list_radar_deployments` row; read each team you report on.
+  It is slower, and it fails when the exchange is unreachable; report that as UNDETERMINED, never as
+  no orders.
+- `list_user_fills` is what the venue filled on one team's wallet, newest first — Main unless you
+  pass a `teamId` — every agent's and every manual order's alike, attributed to no agent or decision.
+  One trade's fills are `get_trade_outcome_by_decision`'s, on the trade's `decisionId` from
+  `list_agent_trades`; never assign an account fill to an agent by its coin and time.
 - `get_deployment_policy` / `get_radar_deployment` when the protection state comes from standing
   policy rather than the position itself. `list_gate_blocks` when something looks like it should
   have fired and did not.

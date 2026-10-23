@@ -95,7 +95,11 @@ places, against the order floor, and whether that is `feasible`. Then one confir
 strategy, the model, and the budget posture** — the capital ceiling and stops the trading
 configuration will carry, or that it will take the platform seed, with the smallest order against
 the floor — and on the player's explicit pick call `commit_agent_draft` with the `agentId`, that
-read's `draftVersion` and `expectedRevision: null`. A reading with `feasible: false` is a create the
+read's `draftVersion`, `expectedRevision: null` and the `teamId` of the team the agent is created on.
+**The team is the commit's, never the draft's**: read `get_account_state`, which lists the player's
+`teams`, name the team in the confirmation — the agent trades on that team's wallet and spends its
+balance — and default to the Main team unless the player names another. A create commit without a
+team is refused. A reading with `feasible: false` is a create the
 commit will refuse: say so, and stage a larger ceiling or a looser configuration first. Where the player has the create screen open, their own Create is the
 other way to commit it.
 
@@ -136,7 +140,9 @@ mid-edit in their form**, and every change you make joins it. Then:
 - **Commit** through step 4: read the draft with `get_agent_draft`, state the radius from its diff
   and impact, confirm, and on the player's explicit pick call `commit_agent_draft` with the
   `agentId` and exactly the `draftVersion` and, as `expectedRevision`, the `committedRevision` that
-  read returned. The commit publishes every axis the draft holds — the player's own unsaved edits
+  read returned, and `teamId: null`: a commit never moves an agent to another team, and an edit
+  commit naming a team is refused. Moving an agent between teams is the player's step in the web
+  app, allowed only once the agent is drained. The commit publishes every axis the draft holds — the player's own unsaved edits
   included — so the confirmation reads out the whole diff, not only your proposal. Where their form
   is open, their own Save is the other way to commit it.
 - **Discard** only on the player's word. `get_agent_draft` is the read of what a discard destroys:
@@ -159,7 +165,7 @@ again only on their word.
 
 Every one of a draft commit (an edit or a rebind), halt, resume, activate and archive runs this
 shape. The reads (`get_agent_budget`, `list_user_active_positions`, `get_agent_automation_status`,
-`get_agent_performance`, `get_agent_thought_log`) need no confirm and
+`get_agent_performance`, `list_agent_market_grid_decisions`) need no confirm and
 cost nothing but a call — do them first, always.
 
 State the blast radius **from server fields, as numbers**, before the confirm form:

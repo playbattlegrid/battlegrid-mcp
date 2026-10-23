@@ -29,7 +29,12 @@ fee. The grid you commit is the one that gets scored, and there is no undo.
 ### 1. Account state first
 
 `get_account_state`. It carries the balance, the rank, and **`mcpWagerEnabled`** — a served
-projection of the player's Server-Signed Wagers signer consent.
+projection of the player's Server-Signed Wagers signer consent on **Main**, the team that pays the
+player's own entry. `balance` is Main's too; the total across every team is `allTeamsBalance`.
+
+An **agent's** entry is paid by the agent's own team, never by Main on its behalf. For an agent
+entry, read that team's row in `teams` — `teams[].readiness.canPayArena` is the served verdict —
+instead of `mcpWagerEnabled`.
 
 - **False** ⇒ a **definite refusal**, before any submission. Say so up front, name the enablement
   path (Profile → Wallet tab → enable Agent Wagers), and continue **read-only**: sessions, market
@@ -151,7 +156,8 @@ player's, and the attribution is part of what was scored.
   `reasoning` is null when no record describes the current picks — say that rather than
   reconstructing one, and a pick missing from `reasoning.picks` is one the player chose.
   `list_my_market_grid_entries` is the history across sessions. An agent's decisions are a different
-  record, `get_agent_thought_log`.
+  record, `list_agent_market_grid_decisions`: each arena decision the agent's model reached, with its
+  session — a stand-down before any model call is only in `get_agent_activity_feed`.
 
 ## On the arena's session page
 
