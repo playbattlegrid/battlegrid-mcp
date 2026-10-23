@@ -257,10 +257,18 @@ the reason — and **names what the change does to the stored policy**, read fro
 
 Then:
 
-- **Radar** → `commit_radar_deployment_draft({ coinId, draftVersion, expectedRevision })`,
+- **Radar** → `commit_radar_deployment_draft({ coinId, draftVersion, expectedRevision, teamId })`,
   naming exactly the `draftVersion` and `committedRevision` your draft read returned — the version
   your preview resolved. Ask with `ask_user` first and commit only after an explicit confirming pick.
   The axes it published leave the draft.
+  `teamId` is the team the deployment trades on, and a team is never drafted. For a deployed coin,
+  pass the `teamId` its `list_radar_deployments` (or `get_radar_deployment`) row carries: a
+  deployment keeps its team for life, and another team is a CONFLICT naming the stored one. For a
+  first deployment, choose one of the player's teams from `get_account_state.teams` (ask when there
+  is more than one) and name it in the confirmation. Every slot agent must trade on that team. A
+  platform agent trades on Main, so it fits only a Main deployment. A slot agent of another team is a
+  VALIDATION_ERROR naming the agent and its team. The draft read reports it beforehand for a deployed
+  coin, and for a first deployment it reports slot agents that trade on different teams.
 - **Arena** → `commit_deployment_policy_draft({ presetId, draftVersion, expectedRevision })`,
   the same way.
 
@@ -420,7 +428,7 @@ whose outcome you did not see.
 ## `test_generate_deployment_grid`
 
 This one runs a **billed LLM generation** against the player's intelligence credits and writes
-thought and activity records. It is a composition aid for tuning an Arena deployment — say that it
+decision and activity records. It is a composition aid for tuning an Arena deployment — say that it
 is billed **before** invoking it, and only invoke it when the player is actually iterating on slots
 and wants to see what the resolved agent would produce. It is never a diagnostic read.
 
