@@ -27,8 +27,14 @@ Run these in order. Skip a step only when the player's question makes it irrelev
 2. **Market context.** `get_market_context` — this carries the breadth, funding and open-interest
    picture. Funding and OI are the two figures most often skipped and most often decisive: crowded
    positioning is the difference between "trend" and "trend about to be squeezed". Report both.
-3. **Leaders and laggards.** `get_top_ranked_coins`. Name the actual coins at both ends, not just
-   "strength in majors". A laggard list is as informative as a leader list and is usually omitted.
+3. **Leaders and laggards.** One ranked `preview_strategy_report` per end, each returning the coins
+   with their rows, so no per-coin follow-up is needed: `coinSelection: { mode: "ranked", limit: 10,
+   category: "ALL", rankBy: { metric: "ROC12", ordering: "hi" } }` for the leaders and `ordering: "lo"`
+   for the laggards, with `detail: "concise"` and `source: { kind: "FIELDS", timeframe, sections:
+   [{ kind: "platform", sectionKey: "includeRelativeStrength" }] }`. `CLOSE_CHANGE` under `"far"` names
+   the biggest movers in either direction. Omit `category` and the cohort is crypto only. Name the
+   actual coins at both ends, not just "strength in majors". A laggard list is as informative as a
+   leader list and is usually omitted.
 3b. **Many coins on the same indicators — one call, not one per coin.** When the answer needs the
    indicator modules ACROSS a set of coins (comparing RSI, funding or volatility over the leaders,
    over a category, over the session pool), use `preview_strategy_report`: one section JSON per
