@@ -61,13 +61,11 @@ every row reads BTC. Conditions: `BTC_RISK_ON` building block (`MAalign is "bull
 ATR floor 0.6%. PM: BE 1R; trail 1R giveback 45. Ranked cohort ≥ 40 —
 rank conditions need a cohort wider than their thresholds.
 
-### 4 · HTF Trend Pullback — 1h, multi-timeframe confluence
+### 4 · HTF Trend Pullback — 1h, higher-timeframe context
 
-Platform `includeMtfConfluence` (`MAalign_ltf/…/_htf`, `RSI14_*_zone`, `ADX14_*_state` vocab
-weak/developing/trending/extreme), `includeMovingAverages` (`dist_EMA20`, …), `includeRsi`
-(`RSI14_now`, `RSI14_zone`). These three render `MAalign` and `RSI14_zone` twice between them, so
-every condition below reads a suffixed form — never bare `MAalign` or bare `RSI14_zone`, which
-would be ambiguous. Conditions: `HTF_UP` building block (`MAalign_htf is "bullish"` +
+Platform `includeHigherTimeframe` (`MAalign_htf`, `RSI14_htf_zone`, `ADX14_htf_state` vocab
+weak/developing/trending/extreme), `includeMovingAverages` (`dist_EMA20`, `MAalign`, …),
+`includeRsi` (`RSI14_now`, `RSI14_zone`). Conditions: `HTF_UP` building block (`MAalign_htf is "bullish"` +
 `ADX14_htf_state in ["trending","extreme"]`); `HTF_DOWN` mirror; `TREND_PRESENT` **required**
 `ANY[ref HTF_UP, ref HTF_DOWN]` — chop blocks compose-trade entirely, before billing;
 `PULLBACK_LONG` verdict UP (ref HTF_UP + `RSI14_now between 35 55` +

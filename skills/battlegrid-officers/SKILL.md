@@ -60,7 +60,8 @@ own model and brief, over the agents its scope covers that closed a decision or 
 since its last review — and answers before any review starts:
 
 - `QUEUED` with `agentCount`: the reviews arrive in `list_officer_reviews` as each finishes;
-- `NOTHING_TO_REVIEW`: no agent is under review, and nothing is queued or billed;
+- `NOTHING_TO_REVIEW`: no agent is under review, or the agents with something new are waiting on a proposal pushed
+  into the player's draft, and nothing is queued or billed;
 - `ALREADY_QUEUED`: a run of this officer is waiting or running.
 
 A run is per officer: to run two, call it for each. While one is waiting or running, `pendingRun` on `list_officers`
@@ -68,21 +69,25 @@ and `get_officer` names its state; read it again rather than calling `run_office
 `commanderAccess` from `get_account_state`, not `llmAccess`: show `deniedMessage` when it is not allowed. An
 archived officer is refused.
 
+An officer waits on an agent whose review by it is pushed: the player is adopting that proposal in the draft, so the
+officer reviews that agent again only once the draft is saved or discarded.
+
 **Never write a review.** The officer records its own; a second opinion on one of its reviews is your reading in
 the conversation, never a record.
 
 ## 3. Where each officer stands
 
 Read it, never compute it. `list_officers` serves each officer's `lastRunAt`, `nextRunAt` and `pendingRun`, and
-`list_officer_reviews` serves `openCountByOfficer`, each unarchived officer's open and pushed reviews. Quote them as
-served, through their display names.
+`list_officer_reviews` serves `openCountByOfficer`, each unarchived officer's reviews awaiting the player. Quote
+them as served, through their display names.
 
 ## 4. Work the inbox
 
 - **Read.** `list_officer_reviews`, by officer or by agent, newest first; `includeClosed` adds the applied,
   dismissed and superseded history. Show each review's verdict, findings, diff, impact and warnings exactly as
   served; `applyAvailable` says Apply is offered, `heldAxes` names every axis the target's draft holds and who wrote
-  it, and `baseMoved` says the target was committed since the review.
+  it, and `baseMoved` says the target was committed since the review. `awaitingOwner` says the review waits on the
+  player; a review that proposes no change (lever `NONE`) is for their information and never waits.
 - **Apply** with `apply_officer_proposal` only after an `ask_user` confirmation naming the review, its target and
   its axis, and only on the confirming pick. A client with no `ask_user` asks in its reply and waits for the
   player's word. Apply publishes the proposal to the live target; it needs `mcp:wager`.
@@ -92,7 +97,8 @@ served, through their display names.
 - **A refusal names its recovery** through `details.nextAct`: `BASE_MOVED` — the target moved since the review,
   dismiss it for a re-review; `AXIS_HELD` and `DRAFT_NOT_EMPTY` — the target's draft already holds work, so the
   player saves or discards it, or pushes instead of applying; `TARGET_NOT_OWNED` and `PROPOSAL_INVALID` — the target
-  no longer accepts the proposal, so dismiss it. A dismissed review is not run again until the agent closes a new
+  no longer accepts the proposal, so dismiss it. An action on a closed review is refused with its `reviewStatus`, and
+  a superseded one names its replacement as `supersededBy`: read that review instead. A dismissed review is not run again until the agent closes a new
   decision or the officer's setup changes.
 
 ## Reporting discipline

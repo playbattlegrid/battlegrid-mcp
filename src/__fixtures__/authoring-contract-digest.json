@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "132.0.0"
+    "contractVersion": "134.0.0"
   },
   "axes": {
     "create": [
@@ -292,6 +292,7 @@
     "PDO",
     "PERP_SPOT_CONFIRMS",
     "PERP_SPOT_FLOW",
+    "PERP_SPOT_GAP",
     "PERP_SPOT_STRENGTH",
     "PIVOT_P",
     "PIVOT_R1",

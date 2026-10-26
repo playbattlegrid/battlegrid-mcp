@@ -69,7 +69,7 @@ columns only for entry timing and risk — daily inputs then move once per daily
 stops and time decay keep managing intraday. **Benchmark sections** (`benchmarkTicker: "BTC"`,
 required-nullable on every custom section) read the benchmark's values on every row — the
 standard market-leader regime gate. Platform `sectionKey`s are their literal keys
-(`includeMtfConfluence`). Custom `sectionKey`s are the **server's** to issue, and which of the two
+(`includeHigherTimeframe`). Custom `sectionKey`s are the **server's** to issue, and which of the two
 things you do depends on the operation: on a **CREATE, omit `sectionKey` entirely** — supplying one
 is refused, since a new strategy owns no custom sections yet; on an **UPDATE or RESTORE, send back
 the keys `get_strategy` returned** for the sections you are keeping, and omit it on a section you
