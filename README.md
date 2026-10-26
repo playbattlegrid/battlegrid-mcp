@@ -38,6 +38,57 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v136.1 (spot facts per bar: each venue's close and buy share, the composite's flow, and Bybit)
+
+**Additive at v136.1: six metrics and a study, and served values move.** v136.1 is the contract on top of v136.
+Nothing a client sends is refused that v136 accepted. Reconnect the proxy, or restart it, so discovery reads the widened
+vocabulary.
+
+### Widened input — new metrics and a study
+
+- **`SPOT_CLOSE_BYB`** (`bybClose`): Bybit's spot close, USDT-quoted, in the coin's own unit.
+- **`BUY_PRES_CB`, `BUY_PRES_BN` and `BUY_PRES_BYB`** (`cbBuyPres`, `bnBuyPres`, `bybBuyPres`): each venue's buy share
+  of its spot volume in the bar's period (0–1), from the venue's taker sides.
+- **`SPOT_AVG_TRADE`** (`spotAvgTrade`): the composite spot volume per trade. **`SPOT_DOMINANCE`** (`spotDom`): the
+  composite spot volume as a share of composite spot plus the bar's perp volume. Both are absent where a listed venue
+  did not cover the period.
+- **The `spotFlow` study** joins the vocabulary and carries `SPOT_CVD` with them. The metric-key enum widens on every
+  input and output that carries it.
+
+### Widened construction — spot reads are per bar
+
+- **`SPOT_CLOSE_CB`, `SPOT_CLOSE_BN` and `SPOT_CVD` read each bar's spot facts at the column's rung**, where they read
+  one value per frame, so each takes a trajectory and a relational operand: `CLOSE × spread(SPOT_CLOSE_CB)` →
+  `trajectory` constructs.
+- **A composite read** (`SPOT_AVG_TRADE`, `SPOT_DOMINANCE`, `SPOT_CVD`) reads completed bars only, and its column says
+  so.
+- **The per-venue buy shares and `SPOT_DOMINANCE` rank exchange-wide**, as do five declared venue spreads:
+  `SPOT_CLOSE_CB × spread(SPOT_CLOSE_BN)`, `CLOSE × spread(SPOT_CLOSE_CB)`, `CLOSE × spread(SPOT_CLOSE_BN)`,
+  `CLOSE × spread(SPOT_CLOSE_BYB)` and `BUY_PRES_CB × spread(BUY_PRES_BN)`.
+
+### Widened output enum
+
+- **`BarFamily` gains `SPOT_COMPOSITE`** on every output that names the family of an input a decision waited on or
+  missed: a decision's spot read stands on the coin's composite at its due bar. A coin whose data profile withholds the
+  spot tape stands its spot conditions on its own bar, so they decide `INSTRUMENT` rather than wait.
+
+### Changed values — the same schema serves a different number
+
+- **A venue close reads the column rung's bar close**, where it read the newest `1m` close within 15 minutes.
+  Confirmed reads the closed bar's close; Developing reads the venue's forming bar, absent once it is older than the
+  coin's spot-tape freshness target; a venue that did not cover the period reads null.
+- **`SPOT_CVD`'s `value` is the same number at the anchor.** Its `trajectory` and `efficiency` read per-bar values at
+  the rung where they read `1m` samples; a thousand-unit ticker such as `kPEPE` reads in its own unit (÷1000); and a
+  span every listed venue covered without a trade reads `0` where it read null.
+- **`PERP_SPOT_*` read the composite `cvd` at the two newest closed anchor bars**, both halves on one clock.
+- **No perp metric, settled indicator or stored header moves**; `cbClose_bnClose_spread` keeps its header.
+  `toolCount` stays 149.
+
+### Digest move
+
+- **`vocabularyDigest` and the authoring catalog digest move** with the six metrics and the study. A client caching
+  vocabulary against either re-reads `list_strategy_vocabulary`.
+
 ## Contract history — v136 (one ranked universe: rank within a category, select coins by a ranked metric)
 
 **Breaking at v136: `get_top_ranked_coins` is retired, and one value moves.** v136 is the contract on top of v135.2.
