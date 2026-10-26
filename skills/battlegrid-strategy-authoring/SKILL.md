@@ -171,9 +171,13 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   transform (and a chained transform) reads its series: the read shape, the window's unit, the price
   basis and what an absent bar does. `seriesHome` says where the metric's series is kept — `candle`,
   `history`, or `null` when the metric has no series, which is why a series transform does not
-  compose on it. Window and offset carry a declared `minimum` and a served `maximum` on each metric's
-  transform entry — the largest value whose read size fits the lookback cap, or `null` when none
-  does. Stage at most that maximum.
+  compose on it. Window and offset carry a declared `minimum` and a served `maximum` on the transform
+  entry — the largest value whose read size fits the lookback cap, or `null` when none does. For a
+  chained column the outer's declaration is `chainOuterParameters[outer]` (served beside `metric`)
+  and its bound is `chainedOuters[outer].windowMaximum`. The window carries a `unit`
+  (`seriesElements`, `seriesChanges` for `efficiency`, which reads one bar more than its window, or
+  `priorElements` for `pctl`). Stage at most that maximum. A chained column's operands come from
+  `chainedOuters[outer].operands`, never from the metric's full `spreadOperands`.
 - `get_metric_construction_hints` → `rankOrderings`. Present only when rank is composable on that
   metric, already range-gated server-side — read the offered set rather than deriving one from
   the metric's native output.

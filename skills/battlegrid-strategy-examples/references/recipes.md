@@ -30,7 +30,7 @@ rather than events all live there. This document assumes them.
 | Closed-bar-only trajectory | add `"bars": "closed"` to any trajectory | same, drawn from closed bars |
 | Extension from trend | `{ "metric": "SMA50", "transformId": "distance", "timeframe": { "rel": "anchor" } }` | `dist_SMA50` (signed %) |
 | Funding paid over a day | `{ "metric": "FUNDING_RATE", "transformId": "aggregate", "timeframe": { "rel": "anchor" }, "window": 24 }` | `rate_mean24` |
-| Chop filter on the entry rung | `{ "metric": "CLOSE", "transformId": "efficiency", "timeframe": { "rel": "lower" }, "window": 5, "bars": "closed" }` | `close_ltf_er` (≥0.6 directional) |
+| Chop filter on the entry rung | `{ "metric": "CLOSE", "transformId": "efficiency", "timeframe": { "rel": "lower" }, "window": 4, "bars": "closed" }` | `close_ltf_er` (≥0.6 directional; 4 changes, the last 5 closes) |
 | One-bar volume concentration | `{ "metric": "VOLUME", "transformId": "maxShare", "timeframe": { "rel": "lower" }, "window": 4, "bars": "closed" }` | `volBase_ltf_maxShare` |
 | Room to structure | `{ "metric": "STRUCT_ZONES", "transformId": "nearestZoneDist", "timeframe": { "rel": "regime" }, "side": "resistance" }` | `zones_htf_resist_dist` |
 | Last **closed** daily read | `{ "metric": "RSI14", "transformId": "value", "timeframe": { "abs": "1d" }, "bars": "closed" }` | `RSI14_1d` — the newest completed daily bar |

@@ -15,6 +15,7 @@ engine) and names its substitutions where the catalog lacks a primitive.
 - Pivot highs / lows, HH-HL structure and break of structure
 - Chaikin Money Flow
 - Now native, formerly substituted
+- Statistics over a series' own history
 
 ## TradingView ports — familiar processes, studio vocabulary
 
@@ -115,3 +116,20 @@ rules about the columns themselves, not about porting — they live in the skill
   `PRIOR_SWING_FRACTAL_HIGH`/`PRIOR_SWING_FRACTAL_LOW` and their ages
   `SWING_FRACTAL_HIGH_BARS_AGO`/`SWING_FRACTAL_LOW_BARS_AGO`), and Chaikin Money Flow (`CMF20`). Port
   these directly — do not offer a substitute for a primitive the catalog serves.
+- **Statistics over a series' own history** — the windowed transforms port the common Pine idioms
+  one for one, over any metric with a series and over a `distance` or `spread`:
+  - the `er` function of the common Pine libraries, `math.abs(x - x[n]) / math.sum(math.abs(x - x[1]), n)`,
+    is `x × efficiency` at window `n` — the window counts CHANGES, so `er(close, 10)` is window 10 and
+    reads 11 bars;
+  - the z-score idiom `(x - ta.sma(x, n)) / ta.stdev(x, n)` is `x × zscore` at window `n`
+    (`RSI14_z20`), population σ as `ta.stdev` defaults to, banded at ±1 and ±2;
+  - `ta.stdev(x, n)` is `x × stddev` (`close_sd20`, in the input's own units);
+  - `ta.percentrank(x, n)` is `x × pctl` at window `n` — the `n` bars BEFORE the newest, ties at or below;
+  - `ta.highest(x, n)` / `ta.lowest(x, n)` are `x × rollingMax` / `x × rollingMin` (`high_max20`
+    is `DONCHIAN_UPPER`'s same-bar rail);
+  - a linear-regression slope over `n` bars (TA-Lib's `LINEARREG_SLOPE`) is `x × linregSlope`, the
+    least-squares slope per bar — not Pine's `ta.linreg(x, n, 0) - ta.linreg(x, n, 1)`, which differs
+    two fits.
+
+  Each reads null where its newest or oldest bar holds no value, or where fewer bars exist than the
+  window reads.
