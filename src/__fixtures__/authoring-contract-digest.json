@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "135.2.0"
+    "contractVersion": "136.1.0"
   },
   "axes": {
     "create": [
@@ -204,6 +204,9 @@
     "BB_WIDTH",
     "BB_WIDTH_PCT",
     "BUY_PRESSURE",
+    "BUY_PRES_BN",
+    "BUY_PRES_BYB",
+    "BUY_PRES_CB",
     "BUY_TRADES",
     "BUY_VOLUME",
     "CANDLE_DOJI",
@@ -381,9 +384,12 @@
     "SMA200",
     "SMA50",
     "SMART_RETAIL",
+    "SPOT_AVG_TRADE",
     "SPOT_CLOSE_BN",
+    "SPOT_CLOSE_BYB",
     "SPOT_CLOSE_CB",
     "SPOT_CVD",
+    "SPOT_DOMINANCE",
     "STOCH_D",
     "STOCH_K",
     "STOCH_RSI14",
