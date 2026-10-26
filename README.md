@@ -38,6 +38,122 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v135.1 (the bar clock, trading-session levels and a period level that stops at its roll)
+
+**Additive at v135.1: thirty-five metrics and five studies, and one value moves.** v135.1 is the contract on top of
+v135. Nothing a client sends is refused that v135 accepted. Reconnect the proxy, or restart it, so discovery reads the
+widened vocabulary.
+
+### Widened input — new metrics and studies
+
+- **The bar clock:** `UTC_HOUR`, `DAY_OF_WEEK` (0–6 UTC, 0 = Sunday) and `TRADING_SESSION` (`asia` 00–08, `london`
+  08–13, `newYork` 13–21, `late` 21–24 UTC; fixed windows, no daylight-saving rule). Each is a fact of the read bar's
+  open time, so a session window is an ordinary condition. A weekend or the London–New York overlap is a composition.
+- **Trading-session levels:** `ASIA_*`, `LONDON_*` and `NEW_YORK_*` (`HIGH` / `LOW` / `OPEN`) for the current
+  session, `null` outside it, and `PRIOR_*` for the previous instance of each.
+- **Swept flags:** `PRIOR_<S>_HIGH_SWEPT` / `_LOW_SWEPT`, read `swept` or `intact`.
+- **Opening ranges:** `OR15_HIGH`, `OR15_LOW`, `OR30_HIGH`, `OR30_LOW`, absent until each range closes.
+- **Initial-balance extensions:** `IB_EXT_UP_150`, `IB_EXT_DOWN_150`, `IB_EXT_UP_200`, `IB_EXT_DOWN_200`, `null` for
+  a zero-range initial balance.
+- **Studies:** `barClock`, `tradingSessions`, `priorTradingSessions`, `openingRange` and `ibExtensions`. The
+  metric-key enum widens with them on every input and output that carries it.
+
+### Changed values — the same schema serves a different number
+
+- **A period level read across its roll is `null`.** A `spread` with one candle side, or a `levelInteraction`, over
+  a bundle-homed period level (a UTC day's or a trading session's) reads `null` on a bar outside the instance the
+  level was taken from. Before, it was measured against the next day's or session's level. A required condition over
+  one fails closed on the roll bar. `distance` and a spread between two bundle-homed levels are unchanged.
+- **Prose says "UTC day" where it said "session"** for the day-fold metrics, `VWAP` and `CVD`. "Session" is now only a
+  game session, and the condition strip labels a trading session with its window ("New York 13–21 UTC"). The served
+  `nullBehavior` of `spread` and `levelInteraction` states the roll rule.
+
+### Digest move
+
+- **`vocabularyDigest` moves.** A client caching vocabulary against it re-reads `list_strategy_vocabulary`.
+
+## Contract history — v135 (an efficiency window counts changes, and six series statistics)
+
+**Breaking at v135: an `efficiency` window means one less than it did, and one output key is replaced.** v135 is the
+contract on top of v134. Reconnect the proxy, or restart it, so discovery reads the new schemas.
+
+### Re-specified input — the same field means something else
+
+- **An `efficiency` column's `window` counts bar-to-bar changes** and reads `window + 1` bars, as TradingView's
+  `er(src, n)` does; it counted the bars read. The default, 20 changes, reads the same 21 bars as before. An explicit
+  window `w` reads one bar more than it did, so send `w − 1` to read the bars you meant. The largest legal window is
+  one below the cap, and a window at the cap is refused. Stored windows on the server are already moved to `w − 1`.
+
+### Reshaped output — something you read moved
+
+- **`rankableSpreadOperands` is gone** from `get_metric_construction_hints` and every catalog transform entry. Read
+  **`chainedOuters`** instead, present exactly when `chainSuccessors` is and keyed by its members. Each entry has the
+  `operands` construction accepts under that outer (`null` where the inner names none) and the chained column's
+  `windowMaximum`. Rank's operands are `chainedOuters.rank.operands`.
+- **`chainOuterParameters`** (required) declares each chain outer once, on `get_metric_construction_hints` and the
+  report catalog.
+- **A served `window` carries required `unit`:** `seriesElements`, `seriesChanges` (`efficiency`) or `priorElements`
+  (`pctl`).
+
+### Widened input and enums
+
+- **Six transforms:** `zscore`, `stddev`, `linregSlope`, `pctl`, `rollingMin` and `rollingMax`, on every metric with a
+  series home and over every relation. A `zscore` header's column contract serves five `zoneBands` (`extreme low`
+  below −2 through `extreme high` above 2).
+- **`efficiency` is accepted** on the 27 oscillators and over `distance` and `spread`.
+- **`budgets.columnLookback` is 64**, where it was 32, for windows and offsets.
+- A transform measurement's `nullPolicy` gains `endpoints`.
+
+### Narrowed offer
+
+- **A series chain over a spread operand with no per-bar value** (`EMA5 × spread(MARK) × trajectory`) is no longer
+  offered. Construction already refused it, and the refusal now names the side and the operands that work.
+
+### Changed values
+
+- **An `efficiency` value whose newest or oldest bar is missing, or whose series is shorter than `window + 1`, is
+  `null`.** A clause over it reads UNRESOLVED instead of reducing the bars present. Expect this on coins with session
+  gaps, young listings and short history homes.
+- **`vocabularyDigest` moves.**
+
+## Contract history — v134 (Multi-Timeframe Confluence becomes columns, and the perp/spot rate gap)
+
+**Breaking at v134: the Multi-Timeframe Confluence platform section is retired.** v134 is the contract on top of
+v133. Reconnect the proxy, or restart it, so discovery reads the new schemas.
+
+### Rejected input — something you send is no longer accepted
+
+- **`includeMtfConfluence` is refused** wherever an input names a platform section: every authoring, staging and
+  preview input, `get_strategy_section_template`'s section key and `get_context_source_full_preview`'s `sourceKey`.
+  **`mtfConfluence` is refused** in `get_market_context`'s `modules`.
+- **Its lower-timeframe reads stay authorable as custom columns:** `MA_ALIGN × value`, `RSI14 × classifyZone` and
+  `ADX × classifyZone` at `{rel:'lower'}` (headers `MAalign_ltf`, `RSI14_ltf_zone`, `ADX14_ltf_zone`). The primary and
+  higher-timeframe reads belong to Moving Averages, RSI, Trend Strength and Higher Timeframe Context.
+- Stored strategies and agents are already migrated on the server. Each placement became a custom section titled
+  `Multi-Timeframe Confluence (lower rung)`, and a Market Read marker `ADX14_…_state` became `ADX14_…_zone`.
+
+### Removed output — a key you read is gone
+
+- **`includeMtfConfluence`** leaves every agent context-source read (`get_intelligence_agent`,
+  `list_intelligence_agents`, `get_agent_explorer`, `activate_intelligence_agent`, `archive_intelligence_agent`,
+  `commit_agent_draft`, `get_agent_prompt_context_preview`) and `list_strategy_categories`. The prompt-section kind
+  `mtf-confluence` leaves `get_context_sources_preview` and `get_context_source_full_preview`.
+
+### Widened input — a new metric
+
+- **`PERP_SPOT_GAP`** (`perpSpotGap`): the perp/spot rate gap `|spot rate − perp rate|`, 0 to 2, offered `value` and
+  the report-scoped `rank`. It is `null` on the bar after the UTC-day reset and where the spot tape is unavailable,
+  never `0`. A required or direction-setting condition over its rank is refused at radar-policy save with
+  `CONDITION_UNREADABLE_BY_RADAR_SCAN`, as a ranked crowd column already is.
+
+### Changed values
+
+- **Six verdict glosses state their gates:** `FLOW_ALIGN`, `SMART_RETAIL`, `CAPTAIN_CONF`, `CONFIDENCE`,
+  `PERP_SPOT_FLOW` and `PERP_SPOT_STRENGTH` serve the catalog gloss followed by the gate sentence over their operands'
+  headers. Read the sentence instead of restating thresholds.
+- **A regime-timeframe column's `timeframe` is the regime timeframe**, whichever sections the report places. Before,
+  it read the anchor, or `null` without Module 16 or 17.
+
 ## Contract history — v131 (an agent's arena decisions and a trade's thesis are read where each is made)
 
 **Breaking at v131: one tool is replaced and some keys you read are gone.** v131 is the contract on top of v130.1. No
