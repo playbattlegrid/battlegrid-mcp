@@ -38,8 +38,13 @@ Before committing a CREATE, every "no" here is a decision to state, not an omiss
 | `spread` | `<base>_<operand>_spread` | `mark_oracle_spread` |
 | `aggregate` wN | `<code>_mean<N>` | `rate_mean24` |
 | `rank` | `<code>_rank_<hi\|lo\|far\|near>` — ordinal, `lte N` = top-N | `bbWidthPct_rank_lo` |
-| `efficiency` wN | `<code>_er` (1 straight, ~0 chop) | `close_ltf_er` |
+| `efficiency` wN | `<code>_er` (1 straight, ~0 chop) — N changes, reading N + 1 bars | `close_ltf_er` |
 | `maxShare` wN | `<code>_maxShare` | `volBase_ltf_maxShare` |
+| `zscore` wN | `<code>_z<N>` (population σ; bands ±1, ±2) | `RSI14_z20` |
+| `stddev` wN | `<code>_sd<N>` (population σ, the input's units) | `close_sd20` |
+| `linregSlope` wN | `<code>_slope<N>` (least-squares slope per bar) | `EMA20_slope20` |
+| `pctl` wN | `<code>_pctl<N>` (0–100 against the N prior bars) | `RSI14_pctl20` |
+| `rollingMin` / `rollingMax` wN | `<code>_min<N>` / `<code>_max<N>` | `low_min20`, `high_max20` |
 | `classifyZone` / `classifyState` | `<code>_zone` / `<code>_state` | `RSI14_zone`, `ADX14_state` |
 | `levelInteraction` | `<code>_lvl`, `<code>_lvl_b<N>` at a buffer of N bps | `bbUpper20_lvl`, `bbUpper20_lvl_b25` |
 | any, stored `"bars": "all"` | `<code>_dev`, then the transform's suffix | `RSI14_dev_t1` |
@@ -502,7 +507,8 @@ its side replaces it.
   clause over it reads FALSE.
 - **A swing level does not remember a broken level.** Two to four bars after a break the level steps
   to the next swing, so a retest of the BROKEN level is not a swing-level read.
-- **The two levels take** `distance`, `spread`, `aggregate`, `trajectory`, `efficiency` and
+- **The two levels take** `distance`, `spread`, `aggregate`, `trajectory`, `efficiency`, the
+  statistics (`zscore`, `stddev`, `linregSlope`, `pctl`, `rollingMin`, `rollingMax`) and
   `levelInteraction`, and both rank across the board
   (`dist_fractalHi_rank_near`: the coins closest to their own last swing high).
 - **The break is the crossing toward the level.** `dist_fractalHi crossesAbove 0` is a close through the
