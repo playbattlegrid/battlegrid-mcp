@@ -26,7 +26,7 @@ the thing itself. Most TV strategies run on the daily chart: carry that with the
 daily-strategy pattern above (pinned-1d thesis with `"bars": "closed"` at offset 0 on an intraday anchor), which
 binds decisions to daily closes while the studio keeps managing risk intraday.
 
-Event-column behaviour, state-vs-event, previous-session-level binding and the squeeze's anchor calibration are
+Event-column behaviour, state-vs-event, previous-UTC-day-level binding and the squeeze's anchor calibration are
 rules about the columns themselves, not about porting — they live in the skill body's
 `## Header grammar` and `## Conditions`. Read those first; this document is the per-script recipes.
 
@@ -72,10 +72,19 @@ rules about the columns themselves, not about porting — they live in the skill
   **Daily-breakout variant on any anchor:** pin the rail at 1d — `dist_donchianHiPrior20_1d crossesAbove 0`
   (`gt 0` for the held state).
   **Literal previous-day levels are native**: `dist_PDH gte 0` composes directly. They are TIMELESS
-  and take `{rel: 'anchor'}` — see `## Header grammar` in the skill body.
+  and take `{rel: 'anchor'}` — see `## Header grammar` in the skill body. The previous UTC day is the
+  00:00–24:00 UTC day, and a level read against a bar of the next day is `null`.
+- **Session highs / lows, opening range, IB extensions** → the trading-session levels are native:
+  `ASIA_HIGH`, `LONDON_LOW`, `NEW_YORK_OPEN` and their previous instances (`PRIOR_LONDON_HIGH`, …), each
+  session fixed in UTC (asia 00–08, london 08–13, newYork 13–21) with no daylight-saving rule, the UTC
+  day's opening ranges (`OR15_HIGH`/`OR15_LOW`, `OR30_HIGH`/`OR30_LOW`) and the IB extensions
+  (`IB_EXT_UP_150` … `IB_EXT_DOWN_200`). A session window (`TRADING_SESSION in ["london","newYork"]`,
+  `DAY_OF_WEEK between 1 and 5`) is an ordinary condition; the glosses state the windows.
 - **ICT / SMC (FVG + order blocks)** → `STRUCT_ZONES` is the native zone engine:
   `zones_htf_support_type` (`bullish FVG`/`bullish order block`), `zones_htf_support_dist
-  between 0 1.5`, `_age_h gte 12`, HTF bias required via `MAalign_htf`. Liquidity sweeps, displacement, killzones and event *sequencing* are shapes the
+  between 0 1.5`, `_age_h gte 12`, HTF bias required via `MAalign_htf`. A killzone is a session window
+  (`TRADING_SESSION`, `UTC_HOUR`) and a sweep of a previous session's extreme is `PRIOR_<S>_HIGH_SWEPT` /
+  `_LOW_SWEPT`; displacement and event *sequencing* are shapes the
   grammar does not have — a clause compares one column with a literal or with its own previous
   completed bar, never with another column or an earlier event, so an ordered sequence of events
   cannot be stated at all. That is a grammar limit, not a missing metric; name it as
@@ -111,7 +120,7 @@ rules about the columns themselves, not about porting — they live in the skill
   (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), Williams %R (`WILLR14`), Stochastic RSI
   (`STOCH_RSI14`), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 8/9/21/50 EMAs
   (`EMA8`/`EMA9`/`EMA21`/`EMA50` — `ta.ema(close, 8)` is `EMA8`, its distance `dist_EMA8`), literal
-  previous-session levels (`PDH`/`PDL`/`PDO`), fractal swing structure
+  previous-UTC-day levels (`PDH`/`PDL`/`PDO`), fractal swing structure
   (`SWING_FRACTAL_HIGH`/`SWING_FRACTAL_LOW`/`SWING_FRACTAL_LABEL`, the prior pivots
   `PRIOR_SWING_FRACTAL_HIGH`/`PRIOR_SWING_FRACTAL_LOW` and their ages
   `SWING_FRACTAL_HIGH_BARS_AGO`/`SWING_FRACTAL_LOW_BARS_AGO`), and Chaikin Money Flow (`CMF20`). Port

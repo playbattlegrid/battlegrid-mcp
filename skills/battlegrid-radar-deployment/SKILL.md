@@ -127,6 +127,10 @@ from what the player asked for:
 | only in named hours and days | a rule with an hours condition |
 | in named regimes during named hours | a rule with one hours condition and one regime condition |
 
+Radar's market hours answer *when may this agent trade*, and shift with daylight saving; a strategy's
+`TRADING_SESSION` condition answers *which session is this bar in*, over fixed UTC windows — the two are
+different questions, and a player asking for one is not asking for the other.
+
 When the player names an exchange session — New York, the New York open, London, the London open,
 the London–New York overlap, Tokyo, the Tokyo open — call `get_radar_market_hours` and stage that session's `hours`
 exactly as served, merged with any other session they name; never work session hours out yourself,
