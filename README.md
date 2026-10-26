@@ -38,6 +38,85 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v136 (one ranked universe: rank within a category, select coins by a ranked metric)
+
+**Breaking at v136: `get_top_ranked_coins` is retired, and one value moves.** v136 is the contract on top of v135.2.
+Reconnect the proxy, or restart it, so discovery reads the new tool list and schemas.
+
+### Removed tool — and its replacement
+
+- **`get_top_ranked_coins` is gone, with no alias.** Discover leaders with `preview_strategy_report` and a ranked
+  `coinSelection`: `{ "mode": "ranked", "limit": 10, "category": "ALL", "rankBy": { "metric": "ROC12", "ordering": "hi" } }`.
+  The answer is the leaders' report rows, not a bare list.
+- **The old metrics map onto ranked metrics:** `abs_change` is `CLOSE_CHANGE` with ordering `far`, `volume` is `RVOL`
+  with ordering `hi`. `rsi_activity` has no replacement.
+- **Three of the old tool's defaults are not carried over.** A ranked selection defaults to crypto, so name
+  `category: "ALL"` to rank every asset class. It ranks at the preview's authorable timeframe, not at any `interval`.
+  It has no default `limit`.
+- `toolCount` goes from 150 to 149.
+
+### Widened input
+
+- **A `rank` column takes a category `scope`** (`all` by default, or one of the breadth scopes such as `crypto`,
+  `l1` or `defi`). The rank is filtered at read time from the same exchange-wide ranked set, so its `universe` is the
+  scope's coin count. A scope holding fewer than five coins ranks none. A non-default scope adds an `_<scope>` token
+  to the header. `scope` is refused on a report-scoped rank, which ranks the report's own coins.
+- **A ranked `coinSelection` takes `rankBy: { metric, ordering }`.** It is refused outside the served
+  `rankScope: "exchangeWide"` / `rankOrderings` vocabulary. Without `rankBy`, ranked selection is by 24h volume, as
+  before.
+
+### Added output
+
+- **The column contract's effective parameters carry `scope`**: the rank's scope, or `null` for a column that does
+  not rank exchange-wide.
+
+### Changed values — the same schema serves a different number
+
+- **Category membership is the coin's main category only.** A secondary category assignment no longer places a coin
+  in that category, so breadth `defi` folds 12 coins where it folded 13. The Asset Browser filter and counts, the
+  breadth fold, a scoped rank and a ranked selection now agree on every category's coins.
+
+### Digest move
+
+- **`vocabularyDigest` moves.** A client caching vocabulary against it re-reads `list_strategy_vocabulary`.
+
+## Contract history — v135.2 (room for 32 conditions, a column's relation to the anchor, and a condition column's family)
+
+**Additive at v135.2: two output fields, and two served limits rise.** v135.2 is the contract on top of v135.1. Nothing
+a client sends is refused that v135.1 accepted. Reconnect the proxy, or restart it, so discovery reads the new output
+schemas.
+
+### Added output
+
+- **`get_strategy_column_contract`'s `timeframe` carries `anchorRelation`:** where the column reads against the strategy
+  anchor (`rung`: `above` · `at` · `below`), whether its read is still in progress at the strategy's close
+  (`developingRead`), and the column editor's served Read-row line for it (`readSummary`, ending "Default here." for a
+  Developing default at or below the anchor) and cost line (`readCost`, "No verdict, can’t be an exit.", for a
+  developing read). It is `null` for a column with no bar set to read under an anchor, a call with no
+  `anchorTimeframe`, or a reference that resolves to no timeframe.
+- **`preview_strategy_report`'s `authoring.conditionColumns[].outputs[]` carry `family`:** the catalog family of the
+  metric the column reads, or `null` for a report-level scalar. It is display grouping only, and a stored condition
+  does not carry it.
+
+### Changed values — the same schema serves a different number
+
+- **A strategy may declare 32 conditions, and a condition may hold 32 leaf clauses**, up from 16 each:
+  `budgets.strategyConditions` and `budgets.conditionClauses` read 32, and the refusals name 32.
+  `budgets.conditionFrameReads` stays 256, and every clause costs at least one frame read, so a strategy cannot fill
+  both caps at once.
+
+### Skill
+
+- **The strategy-examples skill's recipes gain a *Recency and structure* section:** bars since a clause read TRUE
+  (under n, at least n, between a and b), the first cross above a level in N bars, the first non-edge reading in N bars
+  and k lower highs in N bars, each a whole condition built from the shipped hold, groups and operators. It reaches
+  this package through the export lane.
+
+### Digest move
+
+- **The authoring catalog digest moves with the served budgets.** A client caching vocabulary against it re-reads
+  `list_strategy_vocabulary`.
+
 ## Contract history — v135.1 (the bar clock, trading-session levels and a period level that stops at its roll)
 
 **Additive at v135.1: thirty-five metrics and five studies, and one value moves.** v135.1 is the contract on top of
