@@ -15,6 +15,7 @@ rather than events all live there. This document assumes them.
 **Contents**
 - Column recipes
 - Cross detection
+- Recency and structure
 - Board-relative rank recipes
 - Cross-venue and perp/spot basis
 - Crowd positioning
@@ -47,6 +48,85 @@ and is null otherwise:
 An event column is a trigger inside a carrier, never a standing state; pair it with a persistent
 state for regime. The skill body's `## Header grammar` states that rule and is the authority on it —
 a condition that reads a `crossDetect` column as a state reads FALSE on nearly every bar, because a null reads FALSE.
+
+## Recency and structure
+
+"How long since", "the first time in N bars" and "how many lower highs" are holds over a clause — no
+transform counts bars since an event, and no column is built over a condition. Each recipe below is a
+whole condition; adapt its clause, its numbers and its `required`, and keep its shape.
+
+**Counting.** Bars since A counts the bar being decided as 0, so "A within n" — the clause held
+`{ "atLeast": 1, "of": n }` — is "bars since A is at most n − 1". This counts bars since a clause read
+TRUE; it is not a swing pivot's age, which `fractalHiAgo` / `fractalLoAgo` count differently (see
+`tradingview-ports.md`).
+
+**Absence.** A read that ran and found no value reads FALSE (the skill body, `## Conditions`), so a `NOT`
+over it reads TRUE on a coin with no value — a listing younger than its indicator's warm-up, for one.
+Every recipe that holds a `NOT` therefore sits inside an `ALL` with a member that needs the value, so a
+recipe copied as a required gate reads FALSE, never TRUE, when the value is missing.
+
+**Bars since A is under n** — RSI was oversold within the last 5 closes:
+
+```json
+{ "conditionKey": "OVERSOLD_WITHIN_5", "name": "Oversold within 5 closes", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lt", "value": 30, "hold": { "atLeast": 1, "of": 5 } } }
+```
+
+**Bars since A is at least n** — RSI has not been oversold for 5 closes. The `NOT` alone would read TRUE
+on a coin with no RSI, so `RSI14_now gte 0` requires the value to be there:
+
+```json
+{ "conditionKey": "NOT_OVERSOLD_FOR_5", "name": "Not oversold for 5 closes", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "gte", "value": 0, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "group", "op": "NOT", "hold": { "atLeast": 1, "of": 1 }, "members": [
+      { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lt", "value": 30, "hold": { "atLeast": 1, "of": 5 } } ] } ] } }
+```
+
+**Bars since A is between a and b** — RSI was last oversold 3 to 6 closes ago: within `b + 1` = 7, and
+not within `a` = 3. The `NOT` reads TRUE with no value, and the first member then reads FALSE:
+
+```json
+{ "conditionKey": "OVERSOLD_3_TO_6_BARS_AGO", "name": "Oversold 3 to 6 closes ago", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lt", "value": 30, "hold": { "atLeast": 1, "of": 7 } },
+    { "kind": "group", "op": "NOT", "hold": { "atLeast": 1, "of": 1 }, "members": [
+      { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lt", "value": 30, "hold": { "atLeast": 1, "of": 3 } } ] } ] } }
+```
+
+**The first cross above L in N bars** — RSI crossed above 50 on the decided bar, and read at or below 50
+on the 5 closes before it: the cross, and `lte 50` on at least `N − 1` of the newest `N` = 6 closes (the
+decided bar itself reads above 50). A cross is an edge, so it holds Once; the level clause carries the
+count:
+
+```json
+{ "conditionKey": "FIRST_CROSS_ABOVE_50_IN_6", "name": "First cross above 50 in 6 closes", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "crossesAbove", "value": 50, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lte", "value": 50, "hold": { "atLeast": 5, "of": 6 } } ] } }
+```
+
+**The first A in N bars, for an A that is not an edge** — RSI is oversold now and was not oversold on 2
+or more of the newest 6 closes, so this is its first oversold close in 6. With no value the first member
+reads FALSE:
+
+```json
+{ "conditionKey": "FIRST_OVERSOLD_IN_6", "name": "First oversold close in 6", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lt", "value": 30, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "group", "op": "NOT", "hold": { "atLeast": 1, "of": 1 }, "members": [
+      { "kind": "clause", "column": { "sectionKey": null, "header": "RSI14_now" }, "op": "lt", "value": 30, "hold": { "atLeast": 2, "of": 6 } } ] } ] } }
+```
+
+**k lower highs in N bars** — the published swing high stepped down on at least 2 of the newest 8 closes,
+over a `{ "metric": "SWING_FRACTAL_HIGH", "transformId": "value", "timeframe": { "rel": "anchor" } }`
+column (header `fractalHi`). `decreased` is not an edge, so it counts like any clause; it counts each
+step down of the decided pivot, which is a lower high against the pivot before it:
+
+```json
+{ "conditionKey": "TWO_LOWER_HIGHS_IN_8", "name": "Two lower highs in 8 closes", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "fractalHi" }, "op": "decreased", "hold": { "atLeast": 2, "of": 8 } } }
+```
 
 ## Board-relative rank recipes
 
