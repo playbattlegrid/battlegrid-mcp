@@ -82,20 +82,30 @@ add. Either way you never invent one. To section-qualify a duplicated header, re
 `detail: "detailed"` preview's `authoring.conditionColumns` or from the qualified candidates a
 `CONDITION_COLUMN_AMBIGUOUS` refusal offers.
 
+**A session window is an ordinary condition.** `TRADING_SESSION` (`asia` 00–08, `london` 08–13,
+`newYork` 13–21, `late` 21–24 UTC) and `DAY_OF_WEEK` (0 = Sunday … 6 = Saturday, UTC) are bar facts of the
+bar's open, fixed in UTC with no daylight-saving rule — their glosses state the windows. A weekday London
+or New York window is `ALL(TRADING_SESSION in ["london","newYork"], DAY_OF_WEEK between 1 and 5)`, and a
+weekend is `NOT(DAY_OF_WEEK between 1 and 5)`; no strategy setting expresses one.
+
 **Event columns print only on their event.** `MACDhist_cross` and `EMA5_13` (Bullish/Bearish) carry a
 value on the crossing bar and are null on every other one, and a null reads FALSE. Use an event
 column as a TRIGGER inside a carrier, and pair it with a persistent state — a spread sign,
 `MAalign` — for regime. A condition that treats an event column as a standing state reads FALSE on
 nearly every bar, so it is TRUE only on the crossing bar itself.
 
-**The previous-session levels are TIMELESS.** `PDH`, `PDL`, `PDO` and the seven floor pivots
-(`pivotP`, `pivotR1`–`R3`, `pivotS1`–`S3`) read the session profile, not a candle rung, so they take
+**The previous-UTC-day levels are TIMELESS.** `PDH`, `PDL`, `PDO` and the seven floor pivots
+(`pivotP`, `pivotR1`–`R3`, `pivotS1`–`S3`) read the UTC-day profile, not a candle rung, so they take
 no timeframe reference at all: bind them `{rel: 'anchor'}` — the default — and they serve the same
-previous UTC session from any anchor. An absolute reference is REFUSED at save, including `1d`,
+previous UTC day from any anchor. The trading-session levels (`asiaHi`, `pLondonHi`, `nyOpen`, …) read
+the trading-session profile the same way, each session fixed in UTC with the window its label names. An
+absolute reference is REFUSED at save, including `1d`,
 because there is no rung for one to select. They are catalogued price levels, so `dist_PDH gte 0`
 composes directly. (`distance` still rejects an `offset`, and a clause still compares a column
 with a literal or with its own previous completed bar, never with another column; neither of those
-shapes is what a previous-session level needed.) The same holds
+shapes is what a previous-UTC-day level needed.) A `spread` of a bar's own value against one of these
+levels reads `null` on a bar outside the UTC day (or trading session) the level belongs to, so the first
+bars after 00:00 UTC are never measured against the next day's level. The same holds
 for every timeless metric — these levels, funding, the regime and the other bundle
 reads: a `value` column over one accepts only `offset: 0`, and a larger offset is REFUSED at save,
 because there is no earlier bar to cut back to.
@@ -397,7 +407,7 @@ below when it closed at or under it. For a level computed from its own bar (a ba
 average, `ST_LINE`, `PSAR`, the Ichimoku conversion and base lines) that is the prior bar's level, so a
 level that moved between the two bars is judged on the bar it stood at; for a level whose price was fixed
 before the bar (a prior-bar Donchian rail, the break memory, a swing level, the displaced Ichimoku lines, a
-prior-session level or pivot) it is the bar's own level. From below: a bar that closes through the level is a break and reads `none`; a bar whose high
+prior-UTC-day or previous trading-session level or pivot) it is the bar's own level. From below: a bar that closes through the level is a break and reads `none`; a bar whose high
 reached the level and whose close came back under it is `reject_from_below`; a bar whose high came
 within the buffer of the level is `touch_from_below`. From above is the mirror on the low.
 
@@ -414,12 +424,15 @@ within the buffer of the level is `touch_from_below`. From above is the mirror o
     `VWAP`, a moving average (`SMA20`, `EMA20`, …), `ST_LINE`, `PSAR`, the prior-bar Donchian rails
     (`DONCHIAN_UPPER_PRIOR`, `DONCHIAN_LOWER_PRIOR`), the Donchian break memory (`DONCHIAN_BROKEN_HI`,
     `DONCHIAN_BROKEN_LO`), the Ichimoku lines, the swing levels (`SWING_FRACTAL_HIGH`,
-    `SWING_FRACTAL_LOW`) — reads its own value at each bar. A prior-session level or pivot (`PDH`, `PDL`,
-    `PDO`, `PIVOT_P`, `PRIOR_TPO_POC`, …) has one reading for the session; a clause over it is a single
-    read with no hold, because the session profile keeps no earlier reading. On `PSAR` a wick that
+    `SWING_FRACTAL_LOW`) — reads its own value at each bar. A prior-UTC-day level or pivot (`PDH`, `PDL`,
+    `PDO`, `PIVOT_P`, `PRIOR_TPO_POC`, …) or a previous trading-session level (`PRIOR_LONDON_HIGH`, …) has
+    one reading for its UTC day or session; a clause over it is a single read with no hold, because the
+    profile keeps no earlier reading, and on a bar outside that day or session it reads `null`, so the
+    day's last bar is never classified against the next day's level. On `PSAR` a wick that
     trades through the SAR flips it on that bar, so a rejection needs the low (high) to meet the SAR
     exactly and a touch needs a buffer; its flip is `dist_PSAR crossesAbove 0` / `crossesBelow 0`.
-  - **Not offered:** a developing-session level (`TPO_POC`, `TPO_VAH`, …), the naked points of
+  - **Not offered:** a developing-UTC-day level (`TPO_POC`, `TPO_VAH`, …), the current trading
+    session's levels, the opening ranges and the IB extensions, the naked points of
     control and the single prints (`TPO_SINGLE_PRINT_ABOVE`/`_BELOW`, `NAKED_SINGLE_PRINT_ABOVE`/`_BELOW`),
     which move between bars with no earlier reading kept; and the same-bar Donchian rails
     (`DONCHIAN_UPPER`, `DONCHIAN_LOWER`), each the extreme of the window ending at the very bar it would
