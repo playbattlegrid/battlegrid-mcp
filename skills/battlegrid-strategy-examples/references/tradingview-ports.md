@@ -61,7 +61,9 @@ rules about the columns themselves, not about porting — they live in the skill
   column, never as the substitute for the gate.
 - **VWAP reversion** → `dist_VWAP` band + `dist_VWAP_rank_far lte 5` for board-relative
   stretch; required `NOT [ADX14_state in ["trending","extreme"]]` veto; scalp geometry +
-  aggressive timeDecay (VWAP anchors daily at 00:00 UTC).
+  aggressive timeDecay (`VWAP` anchors daily at 00:00 UTC; `VWAP_WEEK`, `VWAP_MONTH`, `VWAP_TRADING_SESSION` and
+  the rolling `VWAP_ROLLING_1H`/`4H`/`24H` are the other anchors, each with ±1/2/3σ bands `_UB<k>`/`_LB<k>` — a
+  band-touch entry reads `CLOSE × spread(VWAP_LB2)` rather than a hand-computed σ).
 - **Donchian / Turtle breakout** (`close > ta.highest(high, 20)[1]`) → `dist_donchianHiPrior20 crossesAbove 0`
   over `DONCHIAN_UPPER_PRIOR × distance` (the breakout bar; `dist_donchianHiPrior20 gt 0` holds on every
   close of the run) + `RVOL20 gte 1.5`; turtle exits = trend preset (trail from 1R, giveback 50). Mirror with
@@ -117,8 +119,8 @@ rules about the columns themselves, not about porting — they live in the skill
   `MACD_LINE × crossDetect`, and the signal-line cross is `MACD_HIST × crossDetect`, the histogram being
   line minus signal), the 15-bar rate of change (`ROC15`), the Donchian break memory
   (`DONCHIAN_BROKEN_HI`/`DONCHIAN_BROKEN_LO`), daily pivots
-  (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), Williams %R (`WILLR14`), Stochastic RSI
-  (`STOCH_RSI14`), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 8/9/21/50 EMAs
+  (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), Williams %R (`WILLR14`), Stoch RSI
+  (`STOCH_RSI_K`/`STOCH_RSI_D` — TradingView's "Stoch RSI" %K and %D at 3, 3, 14, 14, on 0–100), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 8/9/21/50 EMAs
   (`EMA8`/`EMA9`/`EMA21`/`EMA50` — `ta.ema(close, 8)` is `EMA8`, its distance `dist_EMA8`), literal
   previous-UTC-day levels (`PDH`/`PDL`/`PDO`), fractal swing structure
   (`SWING_FRACTAL_HIGH`/`SWING_FRACTAL_LOW`/`SWING_FRACTAL_LABEL`, the prior pivots
