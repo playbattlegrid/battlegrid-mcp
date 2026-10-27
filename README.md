@@ -38,6 +38,31 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v137.3 (the bar's traded notional in USD)
+
+**Additive at v137.3: three metrics and one chart-axis family.** v137.3 is the contract on top of v137.2. Nothing a client
+sends is refused that v137.2 accepted. Reconnect the proxy, or restart it, so discovery reads the widened vocabulary.
+
+### Widened input — new metrics
+
+- **`QUOTE_VOL`** (`quoteVol`): the bar's traded notional in USD, the sum of each trade's price × size from the live tape.
+- **`BUY_QUOTE_VOL` and `SELL_QUOTE_VOL`** (`buyQuoteVol`, `sellQuoteVol`): the same, per taker side. The total is
+  always the two sides added.
+- **Each ranks exchange-wide**: one dollar is one dollar on every coin. The metric-key enum and the ranked-metric enum
+  widen on every input and output that carries them.
+- **A bar holding a minute the live tape did not cover reads each one absent, never zero.** An MDS restart opens such a
+  minute, so the bars around one read absent for now.
+
+### Widened output enum
+
+- **The chart-axis family gains `notional`**, the three metrics' own scale, on the output that carries it
+  (`get_agent_coin_qualification`'s `axisFamily`).
+
+### Digest move
+
+- **`vocabularyDigest` and the authoring catalog digest move** with the three metrics. A client caching vocabulary
+  against either re-reads `list_strategy_vocabulary`.
+
 ## Contract history — v137.2 (the anchored VWAP family with σ bands, and week and month profiles)
 
 **Additive at v137.2: sixty-six metrics and five studies, one value withdrawn, and the metric vocabulary named once per
