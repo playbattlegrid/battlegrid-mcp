@@ -38,6 +38,23 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v137.4 (flat windows read what TradingView reads)
+
+**Changed values at v137.4, behind unchanged schemas.** v137.4 is the contract on top of v137.3. Nothing a client sends
+is refused that v137.3 accepted, and no schema, description or digest moves. Reconnecting is not required.
+
+### Changed values — the same schema serves a different number
+
+On a flat window, these indicators now read what TradingView's Pine v6 built-ins read there (indicator math revision 3).
+This supersedes v137's statement that %R, CCI, Stochastic and Stoch RSI read null over a flat window, for every one but %R.
+- **`K` and `D` (Stochastic %K/%D) read 0** on a window with no range, where they read null.
+- **`stochRsiK` and `stochRsiD` read 0** where the RSI's own 14-bar range is exactly 0, where they read null.
+- **`CCI20` holds its last reading** wherever every typical price in its 20-bar window is equal. Before, it read null
+  there, or ±66.67 where a float residue was left. The hold lasts for at most 190 bars, then reads null.
+- **`willR14` is unchanged**: a window with no range still reads null.
+- **Zones and exchange-wide ranks follow.** A flat coin now ranks on these metrics, where it had no rank. A clause such
+  as `K < 20` reads TRUE on a flat window, where it read FALSE.
+
 ## Contract history — v137.3 (the bar's traded notional in USD)
 
 **Additive at v137.3: three metrics and one chart-axis family.** v137.3 is the contract on top of v137.2. Nothing a client
