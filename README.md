@@ -38,6 +38,46 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v138 (TradingView's defaults, TradingView's CVD, and which values TradingView publishes)
+
+**Breaking at v138: one metric retired, one transform pairing refused, one metric added, catalog outputs widened, and
+served values move.** v138 is the contract on top of v137.5. Reconnect the proxy, or restart it, so discovery reads the
+new vocabulary.
+
+### Retired — the reason v138 is MAJOR
+
+- **`BB_WIDTH` (header `BBwidth20`) is gone from every authoring input.** It was the Bollinger band spread in price
+  units, which TradingView does not publish. Use `BB_WIDTH_PCT` (`bbWidthPct`), TradingView's Bollinger BandWidth
+  `ta.bbw`. Every saved column, Market Read marker and doctrine mention was moved to it before deploy, so a stored
+  strategy needs no edit.
+
+### Refused behind unchanged schemas
+
+- **`OBV` reads only its changes.** Its series is the running sum of each bar's OBV step from the first bar a column
+  reads, so its level is arbitrary. A transform that reads OBV's level (`value`, `rank`, `spread` and every other
+  transform outside the six below) is refused on it. `trajectory`, `zscore`, `stddev`, `linregSlope`, `pctl` and
+  `efficiency` remain, and their values equal TradingView's OBV changes over the same bars.
+
+### Added
+
+- **`CUM_VOLUME_DELTA` (`cumVolDelta`): TradingView's Cumulative Volume Delta.** Each intrabar's volume is signed by
+  its close against its open, then against the previous intrabar's close, then the previous sign, and summed since
+  00:00 UTC. Intrabars are 1m on minute and hour timeframes and 5m on 1d. Published at bar close only.
+- **`CVD` and `SPOT_CVD` are relabelled as order flow** ("Order-flow CVD", "Order-flow spot CVD"). Their keys, codes
+  and values are unchanged.
+- **`provenance` on every catalog metric** (`list_strategy_vocabulary`, `get_metric_construction_hints`): `tradingView`
+  where TradingView publishes the same value at its default settings, `battleGridDerived` where it does not. The
+  authoring-contract digest (`digestVersion` 2) lists `battleGridDerivedMetricKeys`.
+
+### Changed values — the same schema serves a different number (indicator math revision 6)
+
+- **Keltner Channels (`kcUpper`, `kcLower`) are EMA 20 ± 2 × ATR 10**, TradingView's defaults. They were ± 1.5 × ATR 20.
+  The TTM squeeze (`kcSqueeze`) keeps its own 1.5 × ATR 20 channel and does not move.
+- **The Stochastic (`K`, `D`) is (14, 1, 3)**: `K` is unsmoothed. It was (14, 3, 3).
+- **The 1d regime OBV vote reads the day's own OBV change**, so `REGIME_MOM` and the bull and bear vote counts can move
+  on a 1d regime rung. The composite regime label does not.
+- **Verified unchanged:** PPO, MACD, Supertrend and CMF already equal TradingView's defaults.
+
 ## Contract history — v137.5 (Stoch RSI reads 0 over every run of unchanged closes)
 
 **Changed values at v137.5, behind unchanged schemas.** v137.5 is the contract on top of v137.4. Nothing a client sends
