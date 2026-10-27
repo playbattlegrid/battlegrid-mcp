@@ -2,7 +2,7 @@
   "digestVersion": 1,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "137.2.0"
+    "contractVersion": "137.3.0"
   },
   "axes": {
     "create": [
@@ -207,6 +207,7 @@
     "BUY_PRES_BN",
     "BUY_PRES_BYB",
     "BUY_PRES_CB",
+    "BUY_QUOTE_VOL",
     "BUY_TRADES",
     "BUY_VOLUME",
     "CANDLE_DOJI",
@@ -368,6 +369,7 @@
     "PWL",
     "QQE_RSI_MA",
     "QQE_STOP",
+    "QUOTE_VOL",
     "REGIME_CONVICTION",
     "REGIME_CRASH_LATCH",
     "REGIME_CRASH_MARGIN",
@@ -390,6 +392,7 @@
     "RSI2",
     "RSI7",
     "RVOL",
+    "SELL_QUOTE_VOL",
     "SELL_TRADES",
     "SELL_VOLUME",
     "SETTLED_AT",
