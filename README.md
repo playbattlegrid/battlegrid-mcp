@@ -38,6 +38,45 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v137.2 (the anchored VWAP family with σ bands, and week and month profiles)
+
+**Additive at v137.2: sixty-six metrics and five studies, one value withdrawn, and the metric vocabulary named once per
+schema.** v137.2 is the contract on top of v137.1. Nothing a client sends is refused that v137.1 accepted. Reconnect the
+proxy, or restart it, so discovery reads the widened vocabulary.
+
+### Widened input — new metrics and studies
+
+- **The anchored VWAP family**, each computed over the column's own timeframe as TradingView's `ta.vwap(hlc3)` computes it
+  on that chart: `VWAP_WEEK` (`vwapW`, from Monday 00:00 UTC), `VWAP_MONTH` (`vwapM`), `VWAP_TRADING_SESSION` (`vwapTs`),
+  `VWAP_ROLLING_1H`, `VWAP_ROLLING_4H` and `VWAP_ROLLING_24H` (`rvwap1h`, `rvwap4h`, `rvwap24h`), and `VWAP_SWING_HIGH`
+  and `VWAP_SWING_LOW` (`avwapSwHi`, `avwapSwLo`, anchored at the latest decided swing pivot).
+- **±1/2/3σ bands** `<LINE>_UB1..3` and `<LINE>_LB1..3` on `VWAP` and on each of the six new calendar and rolling lines
+  (42 metrics): `line ± k·σ`, with σ the volume-weighted standard deviation over the same bars. Each takes every transform
+  a price level takes, `levelInteraction` included.
+- **Week and month profiles**, summed from each period's UTC-day profiles on one grid: `WEEK_TPO_POC`/`VAH`/`VAL` and
+  `MONTH_TPO_POC`/`VAH`/`VAL` (the current period), `PRIOR_WEEK_TPO_*` and `PRIOR_MONTH_TPO_*`, and the previous
+  completed period's high and low, `PWH`/`PWL` and `PMH`/`PML`. A prior level read across its period's roll is absent.
+- **The studies** `vwap`, `weekProfile`, `priorWeek`, `monthProfile` and `priorMonth` join the vocabulary. The metric-key
+  enum widens on every input and output that carries it.
+- **Ranking.** The eight new VWAP lines rank exchange-wide by distance; the bands do not.
+
+### Changed values — the same schema serves a different number
+
+- **`VWAP` on `1d` reads null.** A UTC-day VWAP on a bar as long as the UTC day is only that bar's own typical price. On
+  every other timeframe `VWAP` is unchanged. Each anchored line is likewise absent on a timeframe whose bar is as long as
+  its anchor's period.
+
+### Schema respelling
+
+- **The metric vocabulary is one named shape, `metricKey`**, published once in each schema's root `$defs` and referenced
+  as `#/$defs/metricKey` wherever a metric is named, where it was inlined at each site. What a schema accepts does not
+  move; every authoring schema shrinks. `toolCount` stays 149.
+
+### Digest move
+
+- **`vocabularyDigest` and the authoring catalog digest move** with the sixty-six metrics and five studies. A client
+  caching vocabulary against either re-reads `list_strategy_vocabulary`.
+
 ## Contract history — v137.1 (a condition exit's evidence and slippage)
 
 **Additive at v137.1: one owner output field, and one served value moves.** v137.1 is the contract on top of v137.
