@@ -60,6 +60,43 @@ output.
 - **`slippageExit` on a `CONDITION_EXIT` close** is the exit average fill less the close of the bar the exit rule fired
   on, where it was null. Every other close kind is unchanged. `toolCount` stays 149.
 
+## Contract history — v137 (TradingView's indicator math, Stoch RSI %K/%D, and a spread in points)
+
+**MAJOR at v137: one metric key is retired into two, a unit joins every unit enum, and served indicator values move to
+TradingView's calculation.** v137 is the contract on top of v136.1. Reconnect the proxy, or restart it, so discovery
+reads the new vocabulary.
+
+### Refused input — `STOCH_RSI14` is retired
+
+- **`STOCH_RSI14` (`stochRSI14`, one 0–1 position) is replaced by `STOCH_RSI_K` and `STOCH_RSI_D`** (`stochRsiK`,
+  `stochRsiD`, study `stochRsi`): TradingView's Stoch RSI %K and %D (14, 14, 3, 3) on 0–100, with Stochastic %K's zone
+  vocabulary and rank ordering. A request naming `STOCH_RSI14` is refused. No stored strategy named it.
+
+### Widened output enum — the `points` unit
+
+- **Every unit enum gains `points`**: a difference of two 0–100 or percent readings, rendered ` pts` with its natural
+  sign. A client validating responses against a cached schema refuses a `points` column until it re-reads discovery.
+
+### Changed values — the same schema serves a different number
+
+- **DI+ and DI− read 0–100**, where they read a 0–1 ratio, so the regime's DI vote can clear its 5-point gate:
+  `REGIME_TREND_SOURCE` can read `di spread`. ADX follows TradingView's `ta.dmi` on ties and its seed.
+- **The Ichimoku spans and lagging close sit one bar earlier**: TradingView's displacement 26, plotted 25 bars ahead.
+- **Parabolic SAR follows TradingView's `ta.sar` on a flip.** %R, CCI, Stochastic and Stoch RSI read null over a flat
+  window, where they read a bound; Stochastic %D counts a %K of 0.
+- **A `spread` over a comparable unit is a difference.** An oscillator, a percent, a ratio, a share, a count or a USD
+  notional reads `base − operand` in its difference unit (`points` for an oscillator or a percent), where it read the
+  signed % gap; a zero operand reads a value where it read null. A price-like base keeps the % gap. Sign rules (`gt 0`,
+  a cross of 0) keep their meaning.
+- **`REGIME_DI_SPREAD` reads in `points` at 2 dp** and equals the `DIplus14_DIminus14_spread` column. It is no longer
+  offered a spread operand. The ranked `BUY_PRES_CB × spread(BUY_PRES_BN)` set ranks the difference its column reads.
+  `toolCount` stays 149.
+
+### Digest move
+
+- **`vocabularyDigest` and the authoring catalog digest move.** A client caching vocabulary against either re-reads
+  `list_strategy_vocabulary`.
+
 ## Contract history — v136.1 (spot facts per bar: each venue's close and buy share, the composite's flow, and Bybit)
 
 **Additive at v136.1: six metrics and a study, and served values move.** v136.1 is the contract on top of v136.
