@@ -38,6 +38,22 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v137.5 (Stoch RSI reads 0 over every run of unchanged closes)
+
+**Changed values at v137.5, behind unchanged schemas.** v137.5 is the contract on top of v137.4. Nothing a client sends
+is refused that v137.4 accepted, and no schema, description or digest moves. Reconnecting is not required.
+
+### Changed values — the same schema serves a different number
+
+The RSI over an unchanged close now equals the RSI before it, exactly, as TradingView's does (indicator math revision 4).
+Before, it drifted by a floating-point residue far below the published places.
+- **`stochRsiK` and `stochRsiD` read 0 over a run of unchanged closes**, %K from the 16th equal close and %D from the
+  18th. Before, the RSI's residue could leave them anywhere from 0 to 100 there, and a value could differ between a
+  short and a long recompute of the same bar. This supersedes v137.4's "where the RSI's own 14-bar range is exactly 0"
+  qualifier: over unchanged closes it now always is.
+- **`RSI14`, `RSI7`, `RSI2`, `QQE_RSI_MA` and `QQE_STOP` change no published value.**
+- **Zones and exchange-wide ranks follow.** A coin on a long flat run now ranks at 0 on Stoch RSI.
+
 ## Contract history — v137.4 (flat windows read what TradingView reads)
 
 **Changed values at v137.4, behind unchanged schemas.** v137.4 is the contract on top of v137.3. Nothing a client sends
