@@ -38,6 +38,28 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v137.1 (a condition exit's evidence and slippage)
+
+**Additive at v137.1: one owner output field, and one served value moves.** v137.1 is the contract on top of v137.
+Nothing a client sends is refused that v137 accepted. Reconnect the proxy, or restart it, so discovery reads the widened
+output.
+
+### Widened output — the bars behind a condition exit
+
+- **`get_signal_log`'s `pipeline.outcome` carries `conditionExitEvidence`**: the evidence records of the exit rule named
+  by `closeTriggerConditionKey`, oldest firing first. Each names the condition, the strategy revision and the firing bar
+  (`timeframe`, `barStart`, `barCloseAt`), and each counted node of the firing condition — a clause's header or a held
+  group's operator — with its hold, its true count and every bar's open time, rendered value and outcome.
+- **It is empty when `closeTriggerConditionKey` is null**: the position closed for another reason, or before evidence
+  was recorded. A firing that found the position already closed by its exchange stop is never served as the close's
+  evidence.
+- **Owner and admin only.** The public signal-log reads never carry it; their outcome schema is strict and unchanged.
+
+### Changed values — the same schema serves a different number
+
+- **`slippageExit` on a `CONDITION_EXIT` close** is the exit average fill less the close of the bar the exit rule fired
+  on, where it was null. Every other close kind is unchanged. `toolCount` stays 149.
+
 ## Contract history — v136.1 (spot facts per bar: each venue's close and buy share, the composite's flow, and Bybit)
 
 **Additive at v136.1: six metrics and a study, and served values move.** v136.1 is the contract on top of v136.
