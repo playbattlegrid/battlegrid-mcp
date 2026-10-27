@@ -102,11 +102,12 @@ proxy, or restart it, so discovery reads the widened vocabulary.
 - **`vocabularyDigest` and the authoring catalog digest move** with the sixty-six metrics and five studies. A client
   caching vocabulary against either re-reads `list_strategy_vocabulary`.
 
-## Contract history — v137.1 (a condition exit's evidence and slippage)
+## Contract history — v137.1 (a condition exit's evidence and slippage, and a spot venue's period bar over quiet minutes)
 
-**Additive at v137.1: one owner output field, and one served value moves.** v137.1 is the contract on top of v137.
-Nothing a client sends is refused that v137 accepted. Reconnect the proxy, or restart it, so discovery reads the widened
-output.
+**Additive at v137.1: one owner output field, three glosses re-worded, and served values move.** v137.1 is the
+contract on top of v137, announced once for two changes: a condition exit's evidence (#5809 in BattleGrid) and step 1
+of BattleGrid's spot-coverage fix (#5832). Nothing a client sends is refused that v137 accepted. Reconnect the proxy,
+or restart it, so discovery reads the widened output and the re-worded vocabulary.
 
 ### Widened output — the bars behind a condition exit
 
@@ -123,6 +124,32 @@ output.
 
 - **`slippageExit` on a `CONDITION_EXIT` close** is the exit average fill less the close of the bar the exit rule fired
   on, where it was null. Every other close kind is unchanged. `toolCount` stays 149.
+- **A spot venue's bar exists for a period it covered and traded in, though quiet minutes in it hold no bar.** A venue
+  period used to need a bar in every minute, so a thin coin that went more than its spot-tape freshness target (at
+  least 15 minutes) without a trade inside an hour lost that hour's venue bar. Now the bar exists whenever every minute
+  was covered and the venue traded in the period, or carried its last price through every minute. So
+  `SPOT_CLOSE_CB`, `SPOT_CLOSE_BN`, `SPOT_CLOSE_BYB`, `BUY_PRES_CB`, `BUY_PRES_BN`, `BUY_PRES_BYB`, the
+  `spot.venues.*` members, the five declared venue spreads (`SPOT_CLOSE_CB × spread(SPOT_CLOSE_BN)`,
+  `CLOSE × spread(SPOT_CLOSE_CB|BN|BYB)`, `BUY_PRES_CB × spread(BUY_PRES_BN)`), their exchange-wide ranks and the
+  venue-dislocation template's columns read a value for such a period where they read null.
+- **A closed venue close is that period's close at any age.** It is the venue's last trade in the period, as the
+  venue's own candle closes, even when that trade was early in the period; a closed reading is never aged. A spread
+  against the perp's close can therefore compare two instants on a thin venue. A Developing (forming) venue close is
+  still absent once older than the coin's spot-tape target.
+- **Unchanged:** the composite's flow, `SPOT_CVD`, `SPOT_AVG_TRADE` and `SPOT_DOMINANCE`. A period with a minute the
+  venue's feed and trade history both missed still has no venue bar.
+
+### Re-worded text — the spot close glosses
+
+- **`SPOT_CLOSE_CB`, `SPOT_CLOSE_BN` and `SPOT_CLOSE_BYB`** state when the venue's period bar exists: its close is the
+  venue's last trade in the period, or the price it carried through every minute of a period with no trade; it is
+  absent where a minute of the period went unseen, or where the coin did not trade on the venue and its price was not
+  carried through every minute. Each names its venue's quote currency from BattleGrid's declared quote policy.
+
+### Digest move
+
+- **`vocabularyDigest` and the authoring catalog digest move** with the three glosses. A client caching vocabulary
+  against either re-reads `list_strategy_vocabulary`.
 
 ## Contract history — v137 (TradingView's indicator math, Stoch RSI %K/%D, and a spread in points)
 
