@@ -38,6 +38,23 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v142.3 (read a metric relative to another coin)
+
+**Additive at v142.3: one transform, one column knob and one numeric unit added.** Nothing a client sends today is
+refused that it accepted before. Reconnect the proxy, or restart it, so discovery reads the new vocabulary.
+
+- **`relativeTo` ("Relative to coin")** reads a column's metric against the same metric of another roster coin, bar
+  by bar. A unit that means the same on every coin gives the difference (`RSI14_ETH_rel` — SOL's RSI minus ETH's, in
+  points). A price gives the ratio (`close_BTC_rel` — SOL ÷ BTC, TradingView's `SOLUSDT/BTCUSDT`). It chains the
+  series statistics (`close_BTC_rel_z20`) and never `rank`.
+- **The column knob `instrument`** names the coin — a roster ticker, `BTC` when omitted. It is resolved like a
+  benchmark binding, and a coin that is not active is refused with `REPORT_COLUMN_INSTRUMENT_UNKNOWN`.
+- **The numeric unit `priceRatio`** carries a ratio, printed at significant digits.
+- **Widened vocabulary:** the transform-id enum gains `relativeTo`, the numeric-unit enum `priceRatio`, a served
+  `operandOrder` may name `instrument`, and a column contract's `effectiveParameters` carries `instrument` (`null` on
+  every column that reads no other coin).
+- **A bar the other coin does not hold is a read that never ran:** a condition over it reads unresolved, never false.
+
 ## Contract history — v140 (every count limit is the account plan's, and Bybit is no longer a spot venue)
 
 **Breaking at v140: three outputs reshaped, one refusal widened, one metric retired.** v140 is the contract on top of
