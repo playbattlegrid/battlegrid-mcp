@@ -38,13 +38,14 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v140 (every count limit is the account plan's)
+## Contract history — v140 (every count limit is the account plan's, and Bybit is no longer a spot venue)
 
-**Breaking at v140: three outputs reshaped, one refusal widened.** v140 is the contract on top of v139. Every
-per-account count limit — active agents, active strategies, radar coins, additional teams — is now the account plan's,
-so the agent slot usage no longer names a rank. Reconnect the proxy, or restart it, so discovery reads the new shapes.
+**Breaking at v140: three outputs reshaped, one refusal widened, one metric retired.** v140 is the contract on top of
+v139, and it carries two changes. Every per-account count limit — active agents, active strategies, radar coins,
+additional teams — is now the account plan's, so the agent slot usage no longer names a rank. And the spot venues are
+Binance and Coinbase only. Reconnect the proxy, or restart it, so discovery reads the new shapes and vocabulary.
 
-### Reshaped output — the reason v140 is MAJOR
+### Reshaped output — one reason v140 is MAJOR
 
 - **`list_intelligence_agents` and `commit_agent_draft`** (a create's receipt) drop `slotUsage`
   (`{ level, rank, limit, used, remaining }`) and serve `usage` (`{ used, limit, remaining }`) and `planCode`.
@@ -60,6 +61,44 @@ radar coin's first deployment, an additional team — is still `FORBIDDEN`, and 
 `PLAN_LIMIT_REACHED`, `details.entitlement` (`agents`, `strategies`, `radarCoinPolicies` or `additionalTeams`),
 `details.planLimit` and `details.planCode`. A radar coin that is already deployed is never counted, so redeploying it
 still answers its revision conflict.
+
+### Retired — the other reason v140 is MAJOR
+
+- **`SPOT_CLOSE_BYB` (header `bybClose`, Bybit's spot close) is gone from every authoring input**, and so is every
+  header derived from it (`bybClose_now`, `close_bybClose_spread`). Bybit's own record cannot recover a minute its feed
+  missed, so it is no longer a spot venue. The SYSTEM `venue-dislocation` template serves six columns: its
+  `CLOSE × spread(SPOT_CLOSE_BYB)` column was removed, and no other stored strategy, agent or section named the key.
+- **Nothing else moves.** `SPOT_CLOSE_CB`, `SPOT_CLOSE_BN`, `BUY_PRES_CB` and `BUY_PRES_BN` stay. The composite already
+  summed only Binance and Coinbase (v139), so `SPOT_CVD`, `SPOT_AVG_TRADE` and `SPOT_DOMINANCE` serve the same values,
+  and a period is no longer held back waiting for Bybit's feed.
+- The report catalog and the authoring catalog digest drop the key, and the preview's `vocabularyDigest` moves with
+  them.
+
+## Contract history — v139 (the spot composite sums only the venues that publish their trade history)
+
+**Breaking at v139: one metric retired, and served values move.** v139 is the contract on top of v138. Production
+moved from v138 to v140 in one deploy, so v139 was never served on its own; what it changes arrives with v140.
+
+### Retired — the reason v139 is MAJOR
+
+- **`BUY_PRES_BYB` (header `bybBuyPres`, Bybit's taker-buy share) is gone from every authoring input**, and so is
+  every header derived from it (`bybBuyPres_now`, `bybBuyPres_rank_hi`, `cbBuyPres_bybBuyPres_spread`). Bybit
+  publishes no trade history, so a minute its feed missed could never be recovered. No stored strategy named it.
+
+### Changed values — the same schema serves a different number
+
+- **The spot composite sums only Binance and Coinbase.** `SPOT_CVD`, `SPOT_AVG_TRADE`, `SPOT_DOMINANCE` and the
+  perp/spot flow reads (`PERP_SPOT_FLOW`, `PERP_SPOT_STRENGTH`, `PERP_SPOT_GAP`, `PERP_SPOT_CONFIRMS`) leave Bybit's
+  flow out. `SPOT_DOMINANCE` reads lower for a coin Bybit listed, and a bar in which Bybit's feed missed a minute keeps
+  the composite's flow where it read null. A day's `SPOT_CVD` stepped once at the deploy.
+
+### Re-worded text — the spot flow glosses
+
+- `SPOT_CVD`, `SPOT_AVG_TRADE`, `SPOT_DOMINANCE` and the `spotFlow` study name the summed venues ("the listed venues
+  that publish their trade history (Binance, Coinbase)"). `PERP_SPOT_FLOW` and `PERP_SPOT_GAP` name the coins the spot
+  lane lists, and the Perp/Spot Flow section's provenance names the summed venues.
+- The report catalog and the authoring catalog digest drop the key, and the preview's `vocabularyDigest` moves with
+  them.
 
 ## Contract history — v138 (TradingView's defaults, TradingView's CVD, and which values TradingView publishes)
 
