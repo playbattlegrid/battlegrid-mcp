@@ -103,8 +103,9 @@ team is refused. A reading with `feasible: false` is a create the
 commit will refuse: say so, and stage a larger ceiling or a looser configuration first. Where the player has the create screen open, their own Create is the
 other way to commit it.
 
-A create spends an agent slot against the player's rank quota, decided by the commit itself: a
-full quota is refused there, with the draft unchanged. A retry of the same draft version after a
+A create spends an agent slot against the player's account plan, decided by the commit itself: a
+full quota is refused there as `FORBIDDEN` with `details.reason` `PLAN_LIMIT_REACHED`, naming the
+plan and its limit, with the draft unchanged. A retry of the same draft version after a
 dropped response replays the original receipt, so an ambiguous retry never spends a second slot.
 
 **When the mandate names the arena, read `get_account_state` in the same breath.** The arena needs
