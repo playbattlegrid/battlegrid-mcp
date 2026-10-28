@@ -2,7 +2,7 @@
   "digestVersion": 2,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "142.0.0"
+    "contractVersion": "142.2.0"
   },
   "axes": {
     "create": [
@@ -387,6 +387,7 @@
     "REGIME_VOL_BBW_RATIO",
     "ROC12",
     "ROC15",
+    "ROC9",
     "RSI14",
     "RSI2",
     "RSI7",
@@ -404,6 +405,7 @@
     "SPOT_CLOSE_CB",
     "SPOT_CVD",
     "SPOT_DOMINANCE",
+    "SQZ_MOM",
     "STOCH_D",
     "STOCH_K",
     "STOCH_RSI_D",
@@ -644,6 +646,7 @@
     "SPOT_CLOSE_CB",
     "SPOT_CVD",
     "SPOT_DOMINANCE",
+    "SQZ_MOM",
     "STRUCT_ZONES",
     "SWING_FRACTAL_HIGH",
     "SWING_FRACTAL_HIGH_BARS_AGO",
