@@ -38,6 +38,29 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v140 (every count limit is the account plan's)
+
+**Breaking at v140: three outputs reshaped, one refusal widened.** v140 is the contract on top of v139. Every
+per-account count limit — active agents, active strategies, radar coins, additional teams — is now the account plan's,
+so the agent slot usage no longer names a rank. Reconnect the proxy, or restart it, so discovery reads the new shapes.
+
+### Reshaped output — the reason v140 is MAJOR
+
+- **`list_intelligence_agents` and `commit_agent_draft`** (a create's receipt) drop `slotUsage`
+  (`{ level, rank, limit, used, remaining }`) and serve `usage` (`{ used, limit, remaining }`) and `planCode`.
+- **`get_account_state`**: `agentSlots` drops `level` and `rank` and keeps `{ used, limit, remaining }`; the state
+  serves `planCode` beside it.
+
+A client reading `slotUsage`, `agentSlots.rank` or `agentSlots.level` reads nothing.
+
+### Widened refusal — a plan limit names itself
+
+A create or activation refused at the plan's limit — an agent create or activation, a strategy create or restore, a
+radar coin's first deployment, an additional team — is still `FORBIDDEN`, and now carries `details.reason`
+`PLAN_LIMIT_REACHED`, `details.entitlement` (`agents`, `strategies`, `radarCoinPolicies` or `additionalTeams`),
+`details.planLimit` and `details.planCode`. A radar coin that is already deployed is never counted, so redeploying it
+still answers its revision conflict.
+
 ## Contract history — v138 (TradingView's defaults, TradingView's CVD, and which values TradingView publishes)
 
 **Breaking at v138: one metric retired, one transform pairing refused, one metric added, catalog outputs widened, and
