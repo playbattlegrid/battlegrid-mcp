@@ -117,7 +117,8 @@ reading a clean report about a messy account learns nothing.
   One trade's fills are `get_trade_outcome_by_decision`'s, on the trade's `decisionId` from
   `list_agent_trades`; never assign an account fill to an agent by its coin and time.
 - `get_deployment_policy` / `get_radar_deployment` when the protection state comes from standing
-  policy rather than the position itself. `list_gate_blocks` when something looks like it should
+  policy rather than the position itself — `get_radar_deployment` with the position's `teamId`, since
+  each team's deployment of a coin is its own. `list_gate_blocks` when something looks like it should
   have fired and did not.
 
 ## 4. Automation health — unprompted

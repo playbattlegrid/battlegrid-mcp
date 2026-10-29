@@ -1,18 +1,18 @@
 ---
 name: battlegrid-radar-deployment
-description: Deploy the player's agents to standing duty — per-coin Radar policies that put every matching rule's agent on duty and fire real trades at confirmed closes, and per-preset Arena deployment policies that enter sessions automatically. Reads what is deployed now, stages a change into the player's draft, previews what it would actually resolve to, commits it only after the player has seen that preview, and un-deploys with the blast radius stated. Activate whenever the player wants an agent put on duty, wants to change or pause a deployment, asks what would fire right now or why nothing is firing, or wants to stop a coin or a preset being traded automatically.
+description: Deploy the player's agents to standing duty — Radar deployments, each one team's watch on one coin, that put every matching rule's agent on duty and fire real trades at confirmed closes, and per-preset Arena deployment policies that enter sessions automatically. Reads what is deployed now, stages a change into the player's draft, previews what it would actually resolve to, commits it only after the player has seen that preview, and un-deploys with the blast radius stated. Activate whenever the player wants an agent put on duty, wants to change or pause a deployment, asks what would fire right now or why nothing is firing, or wants to stop a coin or a preset being traded automatically.
 ---
 
 # Radar & Deployment
 
 You are handing agents **standing authority**. A Radar policy puts EVERY rule whose conditions match
 on duty at once — each rule's regime read at its own agent's regime timeframe — and fires real trades
-at their confirmed closes with no further human action, at most one per coin per pass, offered in rule
-priority; a deployment policy enters real sessions the same way.
+at their confirmed closes with no further human action, at most one per deployment per pass, offered
+in rule priority; a deployment policy enters real sessions the same way.
 Nobody is watching when it happens — which is why the player has to see what a policy resolves to
 *before* it exists, not after.
 
-Radar (per coin) and Arena deployment (per preset) are **separate bounded contexts**. They share
+Radar (per team and coin) and Arena deployment (per preset) are **separate bounded contexts**. They share
 no slot shape, no condition union and no resolution type. Never carry a fact from one to the other,
 and never describe them as one thing with two modes.
 
@@ -20,6 +20,13 @@ and never describe them as one thing with two modes.
 trades a coin on its own only where a Radar policy puts it on duty, and an entry the player queues
 needs no deployment. An Arena deployment enters an agent into a preset's sessions and grants
 **no** trade permission — to have an agent trade a coin on its own, deploy it on Radar.
+
+**A Radar deployment is one team's watch on one coin.** Each team trades on its own wallet, so a coin
+may be deployed once per team: Main's BTC and Swing's BTC are two deployments that sweep, fire, cool
+down and hold positions independently — one position per team per coin. Every Radar tool names the
+deployment with `coinId` **and** `teamId`; a `teamId` you omit addresses the player's **Main** team, so
+on a coin deployed for another team always pass that team. `list_radar_deployments` rows carry each
+deployment's `teamId` and `teamName`. The draft commit always names its team.
 
 ## The five failures this flow exists to prevent
 
@@ -53,14 +60,15 @@ Arena deployment is keyed on `presetId` (a UUID) — from `list_game_presets`.
 
 Then read what exists:
 
-- `get_radar_deployment` (one coin) or `list_radar_deployments` (the fleet, plus the platform
+- `get_radar_deployment` (one deployment: `coinId` and `teamId`) or `list_radar_deployments` (the fleet, plus the platform
   `radarPaused` kill-switch — if that is set, say so up front: nothing will fire whatever you
   write). A `SCANNING` card whose reason is `ENTRIES_PAUSED` is the platform's **entry pause**: new
   entries are paused platform-wide while market data is missing across many coins. Say that up front
   too — the radar takes no new entry on any coin until it lifts, which it does by itself once the
   data is back, and nothing the player changes on a deployment clears it.
-- **For Radar, also read the player's draft of the coin** with `get_radar_deployment_draft` — or
-  `list_radar_deployment_drafts` when no coin is named yet. The player may be part-way through a
+- **For Radar, also read the player's draft of the deployment** with `get_radar_deployment_draft`
+  (`coinId` and `teamId`) — or `list_radar_deployment_drafts` when no deployment is named yet; each of
+  its rows names its `teamId` and `coinId`. The player may be part-way through a
   change in their radar builder. **If a draft exists, say so** — what it holds, and when and from
   where it was last written — and propose against it rather than starting over beside it.
 - `get_deployment_policy` / `list_deployment_policies` for Arena, and **the player's draft of the
@@ -73,9 +81,10 @@ Then read what exists:
 If the question is *why did my radar agent not fire*, do not start from the journal — **go to step
 5**, which reads state first and pattern second.
 
-**In a conversation the radar builder hosts** — your context names the radar builder and a coin id —
-the player's builder is open on that coin whether or not a draft exists yet. Stage every change into
-that coin's draft, naming that `coinId`; it lands in their builder as a proposal. Their own Save
+**In a conversation the radar builder hosts** — your context names the radar builder, a team and a coin
+id — the player's builder is open on that team's deployment of the coin whether or not a draft exists
+yet. Stage every change into that deployment's draft, naming that `coinId` and that `teamId`; it lands
+in their builder as a proposal. Their own Save
 commits it; commit it yourself only when they explicitly confirm through `ask_user`, after the
 preview this flow requires. The builder's state — its rules, the default agent, who is on duty now —
 arrives as the turn's attached scope. An axis their form rewrote after your proposal is their answer:
@@ -88,24 +97,26 @@ is test-routing a regime. Never carry a fact from a radar conversation into it, 
 
 ### 2. Stage the change, then preview exactly what would be written
 
-**Radar** — the change goes into the player's draft of the coin, never straight to the policy:
+**Radar** — the change goes into the player's draft of the deployment, never straight to the policy.
+Name the `coinId` and the `teamId` on every call below:
 
 1. `stage_radar_deployment_draft` with `draftVersion` = the `version` you read (0 when there was
    no draft) and only the axes you are changing, each WHOLE: `RULES` (the complete ordered rule list
    — first is highest priority; every rule that matches is on duty, so priority decides only which
-   agent is offered the coin's one fire on a pass) and `DEFAULT_SLOT` (the catch-all, on duty only
+   agent is offered the deployment's one fire on a pass) and `DEFAULT_SLOT` (the catch-all, on duty only
    when no rule is, or null for none). A Radar policy has **no timeframe**: each rule's regime
    condition is read at its agent's own regime timeframe, which every slot reports as
    `agentRegimeTimeframe`. Staging writes nothing live and shows the change in the player's builder as
    a proposal. A refusal naming axes means the player changed them after your read: read again and
    propose against what they now have.
 2. `get_radar_deployment_draft` — the draft as it now stands: its `draftVersion`, the
-   `committedRevision` it would be published over (null for a coin with no policy yet), the diff
+   `committedRevision` it would be published over (null for a team with no policy on the coin yet), the diff
    against the deployed policy, the `diagnostics` a commit would refuse, and the `impact` — who goes
    on duty, whether it trades once committed, and for a first deployment the coin cap
-   (`admission.coinCapReached` true means the commit will be refused until a coin is un-deployed).
+   (`admission.coinCapReached` true means the commit will be refused until a deployment is un-deployed;
+   a coin deployed for two teams counts twice).
    Do not confirm a draft whose diagnostics carry an error: stage a fix.
-3. `preview_radar_resolution({ coinId, request: { kind: "DRAFT", draftVersion } })` at the version that
+3. `preview_radar_resolution({ coinId, teamId, request: { kind: "DRAFT", draftVersion } })` at the version that
    read returned. It composes the draft over the deployed policy **exactly as the commit will write it**,
    and refuses a draft no longer at that version with `DRAFT_VERSION_MOVED`. Its `ruleCloseCoverage`
    counts, for each hours rule, the closes of its agent's `strategyTimeframe` bar the rule's hours let
@@ -261,18 +272,18 @@ the reason — and **names what the change does to the stored policy**, read fro
 
 Then:
 
-- **Radar** → `commit_radar_deployment_draft({ coinId, draftVersion, expectedRevision, teamId })`,
-  naming exactly the `draftVersion` and `committedRevision` your draft read returned — the version
-  your preview resolved. Ask with `ask_user` first and commit only after an explicit confirming pick.
-  The axes it published leave the draft.
-  `teamId` is the team the deployment trades on, and a team is never drafted. For a deployed coin,
-  pass the `teamId` its `list_radar_deployments` (or `get_radar_deployment`) row carries: a
-  deployment keeps its team for life, and another team is a CONFLICT naming the stored one. For a
-  first deployment, choose one of the player's teams from `get_account_state.teams` (ask when there
-  is more than one) and name it in the confirmation. Every slot agent must trade on that team. A
-  platform agent trades on Main, so it fits only a Main deployment. A slot agent of another team is a
-  VALIDATION_ERROR naming the agent and its team. The draft read reports it beforehand for a deployed
-  coin, and for a first deployment it reports slot agents that trade on different teams.
+- **Radar** → `commit_radar_deployment_draft({ coinId, teamId, draftVersion, expectedRevision })`,
+  naming exactly the `teamId`, `draftVersion` and `committedRevision` your draft read returned — the
+  version your preview resolved. Ask with `ask_user` first and commit only after an explicit confirming
+  pick. The axes it published leave the draft.
+  `teamId` is **required** and never inferred: the commit writes that team's deployment of the coin
+  and nothing else. For a deployed one, pass the `teamId` its `list_radar_deployments` (or
+  `get_radar_deployment`) row carries. For a first deployment, choose one of the player's teams from
+  `get_account_state.teams` (ask when there is more than one), stage and read the draft under it, and
+  name it in the confirmation; a coin another team holds stays deployable for this one. Every slot
+  agent must trade on that team. A platform agent trades on Main, so it fits only a Main deployment. A
+  slot agent of another team is a VALIDATION_ERROR naming the agent and its team, which the draft read
+  reports beforehand.
 - **Arena** → `commit_deployment_policy_draft({ presetId, draftVersion, expectedRevision })`,
   the same way.
 
@@ -284,11 +295,12 @@ ask for again.
 
 ### 4. Pause, resume, discard, delete
 
-**Pause a coin's Radar** → `pause_radar_deployment({ coinId })`. No preview and no revision: stopping
-never waits on a read. The player's draft keeps its content and is re-based onto the paused revision.
-**Resume** → preview the deployed policy with `preview_radar_resolution({ coinId, request: { kind: "COMMITTED" } })`, tell the player which
+**Pause a deployment** → `pause_radar_deployment({ coinId, teamId })`. No preview and no revision:
+stopping never waits on a read. Another team's deployment of the coin keeps trading. The player's draft
+keeps its content and is re-based onto the paused revision.
+**Resume** → preview the deployed policy with `preview_radar_resolution({ coinId, teamId, request: { kind: "COMMITTED" } })`, tell the player which
 agents will go on duty again, and on their word
-`resume_radar_deployment({ coinId, expectedPolicyId, expectedRevision })` naming the `policyId` and
+`resume_radar_deployment({ coinId, teamId, expectedPolicyId, expectedRevision })` naming the `policyId` and
 `revision` that preview returned — so it re-arms the policy the player was shown, or nothing.
 
 **Pause an arena** → `pause_deployment_policy({ presetId })`, and **resume** it the Radar way: preview
@@ -304,14 +316,14 @@ same cancellation and refund as their own Cancel button. Say nothing is cancelle
 
 **Discard a draft** only on the player's word. Read it first and tell the player what it holds and
 when and from where it was last written; then
-`discard_radar_deployment_draft({ coinId, draftVersion })` or
+`discard_radar_deployment_draft({ coinId, teamId, draftVersion })` or
 `discard_deployment_policy_draft({ presetId, draftVersion })` at **the version you read**.
 If the draft moved since, it is refused with `DRAFT_VERSION_MOVED` and nothing is removed — read it
 again and show them.
 
 **Deletes** — `delete_radar_deployment` / `delete_deployment_policy` remove the **entire** policy —
 every slot and condition — and revoke the standing authority. Un-deploying **also ends the player's
-draft** of the coin or the arena. There is no preview here, and correctly so: there is no resolution
+draft** of the deployment or the arena; another team's deployment of the coin, and its draft, stand. There is no preview here, and correctly so: there is no resolution
 to preview once the policy is gone. The evidence is **the deployment's own read**, which supplies the
 `expectedPolicyId` and `expectedRevision` both deletes carry — a policy removed and redeployed since
 your read is refused rather than removed.
@@ -331,13 +343,13 @@ Four reads, cheapest first. Stop as soon as the player's question is answered.
 1. **`get_radar_deployment` → `resolvesNow`** for what is true **right now**: the coin's section and
    reason, and one `onDuty` row per agent — its blocked reason and since when, its qualification
    block, its cooldown, whether its edge is spent, its last fire and its close clock. A row whose last
-   close reads `CLAIMED` qualified but lost the coin's one fire that pass to a higher-priority agent;
+   close reads `CLAIMED` qualified but lost the deployment's one fire that pass to a higher-priority agent;
    its edge is preserved and it fires at a later close only if it still qualifies there. A `SCANNING`
    coin whose reason is `ENTRIES_PAUSED` is under the entry pause (step 1): its agents still decide and
    record every close, and a close that qualifies is held — its fire refused, its edge preserved,
    journaled and recorded as `EDGE_PRESERVED_ENTRIES_PAUSED` with `scanBlockReason` `ENTRIES_PAUSED` —
    so it fires at a later close only if that close qualifies on its own data after the pause lifts. A
-   lower-priority agent behind that fire reads `CLAIMED` on the same bar: the coin's one fire went to
+   lower-priority agent behind that fire reads `CLAIMED` on the same bar: the deployment's one fire went to
    the agent the pause refused, not to a trade. That is the whole answer while the pause lasts; never
    send the player to change an agent or a policy for it. Most "is it working?" questions end here.
    When the question is what ONE on-duty agent of a scanning coin needs to fire — which condition
@@ -347,8 +359,9 @@ Four reads, cheapest first. Stop as soon as the player's question is answered.
    agent reads now, and `lastClose` is the decision its row names as its last close, with the reading
    that bar was decided on.
 2. **`get_radar_activity_summary`** for everything else about "why is it quiet", in ONE call. Pass
-   `agentId` when the question is about one agent — "why isn't Hawk firing on SOL?" — and the read is
-   that agent's history on the coin. Without it the read is the **coin feed**: the deployment's
+   `agentId` when the question is about one agent — "why isn't Hawk firing on SOL?" — with the `teamId`
+   Hawk trades on, and the read is that agent's history on that team's deployment. Without it the read
+   is the **coin feed**: the deployment's
    lifecycle, status changes, duty changes and fires, with no agent's gates, an empty `curveDigest`
    and no curve agent. An `agentId` the player cannot access is answered as not found. It carries
    three parts and they answer three different questions, each on its own scope:
