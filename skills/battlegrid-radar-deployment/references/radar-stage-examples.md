@@ -10,8 +10,11 @@ Every `<UPPER_SNAKE>` value is a placeholder. Replace it with the id a read retu
 - `<AGENT_ID>` comes from your agent list.
 - `<OTHER_AGENT_ID>` is a second agent from your agent list, where an example deploys two.
 
+Every example addresses the player's Main team's deployment of the coin. For another team's deployment,
+add its `teamId` (from `list_radar_deployments` or `get_account_state.teams`) beside `coinId`.
+
 Never send a placeholder as written, and never invent an id. `draftVersion` is the version
-`get_radar_deployment_draft` returned: 0 when the coin has no draft. Each axis you send is written whole, and an axis
+`get_radar_deployment_draft` returned: 0 when the deployment has no draft. Each axis you send is written whole, and an axis
 you omit keeps the value the draft already has.
 
 ## On duty whenever no rule matches — the default slot

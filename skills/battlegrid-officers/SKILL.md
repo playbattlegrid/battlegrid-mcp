@@ -45,9 +45,11 @@ confirmed before it is called.
   refuses either.
 - **Show, then commit on the player's word.** Read `get_officer_draft` and show the diff, the diagnostics and the
   impact — `nextRunAt` is when it first runs, and a create's `admission` says how many officers the player holds
-  against the limit and how many more it admits (`officersRemaining`). Commit with `commit_officer_draft` naming
-  exactly the `draftVersion` and `committedRevision` the read returned, and only when the player says so. A cadence
-  of `OFF` keeps the setup and runs nothing on a schedule.
+  against their account plan's officer limit and how many more it admits (`officersRemaining`). Every unarchived
+  officer counts, paused ones included; a create past the limit is refused as `PLAN_LIMIT_REACHED`, and archiving
+  an officer frees its place. Commit with `commit_officer_draft` naming exactly the `draftVersion` and
+  `committedRevision` the read returned, and only when the player says so. A cadence of `OFF` keeps the setup and
+  runs nothing on a schedule.
 - **Archive** with `archive_officer` only on the player's word: an archived officer runs no more, and its open
   reviews stay in the inbox.
 - In the app, the player sets an officer up in its own console, where this conversation may be docked beside the

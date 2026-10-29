@@ -25,8 +25,9 @@ close executes.
   reason, then `ineligible` with the refusal `propose_entry_decision` would give (`AGENT_NOT_ACTIVE`,
   `MODEL_INACTIVE`, `AGENT_HALTED`). Read them **as written** — never re-sort or re-derive a verdict.
 - **Ask the top-ranked qualifying agent**, and name the other agents that qualified so the player can
-  choose one of them instead. One request per coin: the platform holds one pending request per coin
-  across all of the player's agents, so ask one agent, not each of them.
+  choose one of them instead. One request per team and coin: the platform holds one pending request per
+  coin for each team, across all of that team's agents — an agent trades on its team's wallet — so ask one
+  agent of a team, not each of them.
 - **When none qualifies, say so plainly.** Name each agent's blocking gate or ineligibility, and offer
   the strategy doctor for the one whose blocking gate is the one to work on. Never propose through an agent the scan
   reports rejected, unscorable or ineligible.
@@ -65,7 +66,8 @@ close executes.
 - `userMessage` is the player's own words for the turn; it is recorded in the conversation and read
   by no model. Mint a **fresh UUID** `idempotencyKey` per request; a retry with the same key replays
   the recorded result and never registers a second one.
-- **One pending request per coin.** A second is refused with `CONFLICT` / `REQUEST_PENDING` — read
+- **One pending request per team and coin.** A second on the same team is refused with `CONFLICT` /
+  `REQUEST_PENDING` — read
   the one that exists with `get_entry_request` rather than asking again.
 
 ## 4. Tell the player what they are waiting for

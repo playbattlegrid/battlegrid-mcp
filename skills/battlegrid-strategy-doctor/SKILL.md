@@ -64,7 +64,8 @@ Three reads, and they are not interchangeable:
   agent's `tradingTeamId` on `get_agents_hub`, or a `list_radar_deployments` row's `teamId`. For "why did nothing happen on SOL", read
   `list_gate_blocks` for the pre-model refusals on that coin, and for a Radar coin
   `get_radar_activity_summary` for its causes, then `get_radar_close_decisions` for the bars it
-  decided.
+  decided — both on the team the agent trades on, as `teamId` (a `list_radar_deployments` row's
+  `teamId`); without one they read Main's deployment.
 - **`get_agent_coin_qualification` answers the forward-looking half.** The reason codes above say
   why an agent did NOT trade in the past; this says whether a coin would route for it RIGHT NOW,
   and which gate stops it — the strategy's entry condition, candidate levels, the ATR% volatility
