@@ -38,6 +38,39 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v143 (a Radar deployment is one team's watch on one coin)
+
+**Breaking at v143: one answer narrowed, one input required, outputs reshaped.** A coin may now be deployed on Radar
+once per team: two teams of one account can each deploy the same coin, each with its own rules, fires, cooldown and
+position. A deployment is addressed by its team and its coin. Reconnect the proxy, or restart it, so discovery reads
+the new shapes.
+
+### Narrowed answer — the reason v143 is MAJOR
+
+- **A Radar call naming a coin alone addresses the account's Main team's deployment of it** —
+  `get_radar_deployment`, `pause_radar_deployment`, `resume_radar_deployment`, `delete_radar_deployment`,
+  `preview_radar_resolution`, `get_radar_activity`, `get_radar_activity_summary`, `get_radar_close_decisions`, and
+  `stage_radar_deployment_draft`, `get_radar_deployment_draft` and `discard_radar_deployment_draft`. Before v143 a
+  coin had one deployment per account, whatever its team; a client that deployed a coin for another team and still
+  calls with the coin alone now reads Main's deployment, or none.
+- **`commit_radar_deployment_draft` requires `teamId`.** A commit without it is refused by its schema, and nothing is
+  deployed.
+
+### Widened input
+
+- Every tool above takes an optional `teamId`: the team whose deployment of the coin it addresses, the account's Main
+  when omitted. Another account's team answers `NOT_FOUND`. A read narrowed to an agent names the team that agent
+  trades on, which every `list_radar_deployments` row serves.
+
+### Reshaped output
+
+- **The team beside the coin.** A deployment's `teamId` and `teamName` are always set; `pause_radar_deployment` and
+  `resume_radar_deployment` answer `{ teamId, revision }`; `delete_radar_deployment` and `get_radar_activity_summary`
+  name the `teamId`; the radar draft reads, the draft listing rows and the commit receipt name `teamId` beside
+  `coinId`; an agent's Radar slots in the agent hub name their `teamId`.
+- **The officer's Radar targets.** `get_officer_review_context`'s Radar targets serve `teamId` and `coinId`, and a
+  Radar proposal's `targetId` is the deployment's key, `<teamId>:<coinId>` — pass it back as given.
+
 ## Contract history — v142.3 (read a metric relative to another coin)
 
 **Additive at v142.3: one transform, one column knob and one numeric unit added.** Nothing a client sends today is
