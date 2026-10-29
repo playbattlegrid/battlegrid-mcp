@@ -35,6 +35,9 @@ rather than events all live there. This document assumes them.
 | One-bar volume concentration | `{ "metric": "VOLUME", "transformId": "maxShare", "timeframe": { "rel": "lower" }, "window": 4, "bars": "closed" }` | `volBase_ltf_maxShare` |
 | Room to structure | `{ "metric": "STRUCT_ZONES", "transformId": "nearestZoneDist", "timeframe": { "rel": "regime" }, "side": "resistance" }` | `zones_htf_resist_dist` |
 | Last **closed** daily read | `{ "metric": "RSI14", "transformId": "value", "timeframe": { "abs": "1d" }, "bars": "closed" }` | `RSI14_1d` — the newest completed daily bar |
+| Price in BTC (relative value) | `{ "metric": "CLOSE", "transformId": "relativeTo", "timeframe": { "rel": "anchor" } }` | `close_BTC_rel` — SOL ÷ BTC, TradingView's `SOLUSDT/BTCUSDT` |
+| Stretched vs ETH | `{ "metric": "CLOSE", "transformId": "relativeTo", "chainedTransformId": "zscore", "timeframe": { "rel": "anchor" }, "instrument": "ETH", "window": 20 }` | `close_ETH_rel_z20` — the ratio's z-score; above 2 is rich vs ETH |
+| Momentum lead over BTC | `{ "metric": "RSI14", "transformId": "relativeTo", "timeframe": { "rel": "anchor" } }` | `RSI14_BTC_rel` — RSI minus BTC's RSI, in points |
 
 ## Cross detection
 
