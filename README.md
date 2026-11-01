@@ -38,6 +38,28 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v146.0.1 (the pegs' and breadth's history starts before the deploy)
+
+**Re-worded text at v146.0.1, behind unchanged schemas.** v146.0.1 is the contract on top of v146.0.0. Nothing a
+client sends is refused that v146.0.0 accepted, and no schema moves. Reconnecting is not required.
+
+### Re-worded text — the `PAR_DEV` gloss
+
+- **`PAR_DEV`'s gloss no longer says its series is appended from deploy.** It says the pair's history is seeded at
+  boot from the pair's venue candles, so a lookback beyond the history the store holds reads absent. The preview's
+  `vocabularyDigest` moves with it; `REPORT_CATALOG_SCHEMA_VERSION` does not.
+
+### Changed values — the same schema serves a value where it read absent
+
+- **A pair section's lookback reads values from before the v146 deploy.** Each declared pair's warmup windows are
+  seeded at boot from its venue's own candles: Binance's for `USDC_USDT`, and Coinbase's for `USDT_USD`, whose 4h bars
+  are folded from its 1h candles because Coinbase serves no 4h. A quiet minute is carried only while the pair traded
+  within its freshness target, as on the live tape. A slot neither the venue nor that rule can decide still reads
+  absent.
+- **A market section's lookback reads breadth from before the v146 deploy.** A bar the live pass left unwritten is
+  healed every hour from the stored per-coin bars by the same fold, and only where every coin of the roster can
+  measure it.
+
 ## Contract history — v146 (market breadth and the stablecoin pegs are series a section reads)
 
 **Breaking at v146: inputs refused, one section field required, inputs and vocabularies widened.** Market breadth
