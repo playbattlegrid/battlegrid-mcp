@@ -50,8 +50,9 @@ rules about the columns themselves, not about porting — they live in the skill
   carrier with `MACDhist_cross is "Bullish"`; swing-trend geometry.
 - **Golden / Death Cross** → `SMA50 spread SMA200 × trajectory` gives state and freshness:
   `SMA50_SMA200_spread_now gt 0` AND `_trend is "rising"`; optional breadth gate on
-  `mktBreadth_crypto gte 0` — every published scope resolves, not only `all`, because the leg reads
-  the `(timeframe, scope)` pairs a condition names; position-persona geometry. `SMA50 × SMA200` is
+  `mktBreadth gte 0` in a section bound to the market at `crypto` (`"marketScope": "crypto"`, any
+  scope the trade needs — two scopes are two sections; see `recipes.md`, *Market and stablecoin
+  subjects*); position-persona geometry. `SMA50 × SMA200` is
   the canonical definition and stays the default port; `EMA50` is available as the crypto variant
   when a player asks for it by name.
 - **RSI-2 (Connors)** → `RSI2` is native, so this ports exactly: `RSI2 lte 10` gated by required

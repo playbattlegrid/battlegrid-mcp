@@ -34,8 +34,18 @@ on this coin" with no condition named.
 
 ## On duty only in named regimes
 
+A regime condition names the market structures its rule is on duty in — `bull_trend`, `bear_trend`, `bull_range`,
+`bear_range` — and two more settings, both required:
+
+- `volatilities` — the volatility levels (`contracting`, `normal`, `expanding`) the rule runs in, each listed once.
+  All three place no volatility constraint; that is the setting to send unless the player narrows it.
+- `duringWarnings` — what the rule does while the reading carries a warning (a crash, or momentum diverging in a
+  trend): `run` keeps it on duty, `pause` stands it down until the warning clears, `only` puts it on duty only while
+  a warning holds. `run` is the setting to send unless the player says otherwise.
+
 `minConviction` on the rule is the trade bar (0–1, or null to inherit the agent's). `minConviction` inside the
-regime condition is the regime-reading floor, and must be a level one of the selected regimes can emit.
+regime condition is the regime-reading floor, and must be a level one of the selected regimes can emit at one of the
+selected volatilities.
 
 ```json stage_radar_deployment_draft
 {
@@ -48,7 +58,43 @@ regime condition is the regime-reading floor, and must be a level one of the sel
           "agentId": "<AGENT_ID>",
           "minConviction": null,
           "conditions": [
-            { "kind": "regime", "regimes": ["bull_expansion", "bull_ranging"], "minConviction": "high" }
+            {
+              "kind": "regime",
+              "regimes": ["bull_trend", "bull_range"],
+              "minConviction": "high",
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "run"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+## In a bear trend, standing down during warnings
+
+A crash continues a bear trend as often as it ends one, so whether a warning stops the rule is the player's call.
+Here the agent works the bear trend and stands down while a crash or a momentum divergence holds.
+
+```json stage_radar_deployment_draft
+{
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": null,
+          "conditions": [
+            {
+              "kind": "regime",
+              "regimes": ["bear_trend"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "pause"
+            }
           ]
         }
       ]
@@ -86,6 +132,8 @@ close is served: a close is staged only as hours the player names.
 
 ## In named regimes during named hours — one condition of each kind
 
+This rule trades either trend, but only while volatility is expanding, and only in the US session hours.
+
 ```json stage_radar_deployment_draft
 {
   "coinId": "<COIN_ID>",
@@ -98,7 +146,12 @@ close is served: a close is staged only as hours the player names.
           "minConviction": 0.6,
           "conditions": [
             { "kind": "hours", "hours": [13, 14, 15, 16], "days": [1, 2, 3, 4, 5] },
-            { "kind": "regime", "regimes": ["volatile"] }
+            {
+              "kind": "regime",
+              "regimes": ["bull_trend", "bear_trend"],
+              "volatilities": ["expanding"],
+              "duringWarnings": "run"
+            }
           ]
         }
       ]
@@ -123,7 +176,14 @@ first agent's regimes.
         {
           "agentId": "<AGENT_ID>",
           "minConviction": null,
-          "conditions": [{ "kind": "regime", "regimes": ["bear_expansion", "bear_ranging"] }]
+          "conditions": [
+            {
+              "kind": "regime",
+              "regimes": ["bear_trend", "bear_range"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "run"
+            }
+          ]
         }
       ]
     },

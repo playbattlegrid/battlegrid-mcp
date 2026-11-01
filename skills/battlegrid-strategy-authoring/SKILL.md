@@ -105,10 +105,12 @@ anywhere; if the two ever disagree, you have created the exact ambiguity this st
 
 The player's own saved sections are listed among the vocabulary's templates as `kind: "saved"`.
 When the player names one, fetch it with `get_strategy_section_template` and place its title, note,
-`benchmarkTicker` and columns in a new custom section — a copy, with no `sectionKey`.
+subject (`benchmarkTicker`, `marketScope`) and columns in a new custom section — a copy, with no
+`sectionKey`.
 
 **Keeping a section.** `save_report_section` keeps a custom section in the player's library: send its
-title, note, `benchmarkTicker` and columns as `section`, dropping `kind` and `sectionKey`. Save only
+title, note, subject (`benchmarkTicker`, `marketScope`) and columns as `section`, dropping `kind`
+and `sectionKey`. Save only
 when the player asks to keep one — offer it, never decide it. Before the save, say whether the
 vocabulary already lists that title as `saved`; if it does, the save replaces that saved section's
 note, subject and columns whole. `remove_saved_report_section` drops one by its `savedSectionId`:
@@ -181,6 +183,14 @@ question you would otherwise guess — and a refusal you would otherwise earn:
 - `get_metric_construction_hints` → `rankOrderings`. Present only when rank is composable on that
   metric, already range-gated server-side — read the offered set rather than deriving one from
   the metric's native output.
+- `get_metric_construction_hints` → `subjectKinds`: the section subjects that may carry the metric
+  — `evaluated-coin`, `benchmark` (a bound coin), `reference` (a bound stablecoin pair) and
+  `market`. The market metrics and `PAR_DEV` sit only in a section bound to the market
+  (`marketScope`) or to a pair (`benchmarkTicker: "USDT_USD"`); in a section of any other subject
+  the save refuses them (`REPORT_COLUMN_SUBJECT_METRIC_UNSUPPORTED`). When you ask
+  `get_strategy_column_contract` about a column of a bound section, pass that section's
+  `benchmarkTicker` or `marketScope` with it; omitted, the column is judged on the coin under
+  evaluation.
 
 For full-surface composition patterns — custom and benchmark sections, condition trees with
 verdicts and `required` enforcement, the trade-level policy with its ATR floor, position-management
@@ -421,7 +431,10 @@ never retry the same call blindly.
   field (`Unknown coin symbol: '<input>'`), with nothing written. Symbols are case-insensitive and
   exchange symbols resolve (`btc`, `kPEPE`, `xyz:BRENTOIL` all reach their coin, and the draft
   stores the canonical ticker), so the refusal means the coin is not tracked: never retry with
-  another casing — ask the player which coin they meant.
+  another casing — ask the player which coin they meant. The one exception is a declared
+  stablecoin pair, the only `benchmarkTicker` that is not a coin: `USDT_USD` and `USDC_USDT` are
+  matched exactly as declared, so `usdt_usd` is refused as an unknown coin — send the declared
+  spelling.
 
 ## When the grammar cannot express the ask
 

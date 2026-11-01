@@ -1,6 +1,6 @@
 ---
 name: battlegrid-strategy-examples
-description: Full-surface composition patterns for the strategy studio — validated desk-grade examples of custom report sections, benchmark sections, condition trees with verdicts and required enforcement, the entry-condition rule, ATR trade levels with the ATR floor, and position management. Activate beside strategy-authoring whenever a strategy is being composed or upgraded beyond a basic template.
+description: Full-surface composition patterns for the strategy studio — validated desk-grade examples of custom report sections, benchmark, market-breadth and stablecoin-peg sections, condition trees with verdicts and required enforcement, the entry-condition rule, ATR trade levels with the ATR floor, and position management. Activate beside strategy-authoring whenever a strategy is being composed or upgraded beyond a basic template.
 ---
 
 # Strategy Studio — full-power composition patterns
@@ -73,7 +73,8 @@ day before it. **Daily-strategy pattern:** anchor 4h, pinned-1d thesis columns w
 columns only for entry timing and risk — daily inputs then move once per daily close while
 stops and time decay keep managing intraday. **Benchmark sections** (`benchmarkTicker: "BTC"`,
 required-nullable on every custom section) read the benchmark's values on every row — the
-standard market-leader regime gate. Platform `sectionKey`s are their literal keys
+standard market-leader regime gate; a section can also read a stablecoin pair or the market itself
+(`## Report sections`). Platform `sectionKey`s are their literal keys
 (`includeHigherTimeframe`). Custom `sectionKey`s are the **server's** to issue, and which of the two
 things you do depends on the operation: on a **CREATE, omit `sectionKey` entirely** — supplying one
 is refused, since a new strategy owns no custom sections yet; on an **UPDATE or RESTORE, send back
@@ -283,7 +284,7 @@ history the store keeps for that column, less the column's own lookback and warm
 the served domain is refused (`CONDITION_HOLD_ILLEGAL`, the domain in `allowedDomain`). The reasons
 a header admits only Once:
 
-- `NOT_REWINDABLE` — the value is stored for the current bar only (session and universe scalars,
+- `NOT_REWINDABLE` — the value is stored for the current bar only (the session-field scalars,
   ranks, zone entities, enrichment metrics, a change at or below the strategy timeframe). **Worked liquidity floor:**
   `LIQUID_FLOOR` holds Once because `vol24hUsd` is a bundle scalar.
 - `DEVELOPING` — the column reads a bar still forming: a Developing candle column above the strategy
@@ -293,7 +294,8 @@ a header admits only Once:
 - `BAR_STATE` — the header describes only the bar being decided.
 - `HISTORY` — not enough history is stored on that timeframe to count more than one close.
 
-Candle columns (at, above or below the strategy timeframe), the regime (counted on the regime rung),
+Candle columns (at, above or below the strategy timeframe), the market and stablecoin-pair columns
+(each counted on its subject's own bars), the regime (counted on the regime rung),
 and the funding and open-interest histories (on the coarser of the strategy timeframe and their own
 hourly cadence) can all be held. **A crossover is an event**: it fires on the bar a state changes,
 so its `maxAtLeast` is 1 — hold a cross "within n closes", never "in a row".
@@ -331,13 +333,14 @@ traded price on display — not against the higher-timeframe bar's own close, wh
 higher-timeframe bar stale. A distance CHAINED into a series transform keeps every slot on its own
 bar's close, so one series carries one reference basis.
 
-**The lane a strategy is deployed to.** Report-level scalars split by LANE, and the split is not a
-quality of the header — it is which reader runs. Market breadth and the reference pairs are ordinary
-market-wide reads with no session dimension, so they resolve everywhere. The five **session-field**
-scalars (`fieldPlayers`, `fieldUpBias`, `fieldBiasDir`, `captConc`, `picksSpread`) describe a game
-session the agent is playing in, and **radar runs outside one** — so a radar deployment whose
-strategy reads one is refused outright (`CONDITION_OPERAND_UNSERVED_IN_LANE`), naming the scalars it
-can read instead.
+**The lane a strategy is deployed to.** The one report-level scalar family is the **session field**:
+five scalars (`fieldPlayers`, `fieldUpBias`, `fieldBiasDir`, `captConc`, `picksSpread`, each headed
+`<key>_session` under the `session-field` section) that describe a game session the agent is playing
+in. **Radar runs outside one**, so a radar deployment whose strategy reads one is refused outright
+(`CONDITION_OPERAND_UNSERVED_IN_LANE`): no report-level scalar is readable in that lane, so remove the
+clause or bind the strategy to an agent in a lane that reads a session. Market breadth and the
+stablecoin pegs are not scalars — they are columns of market- and pair-bound sections, read per bar in
+every lane like any other column.
 
 **What the radar scan can read on a coin.** Beyond the lane, a condition the radar acts on — a
 required one, one carrying a verdict, an exit rule, and every condition they reference — must be
@@ -597,11 +600,35 @@ parameters back beside it.
 
 ## Report sections
 
-`{ kind, sectionKey, title, benchmarkTicker, notes, columns }` — the custom section shape. A
-section carries no `timeframe`: its relative columns resolve against the strategy timeframe, and a
-column reaches any other timeframe by pinning it (`timeframe: { abs: '4h' }`). `benchmarkTicker` and `notes` are **required-nullable**: send an explicit `null` rather
+`{ kind, sectionKey, title, benchmarkTicker, marketScope, notes, columns }` — the custom section
+shape. A section carries no `timeframe`: its relative columns resolve against the strategy timeframe,
+and a column reaches any other timeframe by pinning it (`timeframe: { abs: '4h' }`).
+`benchmarkTicker`, `marketScope` and `notes` are **required-nullable**: send an explicit `null` rather
 than omitting them, because the section is rebuilt whole on save and an omitted key clears the
 author's value silently. On a CREATE, omit `sectionKey` — it is derived from the section itself.
+
+**A section reads one subject**, named by its two subject keys — at most one of them set:
+
+- both `null` — the coin under evaluation, one row per coin;
+- `benchmarkTicker` — one bound instrument on every row: a roster coin (`"BTC"`, any spelling the
+  coin resolves from), or a declared stablecoin pair, `"USDT_USD"` (USDT against USD) or
+  `"USDC_USDT"` (USDC against USDT), spelled exactly as declared;
+- `marketScope` — the market at one breadth scope (`all`, `crypto`, `l1`, `memes`, `defi`,
+  `tradfi`, `stocks`, `indices`, `commodities`), one row for the whole field. Two scopes are two
+  sections.
+
+What a section may hold follows its subject, and the save refuses anything else
+(`REPORT_COLUMN_SUBJECT_METRIC_UNSUPPORTED`, naming the `subjectKind` and the `metric`). A pair-bound
+section reads `OPEN`, `HIGH`, `LOW`, `CLOSE` and `PAR_DEV` — the close's signed % from its par —
+and a market section reads the `market` family (`MKT_NET` → `mktBreadth`, `MKT_ABOVE_EMA` →
+`mktAboveEma`, and the rest); a coin section, evaluated or bound, reads neither. Read each metric's
+`subjectKinds` from `get_metric_construction_hints` rather than this list. Neither a pair nor the
+market takes a cross-coin `rank`; a market column takes no `relativeTo`, and a pair column's
+`relativeTo` names the other declared pair and has no `BTC` default. Market and pair columns are
+series from the moment the platform began recording them: every series transform, timeframe and
+hold applies, and a window reaching before the first recorded bar reads absent. Headers carry no subject
+token (`mktBreadth`, `mktBreadth_htf`, `parDev_zone`), so the section is what says whose reading a
+header is. Worked sections and conditions: `references/recipes.md`, *Market and stablecoin subjects*.
 
 ## Trade levels
 
@@ -657,8 +684,9 @@ and the absence section above. The worked material is disclosed on demand, so it
 you ask for it. Read a reference with `read_skill_reference` when you reach the work it covers:
 
 - **`references/recipes.md`** — copy-adaptable column objects and condition fragments: cross
-  detection, board-relative ranks, cross-venue basis, crowd positioning, coin selection, and the
-  discovery fields worth reading before you compose.
+  detection, board-relative ranks, cross-venue basis, crowd positioning, the market-regime and
+  stablecoin-peg sections, coin selection, and the discovery fields worth reading before you
+  compose.
 - **`references/playbooks.md`** — five validated desk-grade compositions end to end, and how to
   adapt one rather than copy it.
 - **`references/tradingview-ports.md`** — per-script port recipes for the popular TradingView

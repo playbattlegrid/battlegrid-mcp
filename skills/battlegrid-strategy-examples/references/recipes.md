@@ -19,6 +19,7 @@ rather than events all live there. This document assumes them.
 - Board-relative rank recipes
 - Cross-venue and perp/spot basis
 - Crowd positioning
+- Market and stablecoin subjects
 - Coin selection
 - Discovery fields worth reading
 
@@ -160,15 +161,91 @@ fragility read.
 
 ## Crowd positioning
 
-`CROWD_UPBIAS` is the platform's own crowd read — the share of recent settled sessions predicting UP,
-as a percentage:
+The crowd's raw read is `CROWD_UPBIAS`, header `upBias`: the share of this coin's picks that are UP
+across recent settled sessions, as a percentage. A share carries no sample size and no baseline, so
+on its own it reads one pick at 100% as strongly as twenty, and on a board where everyone leans the
+same way it calls every coin crowded.
+
+The crowding read is its two significance scores, each a binomial z in standard errors:
 
 ```json
-{ "metric": "CROWD_UPBIAS", "transformId": "value", "timeframe": { "rel": "anchor" } }
+{ "metric": "CROWD_UP_LEAN_Z", "transformId": "value", "timeframe": { "rel": "anchor" } }
+{ "metric": "CROWD_UP_EXCESS_Z", "transformId": "value", "timeframe": { "rel": "anchor" } }
 ```
 
-Header `upBias`. It is a fade input, not a trend input: it says what the board expects, which is the
-thing a crowded-positioning playbook trades against.
+Headers `upLeanZ` (how one-sided the crowd is on the coin, against 50%) and `upExcessZ` (how far
+beyond the rest of the field). A coin is crowded long when both clear the significance threshold their
+glosses state, and crowded short on the mirror. Read them as a fade input, not a trend input: they say
+what the board expects, which is the thing a crowded-positioning playbook trades against. When the
+whole field leans one way, `upExcessZ` is null and no coin stands out.
+
+## Market and stablecoin subjects
+
+A section reads one subject (the skill body, `## Report sections`): the market readings live only on a
+section bound to the market at one breadth scope, and the peg only on a section bound to a declared
+stablecoin pair. So each recipe here is a whole custom section with the conditions that read it. Every
+header is unique to its section, so a clause names it bare (`"sectionKey": null`) on a CREATE. Both
+subjects are series from the moment the platform began recording them, so a window reaching before the
+first recorded bar reads absent.
+
+**Market regime — trade with the field.** A section bound to the `crypto` scope, reading the share of
+crypto coins closing above their own EMA(50), its zone, and net breadth one rung up:
+
+```json
+{ "kind": "custom", "title": "Crypto breadth", "benchmarkTicker": null, "marketScope": "crypto", "notes": null,
+  "columns": [
+    { "metric": "MKT_ABOVE_EMA", "transformId": "value", "timeframe": { "rel": "anchor" } },
+    { "metric": "MKT_ABOVE_EMA", "transformId": "classifyZone", "timeframe": { "rel": "anchor" } },
+    { "metric": "MKT_NET", "transformId": "value", "timeframe": { "rel": "regime" } } ] }
+```
+
+Headers `mktAboveEma` (%), `mktAboveEma_zone` (`risk-off` at 20 or below, `neutral` between, `risk-on`
+at 80 or above) and `mktBreadth_htf` (the up share less the down share on the regime timeframe,
+signed). The share above EMA holds its reading for runs of bars while net breadth turns almost every
+bar, which is why the zone reads the share and the net is read a rung up. Two building blocks, for a
+long carrier to reference beside the coin's own trigger; the short side mirrors them (`risk-off`,
+`lt 0`):
+
+```json
+{ "conditionKey": "FIELD_RISK_ON", "name": "Crypto field risk-on for 3 closes", "verdict": null, "required": false, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "mktAboveEma_zone" }, "op": "is", "label": "risk-on", "hold": { "atLeast": 3, "of": 3 } } }
+```
+
+```json
+{ "conditionKey": "FIELD_BROADENING", "name": "More of the field up than down, a rung up", "verdict": null, "required": false, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "mktBreadth_htf" }, "op": "gt", "value": 0, "hold": { "atLeast": 1, "of": 1 } } }
+```
+
+**Stablecoin peg — stand down while USDT is off its dollar.** A section bound to `USDT_USD`, reading its
+deviation from par, the peg zone, the deviation's path, and its rotation against USDC:
+
+```json
+{ "kind": "custom", "title": "USDT peg", "benchmarkTicker": "USDT_USD", "marketScope": null, "notes": null,
+  "columns": [
+    { "metric": "PAR_DEV", "transformId": "value", "timeframe": { "rel": "anchor" } },
+    { "metric": "PAR_DEV", "transformId": "classifyZone", "timeframe": { "rel": "anchor" } },
+    { "metric": "PAR_DEV", "transformId": "trajectory", "timeframe": { "rel": "anchor" }, "window": 4 },
+    { "metric": "PAR_DEV", "transformId": "relativeTo", "timeframe": { "rel": "anchor" }, "instrument": "USDC_USDT" } ] }
+```
+
+Headers `parDev` (the close's signed % from its par of 1), `parDev_zone` (`at par` inside ±0.20%,
+`drifting` from there to under ±1.00%, `depegged` at ±1.00% or beyond), `parDev_t3…parDev_now` with
+`parDev_trend`, and `parDev_USDC_USDT_rel` — USDT/USD's deviation less USDC/USDT's, in points, which
+reads strongly negative when money leaves USDT for USDC. The relation must name the other pair: a
+pair-bound section has no `BTC` default. A required gate that stands every entry down while USDT is
+off its peg, since a depeg moves every USDT-quoted price at once, and a rotation building block:
+
+```json
+{ "conditionKey": "USDT_AT_PAR", "name": "USDT holding its dollar", "verdict": null, "required": true, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "parDev_zone" }, "op": "is", "label": "at par", "hold": { "atLeast": 1, "of": 1 } } }
+```
+
+```json
+{ "conditionKey": "ROTATING_TO_USDC", "name": "Money rotating from USDT into USDC", "verdict": null, "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "parDev_USDC_USDT_rel" }, "op": "lte", "value": -0.3, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "parDev_trend" }, "op": "is", "label": "falling", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
 
 ## Coin selection
 

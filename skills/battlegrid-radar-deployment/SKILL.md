@@ -135,8 +135,16 @@ from what the player asked for:
 |---|---|
 | whenever no rule matches | `DEFAULT_SLOT` — on duty only while no rule matches, so on a coin with no rules it is on duty at every instant |
 | only in named regimes | a rule with a regime condition |
+| in a named regime, standing down while a warning holds | a rule with a regime condition whose `duringWarnings` is `pause` |
 | only in named hours and days | a rule with an hours condition |
 | in named regimes during named hours | a rule with one hours condition and one regime condition |
+
+A regime condition reads three facts of one reading. `regimes` names the market structures (`bull_trend`,
+`bear_trend`, `bull_range`, `bear_range`); `volatilities` names the volatility levels it runs in, all three meaning no
+volatility constraint; `duringWarnings` says what a warning — a crash, or momentum diverging in a trend — does to it:
+`run` keeps it on duty, `pause` stands it down, `only` puts it on duty only while one holds. A warning never changes
+the structure, so a bear-trend rule on `run` stays on duty through a crash. Stage all three levels and `run` unless
+the player narrows them, and say which you staged.
 
 Radar's market hours answer *when may this agent trade*, and shift with daylight saving; a strategy's
 `TRADING_SESSION` condition answers *which session is this bar in*, over fixed UTC windows — the two are
@@ -181,6 +189,7 @@ it. Pick the construction from what the player asked for:
 |---|---|
 | whenever no rule matches | `DEFAULT_SLOT` — plays only when no rule wins the session |
 | only in named regimes | a rule with a regime condition |
+| in a named regime, sitting out while a warning holds | a rule with a regime condition whose `duringWarnings` is `pause` |
 | only at named session starts, or one scheduled occurrence | a rule with one session condition — a start or an occurrence |
 | in named regimes at those sessions | a rule with a regime condition and one session condition |
 
@@ -194,7 +203,8 @@ repeatedly while iterating is free and correct.
 
 Render the preview as a card and read it out. For **Radar**: the coin's `section` and any typed idle
 or blocked reason, then every row of `resolvesNow.onDuty` in the order served — each agent, the slot
-and priority that put it on duty, its regime reading at its own `regimeTimeframe` with conviction, its
+and priority that put it on duty, its regime reading at its own `regimeTimeframe` with conviction, volatility and
+warnings, its
 qualification verdict and its close clock — and `readings`, one entry per on-duty agent in the same
 order: what that agent reads on the coin right now (below). For **Arena**: which agent goes on duty,
 which slot matched and at what priority, the regime and conviction used, and the qualification
@@ -253,7 +263,9 @@ resolver:
 
 An `UNSCORABLE` entry is an on-duty agent the preview could not read on the coin, with
 `coinDataStopped` when the coin's data explains why; it never fails the preview. `readings` is null
-under a simulated regime: duty is simulated there, and every reading would judge the real one.
+under a simulated reading: duty is simulated there, and every reading would judge the real one. A simulated
+reading is whole — `{ regime, volatility, warnings }`, the warnings only those its structure can carry (a crash on any,
+momentum divergence on a trend only) — and is judged at maximum conviction.
 
 There is no `conditionReach` list and no `blocksScanGate` flag (contract 74.0.0). A condition's reach
 reason is its `UNEVALUATED` entry's `reachReason` in

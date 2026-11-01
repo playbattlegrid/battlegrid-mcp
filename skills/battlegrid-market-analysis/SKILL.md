@@ -24,9 +24,10 @@ Run these in order. Skip a step only when the player's question makes it irrelev
    snapshot's evidence before its label: a label the hysteresis buffer is **holding** is the
    previous bar's, not this bar's, and conviction names which rule matched, not how comfortably —
    the margins to each gate say how close the read is to turning.
-2. **Market context.** `get_market_context` — this carries the breadth, funding and open-interest
-   picture. Funding and OI are the two figures most often skipped and most often decisive: crowded
+2. **Market context.** `get_market_context` — this carries the funding and open-interest picture.
+   Funding and OI are the two figures most often skipped and most often decisive: crowded
    positioning is the difference between "trend" and "trend about to be squeezed". Report both.
+   How much of the field is moving is step 4b's read.
 3. **Leaders and laggards.** One ranked `preview_strategy_report` per end, each returning the coins
    with their rows, so no per-coin follow-up is needed: `coinSelection: { mode: "ranked", limit: 10,
    category: "ALL", rankBy: { metric: "ROC12", ordering: "hi" } }` for the leaders and `ordering: "lo"`
@@ -58,11 +59,32 @@ Run these in order. Skip a step only when the player's question makes it irrelev
    Coin symbols are case-insensitive and exchange symbols are accepted (`btc`, `kPEPE`,
    `xyz:BRENTOIL`); a symbol that names no tracked coin is rejected with an error naming the field,
    never answered as an empty read — say the coin is not tracked rather than retrying it.
-4b. **How much of the FIELD is moving, not just this coin.** Add the Market Breadth module
-   (`{ "kind": "platform", "sectionKey": "includeMarketBreadth" }`) for the two-axis read: how much
-   of the tracked universe closed up, and how much of it carries positive momentum. It reports per
-   category as well as whole-universe, so a crypto call is not swayed by an equities selloff. Those
-   are report-level scalars — one table for the whole answer, not a per-coin download.
+4b. **How much of the FIELD is moving, not just this coin.** Add a custom section bound to the
+   market at one breadth scope to the same `preview_strategy_report` call — `{ "kind": "custom",
+   "title": "Crypto breadth", "benchmarkTicker": null, "marketScope": "crypto", "notes": null,
+   "columns": [ … ] }` — with the market columns the question needs: `MKT_NET` (`mktBreadth`, the
+   up share less the down share) and `MKT_PPO_NET` (`mktPpoNet`, the same over positive versus
+   negative momentum) for the two-axis read, and `MKT_ABOVE_EMA` under `classifyZone`
+   (`mktAboveEma_zone`: `risk-off` when 20% or less of the scope closes above its own EMA(50),
+   `risk-on` at 80% or more, `neutral` between) for the persistent state. Each column is
+   `{ "metric": "MKT_NET", "transformId": "value", "timeframe": { "rel": "anchor" } }` in shape. The
+   section renders ONE row for the whole field, named by its scope, never a per-coin download; the
+   scopes are `all`, `crypto`, `l1`, `memes`, `defi`, `tradfi`, `stocks`, `indices` and
+   `commodities`, so a crypto call is not swayed by an equities selloff — two scopes are two
+   sections. A market reading is a series from the moment it was first recorded: a trajectory or a
+   regime-timeframe column (`"timeframe": { "rel": "regime" }` → `mktBreadth_htf`) works as on any
+   coin column, and a window reaching back before the series began reads absent — say so rather
+   than reading it as a flat market.
+4c. **Stablecoin stress.** When the question is whether the dollar legs are holding, bind a section
+   to a declared pair — `"benchmarkTicker": "USDT_USD"` (USDT against USD on Coinbase) or
+   `"USDC_USDT"` (USDC against USDT on Binance), spelled exactly so — with `PAR_DEV` columns:
+   `parDev` is the close's signed % from its par of 1, and `parDev_zone` reads `at par` inside
+   ±0.20%, `drifting` from there to under ±1.00% and `depegged` at ±1.00% or beyond. On the
+   `USDT_USD` section,
+   `{ "metric": "PAR_DEV", "transformId": "relativeTo", "timeframe": { "rel": "anchor" }, "instrument": "USDC_USDT" }`
+   (`parDev_USDC_USDT_rel`) is USDT's deviation less USDC/USDT's, in points — money rotating
+   between the two. A cross-venue price premium embeds this peg, so read it beside any premium you
+   report.
 5. **Close with what to watch.** Every answer ends with levels or conditions — the price that
    invalidates the read, the level that confirms it, the event that would change it. An analysis
    with no "what to watch" close is unfinished.

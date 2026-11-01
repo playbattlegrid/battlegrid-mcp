@@ -29,6 +29,12 @@ axis you omit keeps the value the draft already has.
 
 ## Play only in named regimes
 
+A regime condition names the market structures its rule plays in — `bull_trend`, `bear_trend`, `bull_range`,
+`bear_range` — with `volatilities`, the volatility levels it plays in (all three place no constraint), and
+`duringWarnings`, what it does while the reading carries a warning: `run` keeps playing, `pause` sits out until
+the warning clears, `only` plays only while one holds. Both are required; send all three levels and `run` unless
+the player narrows them.
+
 ```json stage_deployment_policy_draft
 {
   "presetId": "<PRESET_ID>",
@@ -39,7 +45,14 @@ axis you omit keeps the value the draft already has.
         {
           "agentId": "<AGENT_ID>",
           "minConfidence": null,
-          "conditions": [{ "kind": "regime", "regimes": ["bull_expansion", "bull_ranging"] }]
+          "conditions": [
+            {
+              "kind": "regime",
+              "regimes": ["bull_trend", "bull_range"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "run"
+            }
+          ]
         }
       ]
     }
@@ -74,6 +87,8 @@ session occurrence, never both.
 
 ## In named regimes at those sessions — a regime condition and one session condition
 
+This rule plays a bear trend at the US open and sits out while a crash or a momentum divergence holds.
+
 ```json stage_deployment_policy_draft
 {
   "presetId": "<PRESET_ID>",
@@ -85,7 +100,12 @@ session occurrence, never both.
           "agentId": "<AGENT_ID>",
           "minConfidence": null,
           "conditions": [
-            { "kind": "regime", "regimes": ["volatile"] },
+            {
+              "kind": "regime",
+              "regimes": ["bear_trend"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "pause"
+            },
             { "kind": "session_start", "startTimes": ["14:00:00"], "days": [1, 2, 3, 4, 5] }
           ]
         }
