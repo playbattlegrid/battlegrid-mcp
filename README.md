@@ -38,6 +38,57 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v146 (market breadth and the stablecoin pegs are series a section reads)
+
+**Breaking at v146: inputs refused, one section field required, inputs and vocabularies widened.** Market breadth
+and the USDT/USD and USDC/USDT pegs stop being scalar modules and become per-bar series. A report section now reads
+exactly one subject: the coin being evaluated, one bound instrument (`benchmarkTicker`: a roster coin or a declared
+pair), or the market at one breadth scope (`marketScope`). Reconnect the proxy, or restart it, so discovery reads the
+new shapes.
+
+### Refused input — the reason v146 is MAJOR
+
+- **The `get_market_context` modules `marketBreadth` and `referencePairs`** are gone. A call that asks for either is
+  refused.
+- **The platform report modules `includeMarketBreadth` and `includeReferencePairs`** are gone from every
+  context-source input and output. A report that places either is refused.
+- **Every condition header under the retired scalar families** (`mktUp_all` … `mktStretch_commodities`,
+  `usdtUsdDev_market`, `usdcUsdtDev_market`) is refused as an unknown column. Stored conditions that named one were
+  moved server-side onto a market or pair section of their own strategy or agent. Read the strategy again for the
+  section key and header each one now names (`mktDown_all` became `mktDown` on the strategy's whole-market section).
+- **The prompt section kinds `market-breadth` and `reference-pairs`** no longer appear in a preview.
+- **`DecisionDroppedInput.BREADTH` and `DecisionDropCause.SPANS_BARS`** leave every decision record.
+
+### Required input
+
+- **Every custom section carries `marketScope`**, a breadth scope or `null`, beside `benchmarkTicker`, on
+  `stage_strategy_draft`, `preview_strategy_report` and `save_report_section`, and on every strategy output. Setting
+  both is refused: a section reads one subject.
+
+### Widened input
+
+- **`benchmarkTicker` accepts the declared reference pairs `USDT_USD` and `USDC_USDT`**, matched exactly as declared.
+  A pair section reads `OPEN`, `HIGH`, `LOW`, `CLOSE` and the new `PAR_DEV`, the signed percentage deviation from
+  par.
+- **`get_strategy_column_contract` takes the section's `marketScope`.**
+
+### Widened catalog and vocabularies
+
+- **Fourteen metrics.** The market metrics `MKT_UP` … `MKT_UNIVERSE`, plus `MKT_ABOVE_EMA` (the share of the scope's
+  coins above their own EMA(50)), are legal on a market section only. `PAR_DEV` is legal on a pair section only. Every
+  catalog metric now carries `subjectKinds`, so a client can tell which sections a metric can be placed on before it
+  stages one.
+- **Two zone vocabularies:** `at par / drifting / depegged` on `PAR_DEV`, and `risk-off / neutral / risk-on` on
+  `MKT_ABOVE_EMA`. `classifyZone` is offered on every candle-homed metric that declares a zone vocabulary, which makes
+  `CVD`, `CUM_VOLUME_DELTA` and `SPOT_CVD` × `classifyZone` authorable.
+- **`BarFamily.REFERENCE`** joins the decided-bar shortfall and data-miss vocabularies, and
+  **`AgentConditionLevelRefusal.NOT_ON_SUBJECT_PRICE_AXIS`** joins `get_agent_coin_qualification`'s refusals.
+- `REPORT_CATALOG_SCHEMA_VERSION` 33 → 34.
+
+### Digest move
+
+- Schema hashes move on 28 tool entries; no tool is added or removed.
+
 ## Contract history — v143 (a Radar deployment is one team's watch on one coin)
 
 **Breaking at v143: one answer narrowed, one input required, outputs reshaped.** A coin may now be deployed on Radar
