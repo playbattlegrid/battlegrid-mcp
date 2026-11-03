@@ -173,13 +173,39 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   transform (and a chained transform) reads its series: the read shape, the window's unit, the price
   basis and what an absent bar does. `seriesHome` says where the metric's series is kept — `candle`,
   `history`, or `null` when the metric has no series, which is why a series transform does not
-  compose on it. Window and offset carry a declared `minimum` and a served `maximum` on the transform
-  entry — the largest value whose read size fits the lookback cap, or `null` when none does. For a
+  compose on it. Window and offset carry a declared `minimum`, a `bound` and a served `maximum` on the
+  transform entry, or `null` when none fits. A `lookback` bound is the largest value whose read size
+  fits the lookback cap. A `depth` bound — the length of `aggregate` (the SMA, `ta.sma`) and `ema`
+  (`ta.ema`) — is the longest average whose one-value read fits the readable depth beside the
+  lookback cap (936 for an SMA, 269 for an EMA at the shipped cap); a longer one is refused with
+  `REPORT_COLUMN_DEPTH_EXCEEDED`, and `lookback.used` counts only the average's newest bar. For a
   chained column the outer's declaration is `chainOuterParameters[outer]` (served beside `metric`)
-  and its bound is `chainedOuters[outer].windowMaximum`. The window carries a `unit`
-  (`seriesElements`, `seriesChanges` for `efficiency`, which reads one bar more than its window, or
-  `priorElements` for `pctl`). Stage at most that maximum. A chained column's operands come from
+  and its bound is `chainedOuters[outer].windowMaximum`; `chainedOuters[outer].offsetMinimum` is the least
+  offset the chain accepts — `1` for a rolling extreme chained into `distance` (the breakout level), `null`
+  on every other chain — so stage the inner's offset at or above it. A chain outer never takes an offset:
+  the offset belongs to the inner. The window carries a `unit`
+  (`seriesElements`, `seriesChanges` for `efficiency`, which reads one bar more than its window,
+  `priorElements` for `pctl`, or `smoothingLength` for `ema`, whose length reads more bars than it
+  names — `ema(20)` reads 73). An average reads null until its whole window is present. Stage at most
+  that maximum. A chained column's operands come from
   `chainedOuters[outer].operands`, never from the metric's full `spreadOperands`.
+- A metric can declare its own knobs on `parameters` (served on the metric entry, `null` when it
+  declares none). The seven swing metrics declare `leftBars` and `rightBars` — the bars before and the
+  closed bars after a pivot — default 2/2, minimum 1, `bound: 'depth'`: the pair reads
+  `left + right + 1` bars to decide one pivot and must fit the readable depth beside the lookback cap
+  (each side's served `maximum` is at the other's default, 933 at the shipped cap); a wider pair is
+  refused with `REPORT_COLUMN_DEPTH_EXCEEDED` on `leftBars`. Stage the pair on the column beside its
+  transform knobs, and leave it off for 2/2 — an explicit 2/2 is the same column. Off 2/2 the header
+  carries `_l<left>r<right>` after the code (`fractalHi_l5r5_1h`). Stage a pair only on a transform
+  (or chained outer) whose entry serves `metricParametersAccepted: true`; `rank`, `relativeTo`,
+  `aggregate` and `ema` read the stored 2/2 and refuse it. A condition hold over a column off 2/2 is
+  served a window of 1: each of its bars needs the full readable depth behind it.
+- The eight market-structure metrics (`INTERNAL_STRUCTURE_*`, `SWING_STRUCTURE_*` event, trend and
+  level, `EQH`, `EQL`) declare their own knobs, each served with its `bound`: `swingLength` (`depth`,
+  default 50, minimum 10, maximum 100), `confluenceFilter` (`flag`, internal structure only), `equalBars` (`depth`,
+  default 3) and `equalThreshold` (`range`: stage exactly one of the served steps, 0 to 0.5 by 0.1).
+  Leave a knob off at its default. They read `null` until the column's bars prove a value, so a
+  short history reads more `null`. A trend reads `bullish` or `bearish`. They never take `rank`, `relativeTo`, `aggregate` or `ema`.
 - `get_metric_construction_hints` → `rankOrderings`. Present only when rank is composable on that
   metric, already range-gated server-side — read the offered set rather than deriving one from
   the metric's native output.

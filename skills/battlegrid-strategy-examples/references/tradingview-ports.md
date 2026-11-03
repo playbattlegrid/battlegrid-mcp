@@ -74,6 +74,13 @@ rules about the columns themselves, not about porting — they live in the skill
   the run, and adds nothing to the crossing; `"breakdown low"` mirrors it.
   **Daily-breakout variant on any anchor:** pin the rail at 1d — `dist_donchianHiPrior20_1d crossesAbove 0`
   (`gt 0` for the held state).
+  **Any N-bar breakout (Turtle 55, a 10-bar exit channel):** the prior-bars level is a rolling extreme read
+  at offset 1 — `HIGH × rollingMax(55, offset 1)` is `ta.highest(high, 55)[1]`, and chained into `distance`
+  it is the breakout column: `dist_high_o1_max55 crossesAbove 0` (the breakout bar; `gt 0` holds on every
+  close of the run). Mirror with `LOW × rollingMin(N, offset 1) × distance` → `dist_low_o1_minN crossesBelow 0`.
+  At N = 20 it reads exactly the stored `DONCHIAN_UPPER_PRIOR` / `DONCHIAN_LOWER_PRIOR` rails. The offset
+  must be at least 1 under `distance` (the save refuses offset 0, whose extreme includes the bar measured),
+  and window plus offset must fit the column lookback cap.
   **Literal previous-day levels are native**: `dist_PDH gte 0` composes directly. They are TIMELESS
   and take `{rel: 'anchor'}` — see `## Header grammar` in the skill body. The previous UTC day is the
   00:00–24:00 UTC day, and a level read against a bar of the next day is `null`.
@@ -119,8 +126,13 @@ rules about the columns themselves, not about porting — they live in the skill
   and signals (`MACD_LINE`/`MACD_SIGNAL`, `PPO_LINE`/`PPO_SIGNAL` — the line's zero cross is
   `MACD_LINE × crossDetect`, and the signal-line cross is `MACD_HIST × crossDetect`, the histogram being
   line minus signal), the 15-bar rate of change (`ROC15`), the Donchian break memory
-  (`DONCHIAN_BROKEN_HI`/`DONCHIAN_BROKEN_LO`), daily pivots
-  (`PIVOT_P`/`PIVOT_R1`–`R3`/`PIVOT_S1`–`S3`), Williams %R (`WILLR14`), Stoch RSI
+  (`DONCHIAN_BROKEN_HI`/`DONCHIAN_BROKEN_LO`), daily pivots of
+  all six Pivot Points Standard types (Traditional `PIVOT_P`/`PIVOT_R1`–`R5`/`PIVOT_S1`–`S5`, then
+  `PIVOT_FIB_*`, `PIVOT_CLASSIC_*`, `PIVOT_CAM_*`, `PIVOT_WOODIE_*`, `PIVOT_DM_*` — a level one type shares
+  with Traditional is read from the Traditional key) and the same six types on the previous ISO week,
+  UTC month, UTC quarter and UTC year (`PIVOT_WEEK_*`, `PIVOT_MONTH_*`, `PIVOT_QUARTER_*` and `PIVOT_YEAR_*`:
+  the daily key with `WEEK_`, `MONTH_`, `QUARTER_` or `YEAR_` after `PIVOT_`, so `timeframe.change("W")`'s R1
+  is `PIVOT_WEEK_R1` and `timeframe.change("3M")`'s is `PIVOT_QUARTER_R1`), Williams %R (`WILLR14`), Stoch RSI
   (`STOCH_RSI_K`/`STOCH_RSI_D` — TradingView's "Stoch RSI" %K and %D at 3, 3, 14, 14, on 0–100), the TTM squeeze (`KC_SQUEEZE`), Connors RSI-2 (`RSI2`), the 8/9/21/50 EMAs
   (`EMA8`/`EMA9`/`EMA21`/`EMA50` — `ta.ema(close, 8)` is `EMA8`, its distance `dist_EMA8`), literal
   previous-UTC-day levels (`PDH`/`PDL`/`PDO`), fractal swing structure
