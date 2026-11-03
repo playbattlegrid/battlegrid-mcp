@@ -38,6 +38,26 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v146.14 (market-structure pivots are LuxAlgo's `leg()` exactly)
+
+**Nothing refused at v146.14 that v146.13 accepted at the shipped lookback cap.** One MINOR moves served values and
+widens one served maximum behind unchanged schemas. No tool, field or enum member is added or removed, and no schema
+hash moves.
+
+### Changed values — the same schema serves a different value
+
+- **A market-structure pivot is decided by the bars after it alone, as LuxAlgo's `leg(size)` does.** A high of
+  length n is a pivot when it is above every high of the n bars after it, and a low when it is below every low of
+  them. The bars before it are not read, so a pivot that an earlier, more extreme bar within n hid under v146.13 is
+  now recorded. `*_STRUCTURE_EVENT`, `*_STRUCTURE_TREND`, `*_STRUCTURE_LEVEL`, `EQH` and `EQL` can read differently
+  from v146.13 on the same bars. The swing-fractal metrics keep their two-sided pairs.
+
+### Depth need — what a column reads to publish one value
+
+- **A structure needs `n + 1` bars and an equal flag the larger of `equalBars + 1` and 800.** At the shipped cap of
+  64 `equalBars` serves up to 935 (was 467), and 799 at a cap of 200; above 200 an equal column is still refused.
+  `swingLength` keeps its ceiling of 100.
+
 ## Contract history — v146.13 (market structure follows LuxAlgo's leg, EQH / EQL read `true`)
 
 **Nothing refused at v146.13 that v146.12 accepted at the shipped lookback cap.** One MINOR moves served values
