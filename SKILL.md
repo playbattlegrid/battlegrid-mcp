@@ -15,6 +15,7 @@ from BattleGrid's own server so they name exactly the tools you reach here:
 
 | For | Activate |
 |---|---|
+| Setting up an account step by step, or finding what to do next — from nothing to an agent armed on Radar | `battlegrid-onboarding` |
 | Playing Market Grid sessions | `battlegrid-arena-play` |
 | Building or changing a strategy | `battlegrid-strategy-authoring` |
 | Composing beyond a bare template — report sections, conditions, trade levels, playbooks | `battlegrid-strategy-examples` |
