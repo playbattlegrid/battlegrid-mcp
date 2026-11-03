@@ -44,7 +44,7 @@ Before committing a CREATE, every "no" here is a decision to state, not an omiss
 | `stddev` wN | `<code>_sd<N>` (population σ, the input's units) | `close_sd20` |
 | `linregSlope` wN | `<code>_slope<N>` (least-squares slope per bar) | `EMA20_slope20` |
 | `pctl` wN | `<code>_pctl<N>` (0–100 against the N prior bars) | `RSI14_pctl20` |
-| `rollingMin` / `rollingMax` wN | `<code>_min<N>` / `<code>_max<N>` | `low_min20`, `high_max20` |
+| `rollingMin` / `rollingMax` wN | `<code>_min<N>` / `<code>_max<N>`; at `offset` K > 0 `<code>_o<K>_min<N>` | `low_min20`, `high_max20`, `high_o1_max55` |
 | `classifyZone` / `classifyState` | `<code>_zone` / `<code>_state` | `RSI14_zone`, `ADX14_state` |
 | `levelInteraction` | `<code>_lvl`, `<code>_lvl_b<N>` at a buffer of N bps | `bbUpper20_lvl`, `bbUpper20_lvl_b25` |
 | any, stored `"bars": "all"` | `<code>_dev`, then the transform's suffix | `RSI14_dev_t1` |
@@ -52,12 +52,17 @@ Before committing a CREATE, every "no" here is a decision to state, not an omiss
 
 The code carries its tokens in this order: `<code>[_<tf>][_dev][_o<N>]`, then the transform's suffix.
 `_dev` follows the STORED selector — the author chose Developing — whatever bar set the column then
-reads; `_o<N>` appears on a `value` at offset N > 0.
+reads; `_o<N>` appears on a `value` or a rolling extreme at offset N > 0.
 
 Non-anchor rungs affix `_ltf` (lower) / `_htf` (regime): `MAalign_htf`,
-`zones_htf_support_dist`. Chains are bounded at two: inner `distance`/`spread` → outer
-`trajectory`/`aggregate`/`rank` (`EMA5 spread EMA13 × trajectory` →
-`EMA5_EMA13_spread_now` + `_trend`).
+`zones_htf_support_dist`. Chains are bounded at two and take one of two shapes: inner
+`distance`/`spread`/`relativeTo` → a series outer (`trajectory`, `aggregate`, …) or `rank`
+(`EMA5 spread EMA13 × trajectory` → `EMA5_EMA13_spread_now` + `_trend`); or a rolling extreme
+`rollingMax`/`rollingMin` → `distance`, the breakout level (`HIGH × rollingMax(55, offset 1) ×
+distance` → `dist_high_o1_max55`). The level chain needs a price base with a per-bar candle value and
+`offset` ≥ 1 (the catalog serves it as `chainedOuters.distance.offsetMinimum`): at offset 0 the extreme
+includes the bar measured, so a close can never pass it. The offset belongs to the rolling extreme,
+never to a chain outer.
 
 **Timeframe references are two families.** *Relative* (`anchor`/`lower`/`regime`) re-resolve
 when the strategy timeframe changes — `regime` is the anchor's ladder successor (1d for a 4h
@@ -331,7 +336,9 @@ Donchian band, and every candle label classifier (`MA_ALIGN`, `PRICE_ZONE`, `BB_
 against the frame's current price, `LAST` — the strategy bar's close under a decision, the last
 traded price on display — not against the higher-timeframe bar's own close, which is up to one
 higher-timeframe bar stale. A distance CHAINED into a series transform keeps every slot on its own
-bar's close, so one series carries one reference basis.
+bar's close, so one series carries one reference basis. A breakout chain (`rollingMax(n, offset 1) ×
+distance`) ends at the distance, so its newest bar is measured from `LAST` too, as the distance to the
+catalogued `DONCHIAN_UPPER_PRIOR` is, and a condition over it is UNRESOLVED on a frame with no last price.
 
 **The lane a strategy is deployed to.** The one report-level scalar family is the **session field**:
 five scalars (`fieldPlayers`, `fieldUpBias`, `fieldBiasDir`, `captConc`, `picksSpread`, each headed
