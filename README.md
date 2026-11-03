@@ -38,6 +38,29 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v146.13 (market structure follows LuxAlgo's leg, EQH / EQL read `true`)
+
+**Nothing refused at v146.13 that v146.12 accepted at the shipped lookback cap.** One MINOR moves served values
+behind unchanged schemas. No tool, field or enum member is added or removed, and no schema hash moves.
+
+### Changed values — the same schema serves a different value
+
+- **Market-structure highs and lows alternate, as LuxAlgo Smart Money Concepts' `leg()` does.** A pivot set records
+  a new swing high only after a swing low, and a new low only after a high. A bar that decides both is read as the
+  high. A lower low before any new high, or a higher high before any new low, no longer replaces the structure
+  level. So `*_STRUCTURE_EVENT`, `*_STRUCTURE_TREND` and `*_STRUCTURE_LEVEL` can read differently from v146.12 on
+  the same bars. Two-sided pivot detection is unchanged.
+- **`EQH` and `EQL` can read `true`.** Their ATR(200) is now windowed over the 800 closed bars ending at
+  the deciding bar. Under v146.12 that window was the whole 1,000-bar fetch, so a flag before the newest bar read
+  `false` or no value. A flag is published only where the recorded pivot and the previous one on its side are both
+  proven in the read.
+
+### Depth need — what a column reads to publish one value
+
+- **An equal flag reads at least 800 bars.** Its need is the larger of `2 × equalBars + 1` and 800, judged against
+  the 1,000-bar floor less the lookback cap. At the shipped cap of 64 every legal `equalBars` fits. Above a cap of
+  200 an equal column is refused with `REPORT_COLUMN_DEPTH_EXCEEDED` and a `relation` domain, where v146.12 served it.
+
 ## Contract history — v146.1 to v146.12 (1,000-bar history, author-set lengths, pivots on five periods, market structure)
 
 **Nothing refused at v146.1 through v146.12 that v146.0.1 accepted, with one exception for a v146.11 value no client
