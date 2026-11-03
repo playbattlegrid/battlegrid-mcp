@@ -38,6 +38,88 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v146.1 to v146.12 (1,000-bar history, author-set lengths, pivots on five periods, market structure)
+
+**Nothing refused at v146.1 through v146.12 that v146.0.1 accepted, with one exception for a v146.11 value no client
+had read.** Twelve MINORs: eleven widen the metric catalog, its parameters and its served values, and one
+(v146.12) narrows two values that v146.11 had just added. Schema hashes move only where the metric enum or the
+column shape is inlined, and no tool is added or removed. Reconnect the proxy, or restart it, so discovery reads the
+widened enums.
+
+### Narrowed at v146.12 — two values v146.11 added
+
+- **`INTERNAL_STRUCTURE_TREND` and `SWING_STRUCTURE_TREND` read `bullish` or `bearish` only.** v146.11 also served
+  `none`, which the server never published; a condition clause that names `none` is now refused.
+- **`swingLength` stops at 100.** The served `maximum` is the lesser of 100 and the depth bound (it was 467 at the
+  shipped lookback cap). 101 is refused with a message naming the range 10 to 100. `equalBars` is unchanged.
+
+### Changed values — the same schema serves a different value
+
+- **v146.1: the readable history is 1,000 bars per timeframe, up from 210.** Every candle-based header's served hold
+  domain widens with it: `maxWindow` and `maxAtLeast` are the 1,000-bar floor less the column's own lookback (985
+  for an `RSI14 × value` column, where it was 195). Settled values of the seed-converging and path-dependent
+  indicators (the EMAs, RSI, Stoch RSI, MACD, PPO, Keltner, the TTM squeeze channel, WaveTrend, QQE, ATR, ADX and
+  DI, Supertrend, Parabolic SAR) are recomputed over 1,000 bars and move by small amounts. Finite-window values do not
+  move. The Donchian break memory, the swing pivots' reach and CCI's flat carry hold 979, 997 and 980 bars, and the
+  swing label reads no value until 1,000 closed bars have been seen. The move is listed in `METRIC_VALUE_MOVES`.
+- **v146.2: `get_onboarding_requirements`' `next` follows the setup path.** The path is
+  `TRADING_WALLET → STRATEGY → AGENT → DEPOSIT_USDC → …`, and a rung waiting only on a deposit no longer holds `next`,
+  so a new account builds a strategy and an agent before depositing.
+- **v146.4: `budgets.conditionFrameReads` reads 2,048, up from 256.** `CONDITION_FRAME_READ_BUDGET_EXCEEDED` names
+  the new figure.
+- **v146.7: an `aggregate` column over a series shorter than its window reads `null`** (TradingView's `ta.sma`),
+  where it read the mean of the elements present. This includes `FUNDING_RATE_AGG24` and `OI_AGG24` at a shorter
+  fetch. An `aggregate` column's `lookback.used` counts only its newest bar plus its metric's reach.
+
+### Widened catalog — metrics and studies
+
+- **v146.5: TradingView's six Pivot Points Standard types on the previous UTC day.** These are Traditional R4/R5/S4/S5
+  plus Fibonacci, Classic, Camarilla, Woodie and DM: 34 keys, each a level set of `floorPivots`. Its existing level set
+  `Pivots` is renamed `Traditional`. A level a type shares with Traditional is read from the Traditional key.
+- **v146.8: the six types on the previous ISO week and UTC month.** `PIVOT_WEEK_*` and `PIVOT_MONTH_*`, 41 keys each,
+  with the studies `weeklyPivots` and `monthlyPivots`. Each key is absent until its period is complete.
+- **v146.10: the six types on the previous UTC quarter and year.** `PIVOT_QUARTER_*` and `PIVOT_YEAR_*`, 41 keys each,
+  with the studies `quarterlyPivots` and `yearlyPivots`. They are composed from completed UTC months, so quarterly
+  levels first read on 2027-01-01 and yearly levels on 2028-01-01, and read absent until then.
+- **v146.11: LuxAlgo Smart Money Concepts market structure, the study `marketStructure`.**
+  - `INTERNAL_STRUCTURE_EVENT` / `SWING_STRUCTURE_EVENT` read `BOS↑`, `BOS↓`, `CHoCH↑` and `CHoCH↓`.
+  - `INTERNAL_STRUCTURE_TREND` / `SWING_STRUCTURE_TREND` read the trend.
+  - `INTERNAL_STRUCTURE_LEVEL` / `SWING_STRUCTURE_LEVEL` read the broken level, which composes over `distance` and
+    `levelInteraction`.
+  - `EQH` and `EQL` flag equal highs and lows.
+
+  Each reads `null` where the column's own bars cannot state the full series' value.
+
+### Widened input — lengths an author sets
+
+- **v146.6: `rollingMax` and `rollingMin` take an `offset`.** At offset 1 or more, a rolling extreme chains into
+  `distance` as the breakout level (`HIGH × rollingMax(55, offset 1)` is `ta.highest(high, 55)[1]`, header
+  `high_o1_max55`). The chain-outer vocabulary gains `distance`, and `chainedOuters[outer].offsetMinimum` is served.
+- **v146.7: the `ema` transform** (TradingView's `ta.ema`, header `_ema{n}`) with the window unit
+  `smoothingLength`. `aggregate`'s window maximum widens from the lookback cap to the depth maximum (936 at the shipped
+  cap). Every served bounded window carries `bound` (`lookback` | `depth`).
+- **v146.9: swing `leftBars` and `rightBars`** (default 2, header `_l<left>r<right>` off 2/2) on the seven swing
+  metrics. Every served metric now carries `parameters`, and every transform entry carries `metricParametersAccepted`.
+- **v146.11: `swingLength`, `confluenceFilter`, `equalBars` and `equalThreshold`** on the market-structure metrics.
+  They print as header tokens `_s<n>`, `_cf`, `_e<m>` and `_atr<threshold>` off their defaults. A condition's level
+  reference carries `swingLength` and `confluenceFilter`.
+
+### Widened output
+
+- **v146.3: every rung `get_onboarding_requirements` serves carries `remedy`** (`{ action, actor }`, `null` when the
+  rung is `COMPLETE`).
+
+### New refusal
+
+- **v146.7: `REPORT_COLUMN_DEPTH_EXCEEDED`.** A window, swing pair or structure length whose one-value read does not
+  fit the 1,000-bar history less the column's lookback is refused, and the refusal names the knob. A pair off 2/2 or a
+  structure metric is refused under `rank`, `relativeTo`, `aggregate` and `ema`.
+
+### Digest move
+
+- `REPORT_CATALOG_SCHEMA_VERSION` 34 → 38. The strategy preview's `vocabularyDigest` and the authoring-contract
+  digest move with each catalog widening. `stage_strategy_draft`'s input schema grows from 15,470 to 19,972 bytes.
+
 ## Contract history — v146.0.1 (the pegs' and breadth's history starts before the deploy)
 
 **Re-worded text at v146.0.1, behind unchanged schemas.** v146.0.1 is the contract on top of v146.0.0. Nothing a
