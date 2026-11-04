@@ -58,6 +58,58 @@ hash moves.
   64 `equalBars` serves up to 935 (was 467), and 799 at a cap of 200; above 200 an equal column is still refused.
   `swingLength` keeps its ceiling of 100.
 
+## Contract history — v147 to v147.2 (an arena deployment's member is chosen at the bell, agents leave Radar, an entry's fate is journaled)
+
+**v147 is MAJOR: published results narrow for inputs v146.14 accepted, and one tool refuses a call it answered.**
+v147.1 and v147.2 are MINOR. Nothing either refuses was accepted by the version before it.
+
+### Reshaped output — one reason v147 is MAJOR
+
+- **A deployment resolution names its on-duty members, not one agent.** The RESOLVED arm drops `agentId`,
+  `agentDisplayName`, `agentAvatarUrl`, `matchedSlotPriority`, `matchedIsDefault`, `minConfidencePercent` and
+  `resolved` for `members`, a non-empty array of those fields: every matching rule on duty in priority order, the
+  default only when none matches. Which member plays is decided at the Opening Bell. This moves in
+  `preview_deployment_resolution`, `test_generate_deployment_grid`, `get_deployment_policy`,
+  `list_deployment_policies` and `get_deployment_policy_draft`.
+- **A test generation reports the members it tried.** `test_generate_deployment_grid`'s RESOLVED result gains
+  `tried` (`agentId`, `agentDisplayName`, `admittedCount`, `gridSize`, `stoodAside` per member), and its
+  `generation` is null when every on-duty member stood aside.
+
+### New refusals — the other reason v147 is MAJOR
+
+- **`generate_agent_grid` refuses an agent whose strategy admits too few coins.** When the strategy admits fewer
+  pool coins than the grid needs, the call is a `BAD_REQUEST` with details `{admittedCount, gridSize}`, and a
+  pending grid cached for that agent and session is discarded.
+- **A draft slot naming an agent the caller cannot access is refused** by `preview_deployment_resolution` and
+  `test_generate_deployment_grid`, in any slot, not only the winning one.
+
+### Added tools — v147.1
+
+- **`get_agent_radar_holdings`** (`mcp:read`) serves every Radar deployment of the caller that holds one agent,
+  enabled or paused, each with its server-decided withdraw `effect`.
+- **`withdraw_agent_from_radar`** (`mcp:wager`) takes the agent off the holdings it names, each at the policy and
+  revision that read returned, and answers one outcome per holding.
+
+### Widened refusal — v147.1
+
+- **A `CONFLICT`'s `details.reason` gains `RADAR_WITHDRAW_REFUSED`**, carried with `details.refusals`: one entry
+  per refused holding, with its own code and message.
+
+### Widened enum — `get_agent_activity_feed`'s `eventType`
+
+- **v147 adds `GRID_STOOD_ASIDE`**: the agent's strategy admitted fewer coins than a grid needs, so it stood aside
+  before any spend. A `GRID_SKIPPED` row's `reason` is now a code from one closed vocabulary, not refusal text.
+- **v147.2 adds `GRID_ENTRY_RESOLVED`**: settlement's later word on an agent's entry, with `metadata.resolution`
+  `ENTERED` (the fee confirmed after the submit returned), `RELEASED` (the entry could no longer be entered) or
+  `REFUND_REQUESTED` (a released entry's landed fee is being returned). A `GRID_SUBMITTED` row's `metadata` also
+  carries `entryStatus`: `ENTERED`, or `PAYMENT_PENDING` while the fee is still confirming.
+
+### Re-worded text — v147
+
+- The `preview_deployment_resolution` and `test_generate_deployment_grid` descriptions state the on-duty set and
+  the member trial. `stage_strategy_draft`'s CONDITIONS axis and the strategies workflow card state that a
+  strategy without an entry condition never enters the arena.
+
 ## Contract history — v146.13 (market structure follows LuxAlgo's leg, EQH / EQL read `true`)
 
 **Nothing refused at v146.13 that v146.12 accepted at the shipped lookback cap.** One MINOR moves served values
