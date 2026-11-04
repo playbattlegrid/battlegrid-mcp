@@ -38,6 +38,31 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v149 (an arena entry is sealed until lock; from lock its author and reasoning are public)
+
+**v149 is MAJOR: one published output drops three fields.** Nothing a client sends is refused that v148.1 accepted.
+
+### Reshaped output — the reason v149 is MAJOR
+
+- **`get_market_grid_player_grid` names the entry's author and carries its author's reasoning.** It drops
+  `agentConfidence`, `agentConfidencePercent` and `agentReasoning`, and gains `entrySource` (who authored the current
+  picks: a deployed or requested agent, the Commander, the Commander with the player, an MCP client, the player by
+  hand, or a dice roll) and `reasoning` — the agent's decision or the Commander's or client's rationale, with a
+  confidence and one reasoning per current pick, or `null` when no record describes the picks. A client reading the
+  dropped fields gets nothing.
+
+### Widened output
+
+- **`get_market_grid_results`' leaderboard entries carry `entrySource`.**
+- **An agent's reasoning lists its picks.** The `AGENT` arm of an entry's `reasoning` gains `picks`, one per current
+  pick in position order, in `list_my_market_grid_entries` and `get_my_market_grid_entry` as well as the player grid.
+
+### Changed text
+
+- **`stage_market_grid_entry_draft` says the `RATIONALE` is published.** Once the session locks, every player sees
+  it beside the grid. Before lock, no other player can read an entry's picks or reasoning, and the lobby's per-coin
+  crowd split stays empty for an open session.
+
 ## Contract history — v146.14 (market-structure pivots are LuxAlgo's `leg()` exactly)
 
 **Nothing refused at v146.14 that v146.13 accepted at the shipped lookback cap.** One MINOR moves served values and
