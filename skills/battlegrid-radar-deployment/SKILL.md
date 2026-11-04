@@ -1,6 +1,6 @@
 ---
 name: battlegrid-radar-deployment
-description: Deploy the player's agents to standing duty — Radar deployments, each one team's watch on one coin, that put every matching rule's agent on duty and fire real trades at confirmed closes, and per-preset Arena deployment policies that enter sessions automatically. Reads what is deployed now, stages a change into the player's draft, previews what it would actually resolve to, commits it only after the player has seen that preview, and un-deploys with the blast radius stated. Activate whenever the player wants an agent put on duty, wants to change or pause a deployment, asks what would fire right now or why nothing is firing, or wants to stop a coin or a preset being traded automatically.
+description: Deploy the player's agents to standing duty — Radar deployments, each one team's watch on one coin, that put every matching rule's agent on duty and fire real trades at confirmed closes, one agent onto several coins at once, and per-preset Arena deployment policies that enter sessions automatically. Reads what is deployed now, stages a change into the player's draft, previews what it would actually resolve to, commits it only after the player has seen that preview, and un-deploys with the blast radius stated. Activate whenever the player wants an agent put on duty, wants to change or pause a deployment, asks what would fire right now or why nothing is firing, wants to stop a coin or a preset being traded automatically, or wants an agent taken off the radar — including when an archive or delete is refused for RADAR_DEPLOYED.
 ---
 
 # Radar & Deployment
@@ -167,6 +167,25 @@ When the ask maps to no single row, or a refusal rules out the construction the 
 ask the player which construction they mean, naming the rows that fit — never stage one they did not
 choose. Complete stage payloads for every row are in `references/radar-stage-examples.md`.
 
+**One agent onto several Radar coins** — when the player wants the same agent on more than one coin,
+always on or under one rule. Never stage it coin by coin: one preview and one write cover every coin,
+on the team the agent trades on (the preview names it; there is no `teamId` to pass).
+
+1. `preview_agent_radar_deploy({ agentId, slot, coinIds })`, with `slot` either
+   `{ kind: "DEFAULT", minConviction }` (always on: the agent is on duty whenever no rule matches) or
+   `{ kind: "RULE", minConviction, conditions }` (one rule, conditions shaped as a staged rule's), and
+   `coinIds` resolved through the coin-metadata read. It writes nothing. Each coin is `PLACED` with its
+   served `placement`, rule `priority` and `enabledAfterCommit`, or `REFUSED` with the reason a Save of
+   that coin would give; `admission` is the plan's coin cap for the new coins.
+2. Read every coin's placement — never work it out yourself:
+   - `FIRST_DEPLOYMENT`: a new, active deployment holding just this slot;
+   - `ADD_DEFAULT`: the coin had no default, so the agent now covers the windows it sat out;
+   - `APPEND_RULE`: one rule below the coin's existing rules — **while it matches, the coin's default
+     is off duty**; name that default by `defaultAgentDisplayName` when it is non-null.
+   A coin refused for "already has a default" can still take the agent as a rule: offer that as a
+   second preview, never silently.
+3. Confirm as step 3 says for a batch, then one `deploy_agent_to_radar({ agentId, slot, coins })`.
+
 **Arena** — the same shape, keyed on `presetId`:
 
 1. `stage_deployment_policy_draft` with `draftVersion` = the `version` you read (0 when there was no
@@ -298,6 +317,17 @@ Then:
   reports beforehand.
 - **Arena** → `commit_deployment_policy_draft({ presetId, draftVersion, expectedRevision })`,
   the same way.
+- **One agent onto several Radar coins** → the confirmation groups the coins by served placement and
+  names every coin, with its priority and whether it will trade (a paused coin stays paused); how duty
+  moves on each `APPEND_RULE` and `ADD_DEFAULT` coin, naming the default's holder; every refused coin
+  with its reason; and the `admission`. When `admission.fits` is false, do not offer the deploy: the
+  player drops new coins and you preview again. On an explicit confirming pick, call
+  `deploy_agent_to_radar({ agentId, slot, coins })` with the same `slot`, naming **only the PLACED
+  coins**, each with the `expectedPolicyId` and `expectedRevision` the preview returned (both null for a
+  coin with no policy). A refusal whose `details.reason` is `RADAR_DEPLOY_REFUSED` wrote **nothing**:
+  report each of `details.refusals`, then preview and confirm again. Otherwise there is one outcome per
+  coin; a `CONFLICT` outcome is a coin that changed after the check and is unchanged — name it and
+  offer a fresh preview, never a blind retry.
 
 **On `DRAFT_VERSION_MOVED` or a CONFLICT: re-read, re-preview, re-confirm.** In that order, and all
 three. The draft or the deployment changed under you, so the state your preview resolved and the
@@ -347,6 +377,30 @@ an explicit confirming pick.
 **If the player wants to stop trading without losing the slots, that is not a delete** — it is
 `pause_radar_deployment` for Radar and `pause_deployment_policy` for Arena. Offer that
 whenever the ask sounds like "pause", "stop for now", or "take it off duty for a while".
+
+**Take one agent off the radar** — when the player wants an agent off its coins, or the agent's
+archive or delete is refused with a `RADAR_DEPLOYED` blocker. Never do it coin
+by coin through stage, commit or delete: one read and one write cover every coin.
+
+1. `get_agent_radar_holdings({ agentId })` — every deployment holding the agent, **paused ones
+   included**: exactly what the archive refusal counts.
+2. Show every holding — its coin, team, whether it is paused — with its served `effect`, never one you
+   work out:
+   - `UNDEPLOY`: the agent holds every slot, so the coin is un-deployed, and its unsaved draft ends;
+   - `REMOVE_SLOTS`: the agent's rules go, and **the coin's remaining rules and default take duty in the
+     windows those rules held** — say so, because another agent may then trade there;
+   - `REMOVE_DEFAULT`: the agent's default goes with it; only other agents' rules stay, and the coin
+     sits out whenever none matches.
+3. Confirm with `ask_user`, letting the player leave coins out.
+4. One `withdraw_agent_from_radar({ agentId, holdings })`, naming each confirmed holding as the read
+   returned it: `teamId`, `coinId`, its `policyId` as `expectedPolicyId` and its `revision` as
+   `expectedRevision`.
+
+A refusal whose `details.reason` is `RADAR_WITHDRAW_REFUSED` wrote **nothing**: report each of
+`details.refusals` — its coin and why — and do not call again without a fresh read and a fresh confirm.
+Otherwise there is one outcome per holding. A `CONFLICT` outcome is a coin that changed after the check
+and is unchanged: name it and offer to read the holdings again — never call the withdraw again
+unprompted. After a refused archive, archive again only on the player's word.
 
 ### 5. "Why isn't it firing?" — state, then pattern, then the bar, then rows
 
