@@ -197,8 +197,10 @@ declares no verdict-carrying condition resolves `null` and constrains no side.
 `required: true` or carries a verdict (`UP`, `DOWN` or `NEITHER`); a building block not marked
 `required` gates nothing, and an exit rule never counts. A strategy whose conditions include neither
 never trades: every coin fails first with `NO_ENTRY_CONDITION`, before the trade levels, the ATR
-floor or any condition is read, and its draft carries the `NO_ENTRY_CONDITION` warning. It stays a valid strategy — Market Grid
-reads it as context — so this is a choice to state, never an accident. When the agent decides a
+floor or any condition is read, and its draft carries the `NO_ENTRY_CONDITION` warning. It never
+enters the arena either: an arena grid may hold only the coins its required conditions pass, in the
+directions its verdict admits, so an agent bound to a strategy with no entry condition sits out every
+session. It stays a valid strategy, so this is a choice to state, never an accident. When the agent decides a
 routed trade, its `decide_trade` call cites 1–8 of the evaluated entry conditions in
 `conditionChecklist`, and only a condition that read TRUE may be cited as `CONFIRM`.
 

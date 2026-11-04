@@ -126,10 +126,12 @@ verdict — gates nothing unless it is itself marked `required`, and an exit rul
 Whether a sub-rule should be a building block or inlined is answered by the `strategy-examples`
 skill's **Building block or inline** paragraph. A strategy whose entry conditions include no
 required and no verdict-carrying condition never routes a trade: every coin fails first with
-`NO_ENTRY_CONDITION`, and its draft carries the warning of the same name. It stays a valid
-strategy — Market Grid reads it as context — so a strategy the player means to trade needs at least
-one. Before any condition is read, a coin must clear the ATR floor, `minAtrPct`, the
-TRADE_LEVEL_POLICY dial beside the stop-loss band.
+`NO_ENTRY_CONDITION`, and its draft carries the warning of the same name. It never enters the arena
+either: an arena grid may hold only the coins and directions the entry conditions admit, so an
+agent bound to it sits out every session. It stays a valid strategy, so a strategy the player means
+to trade or play needs at least one. Before any condition is read for a trade, a coin must clear the
+ATR floor, `minAtrPct`, the TRADE_LEVEL_POLICY dial beside the stop-loss band; an arena pick is
+admitted by the entry conditions alone and reads none of the trade dials.
 
 **Read the answer, not just the call.** Each of these returns one field that decides a composition
 question you would otherwise guess — and a refusal you would otherwise earn:
