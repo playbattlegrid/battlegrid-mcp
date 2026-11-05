@@ -177,18 +177,21 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   `history`, or `null` when the metric has no series, which is why a series transform does not
   compose on it. Window and offset carry a declared `minimum`, a `bound` and a served `maximum` on the
   transform entry, or `null` when none fits. A `lookback` bound is the largest value whose read size
-  fits the lookback cap. A `depth` bound — the length of `aggregate` (the SMA, `ta.sma`) and `ema`
-  (`ta.ema`) — is the longest average whose one-value read fits the readable depth beside the
-  lookback cap (936 for an SMA, 269 for an EMA at the shipped cap); a longer one is refused with
-  `REPORT_COLUMN_DEPTH_EXCEEDED`, and `lookback.used` counts only the average's newest bar. For a
+  fits the lookback cap. A `depth` bound — the length of `aggregate` (the SMA, `ta.sma`), `ema`
+  (`ta.ema`), `rma` (Wilder's average, `ta.rma`), `wma` (`ta.wma`), `rsi` (`ta.rsi`, 0–100) and `cci` (`ta.cci`),
+  or of a statistic (`zscore`, `stddev`, `linregSlope`, `pctl` (`ta.percentrank`), `rollingMin`, `rollingMax`) — is the longest window whose one-value read fits the readable depth beside the lookback cap (936
+  for an SMA, WMA, CCI or a statistic, 935 for `pctl`, 269 for an EMA, 118 for an RMA or RSI at the shipped cap);
+  `rsi` and `cci` read null over a window whose values are all equal; a longer one is refused with
+  `REPORT_COLUMN_DEPTH_EXCEEDED`, and `lookback.used` counts only where the window ends: its newest bar, or a
+  rolling extreme's `offset` back (the offset stays lookback-bounded, 63 at the shipped cap). For a
   chained column the outer's declaration is `chainOuterParameters[outer]` (served beside `metric`)
   and its bound is `chainedOuters[outer].windowMaximum`; `chainedOuters[outer].offsetMinimum` is the least
   offset the chain accepts — `1` for a rolling extreme chained into `distance` (the breakout level), `null`
   on every other chain — so stage the inner's offset at or above it. A chain outer never takes an offset:
   the offset belongs to the inner. The window carries a `unit`
   (`seriesElements`, `seriesChanges` for `efficiency`, which reads one bar more than its window,
-  `priorElements` for `pctl`, or `smoothingLength` for `ema`, whose length reads more bars than it
-  names — `ema(20)` reads 73). An average reads null until its whole window is present. Stage at most
+  `priorElements` for `pctl`, `smoothingLength` for `ema`, `wilderLength` for `rma` or `wilderChanges` for `rsi`,
+  whose lengths read more bars than they name — `ema(20)` reads 73, `rma(14)` reads 108, `rsi(14)` reads 109). An average reads null until its whole window is present. Stage at most
   that maximum. A chained column's operands come from
   `chainedOuters[outer].operands`, never from the metric's full `spreadOperands`.
 - A metric can declare its own knobs on `parameters` (served on the metric entry, `null` when it
@@ -199,15 +202,41 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   refused with `REPORT_COLUMN_DEPTH_EXCEEDED` on `leftBars`. Stage the pair on the column beside its
   transform knobs, and leave it off for 2/2 — an explicit 2/2 is the same column. Off 2/2 the header
   carries `_l<left>r<right>` after the code (`fractalHi_l5r5_1h`). Stage a pair only on a transform
-  (or chained outer) whose entry serves `metricParametersAccepted: true`; `rank`, `relativeTo`,
-  `aggregate` and `ema` read the stored 2/2 and refuse it. A condition hold over a column off 2/2 is
+  (or chained outer) whose entry serves `metricParametersAccepted: true`; `rank`, `relativeTo`
+  and the depth-bounded windows (the averages and the statistics) read the stored 2/2 and refuse it. A condition hold over a column off 2/2 is
   served a window of 1: each of its bars needs the full readable depth behind it.
 - The eight market-structure metrics (`INTERNAL_STRUCTURE_*`, `SWING_STRUCTURE_*` event, trend and
   level, `EQH`, `EQL`) declare their own knobs, each served with its `bound`: `swingLength` (`depth`,
   default 50, minimum 10, maximum 100), `confluenceFilter` (`flag`, internal structure only), `equalBars` (`depth`,
   default 3) and `equalThreshold` (`range`: stage exactly one of the served steps, 0 to 0.5 by 0.1).
   Leave a knob off at its default. They read `null` until the column's bars prove a value, so a
-  short history reads more `null`. A trend reads `bullish` or `bearish`. They never take `rank`, `relativeTo`, `aggregate` or `ema`.
+  short history reads more `null`. A trend reads `bullish` or `bearish`. They never take `rank`, `relativeTo` or a depth-bounded window (an average or a statistic).
+- `MFI14`, `WILLR14` and `CMF20` declare one knob, `period` (`depth`, minimum 2): its served `defaultValue` is
+  each metric's own registered length (14, 14, 20), and its `maximum` the largest that fits the readable depth
+  (935 for MFI, 936 for %R and CMF at the shipped cap). Leave it off at the default. Off it the header carries
+  `_p<n>` (`MFI14_p21`), and the same refusals as an authored swing pair apply: no `rank`, `relativeTo` or
+  depth-bounded window. An operand of another oscillator in the same column reads its own registered length.
+- The Stochastic (`STOCH_K`, `STOCH_D`) declares `period` (the %K length), `kSmoothing` and `dSmoothing`, at
+  TradingView's 14, 1, 3; the Stoch RSI (`STOCH_RSI_K`, `STOCH_RSI_D`) declares `rsiPeriod`, `period` (the
+  stochastic length), `kSmoothing` and `dSmoothing`, at 14, 14, 3, 3. Each is `depth`-bounded; the lengths have
+  minimum 2 and the smoothings minimum 1 (1 is unsmoothed). Leave every setting off at the defaults. Once any is
+  off, the header writes all of them (`K_p21s3d3`, `stochRsiK_rsi14_p21s3d3`) and the same refusals apply: no
+  `rank`, `relativeTo` or depth-bounded window.
+- MACD (`MACD_LINE`, `MACD_SIGNAL`, `MACD_HIST`) and PPO (`PPO_LINE`, `PPO_SIGNAL`, `PPO_HIST`) declare `fast`,
+  `slow` and `signal`, the two close EMAs' lengths and the signal EMA's, at TradingView's 12, 26, 9. Each is
+  `depth`-bounded with minimum 1. Leave them off at the defaults; once any is off, the header writes all three
+  (`MACDhist_fast8slow21sig5`) and the same refusals apply.
+- The Bollinger Bands (`BB_UPPER`, `BB_LOWER`, `BB_PCT_B`) declare `period` and `stdDev`, at TradingView's 20, 2;
+  the Keltner Channels (`KC_UPPER`, `KC_LOWER`) declare `period`, `atrPeriod` and `multiplier`, at 20, 10, 2. The
+  lengths are `depth`-bounded; `stdDev` (0.1 to 5) and `multiplier` (0.1 to 10) are `range` knobs on a 0.1 step —
+  any other value is refused. Leave them off at the defaults; once any is off, the header writes every setting
+  (`bbUpper20_p30sd2.5`, `kcLower_p20atr14mult2`) and the same refusals apply.
+- Supertrend (`ST_LINE`, `ST_DIR`) declares `atrPeriod` and `multiplier`, at TradingView's 10, 3; the Parabolic SAR
+  (`PSAR`) declares `accelerationStart`, `accelerationIncrement` and `accelerationMaximum`, at 0.02, 0.02, 0.2.
+  `atrPeriod` is `depth`-bounded; `multiplier` is the 0.1-step range above, the start and increment are `range` knobs
+  from 0.001 to 0.1 on a 0.001 step, and the maximum from 0.01 to 1 on a 0.01 step. Leave them off at the defaults;
+  once any is off, the header writes every setting (`stLine_atr14mult2`, `PSAR_start0.01inc0.01max0.1`) and the
+  same refusals apply.
 - `get_metric_construction_hints` → `rankOrderings`. Present only when rank is composable on that
   metric, already range-gated server-side — read the offered set rather than deriving one from
   the metric's native output.

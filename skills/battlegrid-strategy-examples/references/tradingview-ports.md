@@ -148,6 +148,12 @@ rules about the columns themselves, not about porting — they live in the skill
   - the z-score idiom `(x - ta.sma(x, n)) / ta.stdev(x, n)` is `x × zscore` at window `n`
     (`RSI14_z20`), population σ as `ta.stdev` defaults to, banded at ±1 and ±2;
   - `ta.stdev(x, n)` is `x × stddev` (`close_sd20`, in the input's own units);
+  - `ta.ema(x, n)`, `ta.rma(x, n)` and `ta.wma(x, n)` are `x × ema`, `x × rma` and `x × wma` at window `n`
+    (`close_ema200`, `close_rma14`, `close_wma34`), and `ta.sma(x, n)` is `x × aggregate` — a stored EMA or SMA
+    code is the exact source at its own length;
+  - `ta.rsi(x, n)` and `ta.cci(x, n)` are `x × rsi` and `x × cci` at window `n` (`hlc3_rsi21`, `close_cci50`),
+    each null over a window whose values are all equal; the stored `RSI14`, `RSI7`, `RSI2` and `CCI20` (on HLC3)
+    are the exact source at their own length, and `EMA50 × rsi` is the RSI of the stored 50-bar average;
   - `ta.percentrank(x, n)` is `x × pctl` at window `n` — the `n` bars BEFORE the newest, ties at or below;
   - `ta.highest(x, n)` / `ta.lowest(x, n)` are `x × rollingMax` / `x × rollingMin` (`high_max20`
     is `DONCHIAN_UPPER`'s same-bar rail);
