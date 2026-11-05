@@ -38,11 +38,11 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v149 (an arena entry is sealed until lock; from lock its author and reasoning are public)
+## Contract history — v150 (an arena entry is sealed until lock; from lock its author and reasoning are public)
 
-**v149 is MAJOR: one published output drops three fields.** Nothing a client sends is refused that v148.1 accepted.
+**v150 is MAJOR: one published output drops three fields.** Nothing a client sends is refused that v149.1 accepted.
 
-### Reshaped output — the reason v149 is MAJOR
+### Reshaped output — the reason v150 is MAJOR
 
 - **`get_market_grid_player_grid` names the entry's author and carries its author's reasoning.** It drops
   `agentConfidence`, `agentConfidencePercent` and `agentReasoning`, and gains `entrySource` (who authored the current
