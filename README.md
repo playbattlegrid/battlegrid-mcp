@@ -63,6 +63,32 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
   it beside the grid. Before lock, no other player can read an entry's picks or reasoning, and the lobby's per-coin
   crowd split stays empty for an open session.
 
+## Contract history — v150 (Cost Economics is one scoped section: account, team or agent, over a period)
+
+**v150 is MAJOR: one published tool now requires an input it did not, and its output is reshaped.** One tool is added.
+
+### Refused input — one reason v150 is MAJOR
+
+- **`get_agent_cost_economics` requires `period`** beside `agentId`: one of `24H`, `7D`, `30D` or `LIFETIME`, the
+  trailing span ending at the read. It used to read a fixed 90-day window. A call naming only `agentId` is refused
+  as `VALIDATION_ERROR`. Pass a period; `30D` is the longest span inside the old window.
+
+### Reshaped output — the other reason v150 is MAJOR
+
+- **`get_agent_cost_economics`' `economics` is the scoped-section envelope.** It carries `scope`
+  (`{ kind: 'AGENT', agentId }`), `window` (`period`, ISO `startAt` — `null` for `LIFETIME` — and `endAt`), `groupBy`,
+  `pooled`, `members` and `quietMemberCount`. The `rows`, `totals` and `costErodedCount` that sat at the top of
+  `economics` now sit under `economics.pooled`. `windowDays` is replaced by `window`. `unreconciledCount` is removed:
+  a closed position can no longer lack its money, so every close in the window is counted in its outcome's row.
+
+### Added tools
+
+- **`get_cost_economics_breakdown`** serves the same envelope for your whole account, or for one of your teams when
+  `teamId` is given, over a required `period`. `groupBy` may be `TEAM` or `AGENT` for the account and `AGENT` for a
+  team; anything else is refused as `VALIDATION_ERROR`. `members` lists each member with a close in the window, each
+  with its own figures in the pooled shape, and `quietMemberCount` counts the members that had none. A team that is
+  not yours answers not found.
+
 ## Contract history — v146.14 (market-structure pivots are LuxAlgo's `leg()` exactly)
 
 **Nothing refused at v146.14 that v146.13 accepted at the shipped lookback cap.** One MINOR moves served values and
