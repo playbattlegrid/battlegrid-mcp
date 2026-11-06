@@ -38,6 +38,50 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v152 (LLM spend, pipeline blocks and the review's market slices are scoped sections)
+
+**v152 is MAJOR: two published outputs lose fields, and one tool refuses a call it used to answer.** Six tools are
+added.
+
+### Reshaped output — one reason v152 is MAJOR
+
+- **`get_agent_review_analytics` drops `llm`, `railRefusals` and `halt`.**
+  - LLM spend and net after LLM are now `get_agent_llm_spend`'s.
+  - Rail refusals and the current halt are now `get_agent_pipeline_blocks`'.
+  - Both read over a period. The review's window, slices and conditions are unchanged.
+- **`get_account_review_analytics` serves `window` in place of `windowDays`.** `window` holds `period` and ISO `startAt`
+  and `endAt`.
+  - Each row's figures cover that window, over the agents counted on My Agents. Realized net, fees, spend, net after
+    LLM and closed trades count the closes in the period; win rate counts the trades decided in it.
+  - Each row's `halt` gains `kind: 'AGENT'`.
+  - `totals` are the account's own pooled figures, not the sum of the rows.
+
+### Refused input — the other reason v152 is MAJOR
+
+- **`get_account_review_analytics` requires `period`** (`24H`, `7D`, `30D` or `LIFETIME`). A call naming none is
+  refused as `VALIDATION_ERROR`. Pass `30D`, the period the Strategy Officer reads.
+
+### New refusal
+
+- **`list_gate_blocks` answers not found** for an agent you cannot access, or for a platform agent that is no longer
+  active. It used to serve an empty page.
+
+### Added tools
+
+Each is a scoped-section envelope, in the shape v150 gave Cost Economics. The agent doors take `{ agentId, period }`
+and the breakdown doors `{ teamId?, period, groupBy? }`.
+
+- **`get_agent_llm_spend` / `get_llm_spend_breakdown`:**
+  - spend by billing mode and in total;
+  - realized net and net after LLM;
+  - at the account, the spend recorded with no agent.
+- **`get_agent_pipeline_blocks` / `get_pipeline_blocks_breakdown`:**
+  - gate-block groups by stage;
+  - rail refusals;
+  - the agent's halt, or the count of halted agents.
+- **`get_agent_review_slices` / `get_review_slices_breakdown`:** the market figures of the decisions made in the
+  period — overall, and by regime, hour, weekday and coin.
+
 ## Contract history — v151 (an arena entry is sealed until lock; from lock its author and reasoning are public)
 
 **v151 is MAJOR: one published output drops three fields.** Nothing a client sends is refused that v150 accepted.
