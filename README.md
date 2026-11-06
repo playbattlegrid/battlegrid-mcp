@@ -38,6 +38,80 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v155 (every breakdown section serves its highlights)
+
+**v155 is MAJOR: every breakdown envelope gains a required field.** Inputs are unchanged.
+
+### Reshaped output — the reason v155 is MAJOR
+
+- **Every breakdown envelope carries `highlights`.** This covers the agent and breakdown doors of Cost Economics,
+  LLM spend, pipeline blocks, review slices, conditions, Entry Discipline, Decision Quality and Conviction
+  Calibration.
+  - `highlights` is the section's server-computed findings, in policy order, empty when none fires.
+  - Each finding is `{ policy, kind, subject, value, sampleSize }`.
+  - `kind` is one of `LARGEST_CONTRIBUTOR`, `PULLS_PARENT_NEGATIVE`, `DEVIATION`, `NEGATIVE_EDGE` or `HALTED`.
+  - `subject` is an agent, a brain row (agent and model) or a condition row (strategy, revision, condition, and
+    whether you may open that strategy).
+  - `value` is the figure the policy read, in the policy's unit, and `sampleSize` is its population (null for a halt).
+  - A highlight fires only above its section's readiness gate. Entry Discipline serves an empty list.
+  - A strict client validating the envelope must admit the field. Nothing else moves.
+
+## Contract history — v154 (Decision Quality and Calibration compare agents and models, in R)
+
+**v154 is MAJOR: two published outputs are reshaped and lose fields.** Two tools are added.
+
+### Reshaped output — the reason v154 is MAJOR
+
+- **`get_agent_decision_quality` answers the brain comparison envelope.** It carries `scope`, `window` (the evidence
+  window), `anchor` (`DECIDED`), `minSampleSize` and `rows`.
+  - There is one row per model the agent's decisions ran on, never pooled. Each row carries `agent`, `model`, and
+    `isCurrentModel`.
+  - `rank` is 1-based among the ready rows; it is `null` below the gate.
+  - `figures` is the old figure set without `windowDays`.
+  - The exit block gains `unmeasuredCount`, `meanExitR`, `meanGrossR` (the ranking figure) and `grossOfCosts`.
+  - Read the row with `isCurrentModel`.
+- **`get_agent_conviction_calibration` answers the same envelope** with `anchor` `CLOSED`.
+  - `figures` loses `windowDays` and gains `brierScore`, the ranking figure, where lower is better.
+  - Every band and deployment-rule group loses `averageNetPnlUsd` and gains `averageGrossR`, with `rTradeCount`.
+    Compare groups in R, not dollars.
+
+### Added tools
+
+- **`get_decision_quality_breakdown` and `get_conviction_calibration_breakdown`** serve the same envelopes. They take
+  `{ teamId?, strategyId?, fromRevision?, toRevision?, agentId? }`, for the account, one team, or a strategy cohort
+  narrowed to a team or an agent. The result has one row per (agent, model) and takes no period and no grouping.
+
+## Contract history — v153 (strategy revision cohorts and one evidence window)
+
+**v153 is MAJOR: published outputs lose fields, one tool's input is replaced, and a finding input is narrowed.** Three
+tools are added.
+
+### Refused input — one reason v153 is MAJOR
+
+- **`get_agent_entry_discipline` takes `{ agentId }` alone.** `windowStartAt` and `windowEndAt` are refused. The read
+  covers the evidence window, the last 90 days ending at the read.
+- **`submit_officer_review`'s CONDITION finding requires `strategyId` and `strategyRevision`**, copied from the
+  `get_agent_conditions` row it cites. A finding naming no row of the agent's condition evidence is refused.
+
+### Reshaped output — the other reason v153 is MAJOR
+
+- **`get_agent_entry_discipline` answers the scoped-section envelope `{ entryDiscipline }`.** Its `adoption` is one
+  row per strategy revision the decisions were read under, and it gains `unstampedDecisions`.
+- **`get_agent_review_analytics` drops `condition`.** Cited conditions are `get_agent_conditions`' rows, keyed by
+  strategy revision. Its flat window fields give way to `window`.
+- **Every breakdown envelope's `window` gains `policy`.** It is `PERIOD` or `EVIDENCE`.
+- **Every breakdown envelope's `scope` gains a `STRATEGY` arm.** The arm carries the cohort, every stored revision
+  with the axes it changed, and an optional team or agent narrowing.
+- **The pipeline blocks figures' `railRefusals` and `halt` are nullable.** They are null at a strategy scope. The
+  figures gain `unstampedBlocks`.
+
+### Added tools
+
+- **`get_agent_conditions`** and **`get_conditions_breakdown`** serve one row per (strategy, revision, condition key):
+  the checklist verdict against what each citing decision became.
+- **`get_entry_discipline_breakdown`** serves Entry Discipline at a strategy cohort.
+- **`get_pipeline_blocks_breakdown`** also accepts a strategy cohort. It then serves only the conditions stage.
+
 ## Contract history — v152 (LLM spend, pipeline blocks and the review's market slices are scoped sections)
 
 **v152 is MAJOR: two published outputs lose fields, and one tool refuses a call it used to answer.** Six tools are
