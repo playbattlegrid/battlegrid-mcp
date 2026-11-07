@@ -38,6 +38,53 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v156 (a crowd reading no bar can serve is not a condition; trades name their config version)
+
+**v156 is MAJOR: writes v155.1 accepted are refused, and one published result narrows.** No input schema moves.
+
+### Refused input — the first reason v156 is MAJOR
+
+- **A condition on a crowd reading no decided bar can serve is refused**, entry or exit, with `VALIDATION_ERROR`
+  and authoring code `CONDITION_OPERAND_UNSERVABLE`. Two readings are refused:
+  - a live crowd header: the eight `…Live` crowd codes (`pickLive`, `upBiasLive`, `crowdAccLive`, `captRateLive`,
+    `upLeanZLive`, `upExcessZLive`, `captExcessZLive`, `accEdgeZLive`), written before the game's candle closes;
+  - any crowd header on a main candle no Market Grid time range settles on.
+- **Where it refuses:** every strategy write (`commit_strategy_draft`, `restore_strategy`, `fork_strategy`,
+  `apply_officer_proposal`) and the radar deploy, rebind and preflight checks (`deploy_agent_to_radar`,
+  `commit_radar_deployment_draft`, an agent rebind through `commit_agent_draft`, `preview_radar_resolution`,
+  `preview_agent_radar_deploy`, `propose_entry_decision`). Reports and prompts still read those columns.
+
+### Narrowed output — the other reason
+
+- **`preview_strategy_report`'s `authoring.conditionColumns` no longer lists the refused headers**, so the same
+  `detail: "detailed"` request returns fewer condition columns.
+
+### Widened acceptance
+
+- **A settled crowd exit rule is accepted and deployable.** An exit rule on a settled crowd reading (for example
+  `upLeanZ`) now carries the exit role and deploys on a radar slot. Each decided bar reads the sessions settled at
+  or before its close. A coin with no Market Grid cell in that window, or no settled session, leaves the rule
+  unread, so it never fires. Exit rules on the four convergence readings (`FLOW_ALIGN`, `SMART_RETAIL`,
+  `CAPTAIN_CONF`, `CONFIDENCE`) are still refused on the exit lane.
+
+### Widened output
+
+- **Trades trace to a config version.** `configVersion` is added to `get_agent_explorer`'s entries (a number, the
+  agent's current config version), and to `get_public_agent_open_positions`, `get_public_agent_realized_trades`,
+  `get_trade_chart` and `get_public_agent_trade_chart` (`number | null`, the version the trade's decision names).
+- **A firing condition exit records the crowd it read.** The condition-exit evidence on `get_signal_log` and
+  `get_public_agent_signal_log_detail` gains `crowdSettledAt` (`string | null`).
+
+### Changed values — the same schema serves a different value
+
+- **A settled crowd header's `conditionHold.refusal` reads `HISTORY`** where it read `NOT_REWINDABLE`. A hold over
+  it still counts one bar.
+
+### Re-worded text
+
+- The `preview_radar_resolution`, `propose_entry_decision` and `restore_strategy` descriptions state that an exit
+  rule deciding nothing else is read by the exit sweep.
+
 ## Contract history — v155 (every breakdown section serves its highlights)
 
 **v155 is MAJOR: every breakdown envelope gains a required field.** Inputs are unchanged.
