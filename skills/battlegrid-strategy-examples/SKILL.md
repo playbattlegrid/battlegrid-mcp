@@ -46,7 +46,7 @@ Before committing a CREATE, every "no" here is a decision to state, not an omiss
 | `pctl` wN | `<code>_pctl<N>` (0–100 against the N prior bars) | `RSI14_pctl20` |
 | `rollingMin` / `rollingMax` wN | `<code>_min<N>` / `<code>_max<N>`; at `offset` K > 0 `<code>_o<K>_min<N>` | `low_min20`, `high_max20`, `high_o1_max55` |
 | `classifyZone` / `classifyState` | `<code>_zone` / `<code>_state` | `RSI14_zone`, `ADX14_state` |
-| `levelInteraction` | `<code>_lvl`, `<code>_lvl_b<N>` at a buffer of N bps | `bbUpper20_lvl`, `bbUpper20_lvl_b25` |
+| `levelInteraction` | `<code>_lvl`, `<code>_lvl_b<N>` at a buffer of N bps, `<code>_lvl_a<m>` at `touchAtr` m | `bbUpper20_lvl`, `bbUpper20_lvl_b25`, `EMA20_lvl_a0.5` |
 | any, stored `"bars": "all"` | `<code>_dev`, then the transform's suffix | `RSI14_dev_t1` |
 | `value` at `offset` N > 0 | `<code>_o<N>` | `RSI14_1d_o1` |
 
@@ -109,9 +109,14 @@ absolute reference is REFUSED at save, including `1d`,
 because there is no rung for one to select. They are catalogued price levels, so `dist_PDH gte 0`
 composes directly. (`distance` still rejects an `offset`, and a clause still compares a column
 with a literal or with its own previous completed bar, never with another column; neither of those
-shapes is what a previous-UTC-day level needed.) A `spread` of a bar's own value against one of these
-levels reads `null` on a bar outside the UTC day (or trading session) the level belongs to, so the first
-bars after 00:00 UTC are never measured against the next day's level. The same holds
+shapes is what a previous-UTC-day level needed.) Every bar reads the level as it stood when that bar
+OPENED, kept for the newest 24 strategy bars: on a `1d` strategy, day D's bar reads `PDH` = the high of
+day D−1, so `dist_PDH gt 0` fires on the day that closes above it, and `dist_PDH crossesAbove 0` compares
+two bars that each read their own day's level — the first bar of a new day included. A `spread` of a
+bar's own value against one of these levels reads that bar's level the same way. A relation over a
+session-profile level — `spread`, `distance` or `levelInteraction`, chained forms included, the level as its
+side or its operand — is built only on the strategy's anchor rung (`{rel: 'anchor'}`): on any other rung the
+operand is not offered and the column is REFUSED at save. The same holds
 for every timeless metric — these levels, funding, the regime and the other bundle
 reads: a `value` column over one accepts only `offset: 0`, and a larger offset is REFUSED at save,
 because there is no earlier bar to cut back to.
@@ -159,12 +164,13 @@ bar before: a header whose `conditionHold.maxWindow` is 1 is served none of the 
 `vol24hUsd increased` is refused (`CONDITION_OPERATOR_UNSUPPORTED`, naming the operators it does
 admit), and on a header that keeps them each reads one bar less than its window.
 
-**An edge is held "within n closes" only.** `crossesAbove`, `crossesBelow`, `enters` and `exits` mark
-the bar a state changed, so like a crossover event their `maxAtLeast` is 1 — hold them "within n
-closes", never "in a row". `increased` and `decreased` are no edge: "3 closes in a row" of
-`increased` is three rising closes. A group whose members must all read TRUE together (`ALL`) over an
-edge admits "within" only too. Every prior-bar read counts toward the frame-read budget: a clause
-held "within 3 closes" reads four bars.
+**An edge is counted by the closes it fired on.** `crossesAbove`, `crossesBelow`, `enters` and `exits`
+mark the bar a state changed, so a hold over one counts the closes it fired on: "at least k of n closes"
+is Pine's `math.sum(cond ? 1 : 0, n) >= k`, and `{ 2, 10 }` is "fired on at least 2 of the last 10
+closes". `{ n, n }` over one edge reads TRUE only where it fired on every one of the n closes, which a
+single crossing never does twice in a row. `increased` and `decreased` are no edge: "3 closes in a row"
+of `increased` is three rising closes. Every prior-bar read counts toward the frame-read budget: a
+clause held "within 3 closes" reads four bars.
 
 Recipes — each one clause:
 
@@ -186,6 +192,8 @@ Recipes — each one clause:
   close above the raised rail — the run of new closing highs ended.
 - **RSI crossed above 50 within the last 3 closes** — `RSI14_now crossesAbove 50` holding
   `{ "atLeast": 1, "of": 3 }`.
+- **Two crosses of the 20 EMA in 10 bars** — `dist_EMA20 crossesAbove 0` holding
+  `{ "atLeast": 2, "of": 10 }`: the close crossed above the average on at least 2 of the last 10 closes.
 
 **Two things block a trade, not one.** `required: true` = a FALSE reading blocks compose-trade
 before billing. And the RESOLVED verdict binds entry DIRECTION: `UP` admits long setups only,
@@ -241,8 +249,8 @@ Inline it when:
   `conditionRef`, so "together on 3 closes in a row" over a sub-rule needs its clauses inline.
 
 Inlining a `NOT` is not always a flipped operator. A clause whose read ran and found no value reads
-FALSE, so `NOT [dist_donchianHi20 gt -0.52]` reads TRUE on a coin with no channel value while
-`dist_donchianHi20 lte -0.52` reads FALSE; `NOT [CVD_state is "bearish"]` and
+FALSE, so `NOT [dist_donchianHiPrior20 gt -0.52]` reads TRUE on a coin with no channel value while
+`dist_donchianHiPrior20 lte -0.52` reads FALSE; `NOT [CVD_state is "bearish"]` and
 `CVD_state in ["bullish", "neutral"]` part the same way. Flip only a header that always carries a
 value, or choose deliberately which answer a missing value gives.
 
@@ -292,8 +300,10 @@ the served domain is refused (`CONDITION_HOLD_ILLEGAL`, the domain in `allowedDo
 a header admits only Once:
 
 - `NOT_REWINDABLE` — the value is stored for the current bar only (the session-field scalars,
-  ranks, zone entities, enrichment metrics, a change at or below the strategy timeframe). **Worked liquidity floor:**
-  `LIQUID_FLOOR` holds Once because `vol24hUsd` is a bundle scalar.
+  ranks, enrichment metrics, a change at or below the strategy timeframe). **Worked liquidity floor:**
+  `LIQUID_FLOOR` holds Once because `vol24hUsd` is a bundle scalar. A structure-zone column is not one of
+  these: it holds on its own timeframe up to the window its `conditionHold` serves, each counted bar
+  reading the zone set stored for that bar.
 - `DEVELOPING` — the column reads a bar still forming: a Developing candle column above the strategy
   timeframe, or a change over a horizon above it. **Developing columns cannot be held**; set a candle
   column Confirmed to count closes, or read a change at or below the strategy timeframe.
@@ -305,7 +315,7 @@ Candle columns (at, above or below the strategy timeframe), the market and stabl
 (each counted on its subject's own bars), the regime (counted on the regime rung),
 and the funding and open-interest histories (on the coarser of the strategy timeframe and their own
 hourly cadence) can all be held. **A crossover is an event**: it fires on the bar a state changes,
-so its `maxAtLeast` is 1 — hold a cross "within n closes", never "in a row".
+so a hold over it counts the closes it fired on, as an edge's does.
 
 **Group hold — closes counted together.** A group's `hold` counts its members' joint reading on the
 same bar: the group's own outcome, its members folded by its operator, must read TRUE on at least
@@ -313,8 +323,8 @@ same bar: the group's own outcome, its members folded by its operator, must read
 "together": "together on 3 closes in a row", "together within 5 closes", "together on at least 2 of
 5 closes". Inside a group holding more than Once, every member holds Once and none is a
 `conditionRef` — each read is counted by exactly one hold — so a row holding its own closes, a
-reference, or a held group inside is refused, naming the member. A conjunction that needs a
-crossover to be TRUE (`ALL(cross, x)`) admits "within" only. Reach for a split to keep a condition's
+reference, or a held group inside is refused, naming the member. A conjunction over a crossover
+(`ALL(cross, x)`) counts the closes on which both read TRUE together. Reach for a split to keep a condition's
 MEANING separable; a reference carries its condition's one answer for the bar being decided and is
 never counted across closes.
 
@@ -333,14 +343,15 @@ horizon in the metric, so above the strategy timeframe it is Developing at every
 selector. The resolved answer for a column is served on `effectiveParameters.bars`, and it states both
 exceptions.
 
-**A higher-timeframe level is measured from the current strategy-bar price.** The distance to a `4h`
-Donchian band, and every candle label classifier (`MA_ALIGN`, `PRICE_ZONE`, `BB_TOUCH`), compares
-against the frame's current price, `LAST` — the strategy bar's close under a decision, the last
-traded price on display — not against the higher-timeframe bar's own close, which is up to one
-higher-timeframe bar stale. A distance CHAINED into a series transform keeps every slot on its own
-bar's close, so one series carries one reference basis. A breakout chain (`rollingMax(n, offset 1) ×
-distance`) ends at the distance, so its newest bar is measured from `LAST` too, as the distance to the
-catalogued `DONCHIAN_UPPER_PRIOR` is, and a condition over it is UNRESOLVED on a frame with no last price.
+**A higher-timeframe candle-homed level is measured from that timeframe's own bar close.** The
+distance to a `4h` Donchian band reads the `4h` bar's own close at every slot, the newest included, as
+the `4h` chart reads it — so it changes once per `4h` bar, and the `levelInteraction` label on the same
+level reads the same bar. `PRICE_ZONE` classifies its own bar's close the same way. A period level or a
+mark (`PDH`, a session level, `MARK`) is measured from the current strategy-bar price, `LAST` — the
+strategy bar's close under a decision, the last traded price on display — and an earlier bar's distance
+to a period level from that bar's close against the level its own bar opened with. A breakout chain
+(`rollingMax(n, offset 1) × distance`) reads each bar's own close against the rolling extreme, as the
+distance to the catalogued `DONCHIAN_UPPER_PRIOR` does.
 
 **The lane a strategy is deployed to.** The one report-level scalar family is the **session field**:
 five scalars (`fieldPlayers`, `fieldUpBias`, `fieldBiasDir`, `captConc`, `picksSpread`, each headed
@@ -418,45 +429,71 @@ one of five labels: `touch_from_below`, `touch_from_above`, `reject_from_below`,
 below when it closed at or under it. For a level computed from its own bar (a band, `VWAP`, a moving
 average, `ST_LINE`, `PSAR`, the Ichimoku conversion and base lines) that is the prior bar's level, so a
 level that moved between the two bars is judged on the bar it stood at; for a level whose price was fixed
-before the bar (a prior-bar Donchian rail, the break memory, a swing level, the displaced Ichimoku lines, a
-prior-UTC-day or previous trading-session level or pivot) it is the bar's own level. From below: a bar that closes through the level is a break and reads `none`; a bar whose high
+before the bar (a prior-bar Donchian rail, the break memory as of the bar before, a swing level, the displaced Ichimoku lines, a
+prior-UTC-day or previous trading-session level or pivot) it is the bar's own level. A developing session
+level (`TPO_POC`, `LONDON_HIGH`, an opening range, a single print, …) is read on a completed bar, as both
+the side and the level, as it stood when the bar opened — the prior bar's reading in the same day or session
+— so a bar that prints a new session high and closes above the old one reads `none` and
+`dist_LONDON_HIGH crossesAbove 0` fires; on the day's or session's first bar no such level is in force and
+the clause is unresolved. A live read's still-forming bar keeps the level as it stands at the read, the value
+a chart shows, and takes its side from the level in force at the bar's open. From below: a bar that closes through the level is a break and reads `none`; a bar whose high
 reached the level and whose close came back under it is `reject_from_below`; a bar whose high came
-within the buffer of the level is `touch_from_below`. From above is the mirror on the low.
+within the TOUCH tolerance of the level is `touch_from_below`. From above is the mirror on the low. A
+close through the level in force reads `none` in either direction, a prior close exactly on the level
+included — that bar is the `distance` crossing (Pine's `ta.crossover`: on or under the level before,
+above it now).
 
 - **A reject bar reports reject.** It is never also reported as a touch, so "touched or rejected" is
   an `in` clause over both labels of a side: `bbUpper20_lvl in ["touch_from_below","reject_from_below"]`.
-- **`buffer`** is whole basis points of the level, 0–500, default 0 — `buffer: 25` is 0.25%. Only the
-  touch reads it: a reject must pierce the level itself. Two buffers are two columns (`bbUpper20_lvl`,
-  `bbUpper20_lvl_b25`).
+- **The TOUCH tolerance is one knob, never two.** A column carries exactly one of `buffer` — whole
+  basis points of the level, default `0` (exact contact); `buffer: 25` is 0.25%, header `<code>_lvl_b25`
+  — or `touchAtr` — a multiple of the column rung's ATR14 at the prior bar, header `<code>_lvl_a<m>`
+  (`touchAtr: 0.5` on `EMA20` is `EMA20_lvl_a0.5`) — never both. Only the touch reads it: a close through
+  the level and a reject are decided before any tolerance, and a reject must pierce the level itself.
+  Their ranges and steps are the served authoring parameters', read from the column contract. A
+  `touchAtr` column reads `null` on a bar whose prior bar has no ATR14 yet. Two tolerances are two
+  columns (`bbUpper20_lvl`, `bbUpper20_lvl_b25`).
 - **A break is a crossing, never a label.** The break of a level is `distance` over the same level
   crossing 0: `dist_bbUpper20 crossesAbove 0` from below, `crossesBelow 0` from above. On the strategy's
   own rung a `…_from_below` label never holds on a bar where `crossesAbove 0` holds.
 - **Which levels take it.**
   - **Offered:** a candle-homed level — a band (`BB_UPPER`, `BB_LOWER`, `KC_UPPER`, `KC_LOWER`),
     `VWAP`, a moving average (`SMA20`, `EMA20`, …), `ST_LINE`, `PSAR`, the prior-bar Donchian rails
-    (`DONCHIAN_UPPER_PRIOR`, `DONCHIAN_LOWER_PRIOR`), the Donchian break memory (`DONCHIAN_BROKEN_HI`,
-    `DONCHIAN_BROKEN_LO`), the Ichimoku lines, the swing levels (`SWING_FRACTAL_HIGH`,
+    (`DONCHIAN_UPPER_PRIOR`, `DONCHIAN_LOWER_PRIOR`), the Donchian break memory as of the bar before
+    (`DONCHIAN_BROKEN_HI_PRIOR`, `DONCHIAN_BROKEN_LO_PRIOR`, Pine's `brk[1]`), the Ichimoku lines, the swing levels (`SWING_FRACTAL_HIGH`,
     `SWING_FRACTAL_LOW`) — reads its own value at each bar. A prior-UTC-day level or pivot (`PDH`, `PDL`,
-    `PDO`, `PIVOT_P`, `PRIOR_TPO_POC`, …) or a previous trading-session level (`PRIOR_LONDON_HIGH`, …) has
-    one reading for its UTC day or session; a clause over it is a single read with no hold, because the
-    profile keeps no earlier reading, and on a bar outside that day or session it reads `null`, so the
-    day's last bar is never classified against the next day's level. On `PSAR` a wick that
+    `PDO`, `PIVOT_P`, `PRIOR_TPO_POC`, …), a previous trading-session level (`PRIOR_LONDON_HIGH`, …) and
+    every developing session level — the developing day, week and month value area and point of control
+    (`TPO_POC`, `TPO_VAH`, `WEEK_TPO_POC`, …), the current trading sessions' highs, lows and opens
+    (`LONDON_HIGH`, `ASIA_OPEN`, …), the opening ranges, the initial balance and its extensions, and today's
+    single prints (`TPO_SINGLE_PRINT_ABOVE`/`_BELOW`) — reads each bar's own snapshot of the profile, kept
+    for the newest 24 strategy bars, so a clause over it can be held across them as any other clause: at
+    12:00 on a `1h` strategy `LONDON_HIGH` reads London's high, and the bar before it read London's high as
+    it stood then; a verb over a developing level reads it as it stood when its bar opened. On `PSAR` a wick that
     trades through the SAR flips it on that bar, so a rejection needs the low (high) to meet the SAR
-    exactly and a touch needs a buffer; its flip is `dist_PSAR crossesAbove 0` / `crossesBelow 0`.
-  - **Not offered:** a developing-UTC-day level (`TPO_POC`, `TPO_VAH`, …), the current trading
-    session's levels, the opening ranges and the IB extensions, the naked points of
-    control and the single prints (`TPO_SINGLE_PRINT_ABOVE`/`_BELOW`, `NAKED_SINGLE_PRINT_ABOVE`/`_BELOW`),
-    which move between bars with no earlier reading kept; and the same-bar Donchian rails
-    (`DONCHIAN_UPPER`, `DONCHIAN_LOWER`), each the extreme of the window ending at the very bar it would
-    classify, which a close can never pass — read `DONCHIAN_UPPER_PRIOR` / `DONCHIAN_LOWER_PRIOR`. A
-    price fact (`CLOSE`, `HLC3`, `MARK`) is refused: it is the price, not a level.
+    exactly and a touch needs a tolerance; its flip is `dist_PSAR crossesAbove 0` / `crossesBelow 0`.
+  - **Not offered:** the naked points of control and the naked single prints (`NAKED_POC_ABOVE`,
+    `NAKED_POC_BELOW`, `NAKED_SINGLE_PRINT_ABOVE`, `NAKED_SINGLE_PRINT_BELOW`), each chosen as the nearest
+    untested level beyond the bar's own close, so a close can never pass it — read the distance to it; and
+    the same-bar Donchian rails (`DONCHIAN_UPPER`, `DONCHIAN_LOWER`), each the extreme of the window ending at the very bar it would
+    classify, which a close can never pass — read `DONCHIAN_UPPER_PRIOR` / `DONCHIAN_LOWER_PRIOR`. The same rule refuses
+    them under `distance`; the same-bar gap is `CLOSE × spread(DONCHIAN_UPPER)` (`close_donchianHi20_spread`), a
+    number that is never above 0 and so never a breakout; and
+    the Donchian break memory itself (`DONCHIAN_BROKEN_HI`, `DONCHIAN_BROKEN_LO`), which the bar's own close
+    records or clears, so the bar it is broken or recovered on has no level in force at its open — read
+    `DONCHIAN_BROKEN_HI_PRIOR` / `DONCHIAN_BROKEN_LO_PRIOR`, the memory as it stood after the bar before
+    (`value` and `distance` over the memory stay offered). A
+    price fact (`CLOSE`, `HLC3`, `MARK`) is refused: it is the price, not a level. Under `distance`, `CLOSE` and
+    `LAST` are refused at every rung: a distance is measured from the bar's own close (the last price for a bundle
+    level), so from either it is 0 on every bar.
 - **A higher-rung level reads that rung's completed bar.** `bbUpper20_htf_lvl` classifies the last
   completed regime-rung bar from its own high, low and close, never the strategy bar's price — so
   compose its break on the same rung, `dist_bbUpper20_htf crossesAbove 0`.
 
-**`BB_TOUCH` and `BB_UPPER × levelInteraction` answer different questions.** `BB_TOUCH` (`BBtouch`)
-says where the CLOSE sits in %B — inside the band edge or not. `BB_UPPER × levelInteraction` says what
-the bar's RANGE did at the edge — touched it, or pierced it and closed back.
+**`pctB20` and `BB_UPPER × levelInteraction` answer different questions.** `pctB20` (`BB_PCT_B`) says
+where the CLOSE sits in the envelope — `pctB20 lt 0.05` closed in the bottom 5%, `gt 0.95` in the top 5%, a
+threshold, never a touch. `BB_UPPER × levelInteraction` says what the bar's RANGE did at the edge — touched it,
+or pierced it and closed back.
 
 **Candle patterns** — the bar's shape against the ten bars before it (TA-Lib's default settings). A
 pattern carries no trend context: "a hammer in a downtrend" is `pin is "lower_wick"` plus a separate
@@ -498,6 +535,28 @@ Recipes — the level recipes on candle-homed levels:
 - **Price touched or rejected VWAP from above** — `VWAP_lvl in ["touch_from_above","reject_from_above"]`,
   with `buffer: 10` for a touch within 0.1% (header `VWAP_lvl_b10`).
 - **Price broke the 20 EMA** — `dist_EMA20 crossesAbove 0`, the `distance` column over the same level.
+- **Touched the 20 EMA within half an ATR** — an `EMA20 × levelInteraction` column with `touchAtr: 0.5`,
+  header `EMA20_lvl_a0.5`; the clause `EMA20_lvl_a0.5 in ["touch_from_above","reject_from_above"]`. The
+  column carries `buffer` or `touchAtr`, never both.
+- **Retested the broken 20-bar high and held** — a `DONCHIAN_BROKEN_HI_PRIOR × levelInteraction` column
+  with `buffer: 20`, header `donchianBrkHiPrior20_lvl_b20`; the clause
+  `donchianBrkHiPrior20_lvl_b20 in ["touch_from_above","reject_from_above"]`. The twin is the break that
+  stood when the bar opened, so a bar whose own close records a newer break is still judged against the
+  older one.
+- **Failed breakout: lost the broken 20-bar high** — `dist_donchianBrkHiPrior20 crossesBelow 0`: the bar
+  closed back under the break that stood when it opened; `dist_donchianBrkHiPrior20 lt 0` is the state.
+  On that bar the memory itself (`donchianBrkHi20`) reads no value, because the close cleared it.
+
+Confirmation recipes — each composed from `distance` and the hold, never from a label:
+
+- **Broke by at least X%** — `dist_EMA20 crossesAbove 0.5`: the close crossed 0.5% above the average.
+- **Broke and held 3 closes** — `dist_EMA20 crossesAbove 0` holding `{ "atLeast": 1, "of": 3 }` AND
+  `dist_EMA20 gt 0` holding `{ "atLeast": 3, "of": 3 }`: it crossed within the last 3 closes and closed
+  above on all 3.
+- **Above the level 3 closes in a row** — `dist_EMA20 gt 0` holding `{ "atLeast": 3, "of": 3 }` alone is a
+  state, never "broke and held": it holds on every close of a run that began long before.
+- **Rejected and closed back by X%** — `EMA20_lvl is "reject_from_below"` AND `dist_EMA20 lt -0.3`: the
+  high pierced the average and the close came back at least 0.3% under it.
 - **A bullish engulfing within the last 3 bars** — `engulf is "bullish"` holding
   `{ "atLeast": 1, "of": 3 }`.
 - **An inside bar** — `barContain is "inside"`.

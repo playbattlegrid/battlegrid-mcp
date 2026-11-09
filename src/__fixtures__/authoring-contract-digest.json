@@ -2,7 +2,7 @@
   "digestVersion": 2,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "149.1.0"
+    "contractVersion": "161.0.0"
   },
   "axes": {
     "create": [
@@ -200,7 +200,6 @@
     "BAR_FORMING",
     "BB_LOWER",
     "BB_PCT_B",
-    "BB_TOUCH",
     "BB_UPPER",
     "BB_WIDTH_PCT",
     "BUY_PRESSURE",
@@ -248,7 +247,9 @@
     "DI_MINUS",
     "DI_PLUS",
     "DONCHIAN_BROKEN_HI",
+    "DONCHIAN_BROKEN_HI_PRIOR",
     "DONCHIAN_BROKEN_LO",
+    "DONCHIAN_BROKEN_LO_PRIOR",
     "DONCHIAN_LOWER",
     "DONCHIAN_LOWER_PRIOR",
     "DONCHIAN_UPPER",
@@ -716,6 +717,7 @@
     "VWAP_WEEK_UB1",
     "VWAP_WEEK_UB2",
     "VWAP_WEEK_UB3",
+    "VWMA20",
     "WEEK_TPO_POC",
     "WEEK_TPO_VAH",
     "WEEK_TPO_VAL",
@@ -730,7 +732,6 @@
     "ATR_PCT",
     "BAR_CONTAINMENT",
     "BAR_FORMING",
-    "BB_TOUCH",
     "BUY_PRESSURE",
     "BUY_PRES_BN",
     "BUY_PRES_CB",
@@ -770,7 +771,9 @@
     "CVD",
     "DAY_OF_WEEK",
     "DONCHIAN_BROKEN_HI",
+    "DONCHIAN_BROKEN_HI_PRIOR",
     "DONCHIAN_BROKEN_LO",
+    "DONCHIAN_BROKEN_LO_PRIOR",
     "EMA_CROSS",
     "EQH",
     "EQL",

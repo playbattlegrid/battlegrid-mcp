@@ -155,11 +155,12 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   least), counted in completed bars of the column's own timeframe — not to this axis. Every clause
   and group carries `hold`; `{ "atLeast": 1, "of": 1 }` is Once. The `strategy-examples` skill
   carries the vocabulary, the served hold domain (a crossover or an edge operator — `crossesAbove`,
-  `crossesBelow`, `enters`, `exits` — is held "within" only; a Developing column cannot be held) and
+  `crossesBelow`, `enters`, `exits` — is counted by the closes it fired on; a Developing column cannot be
+  held) and
   the per-column Confirmed / Developing read.
 - **What a bar did is its own vocabulary.** A touch or a rejection of a level, a candle pattern, a
   gap and a run of bars are composed from the `strategy-examples` skill's **Bar geometry** section —
-  `levelInteraction` over a level with its `buffer` knob, and the pattern, gap, run and price-source
+  `levelInteraction` over a level with its one TOUCH tolerance, `buffer` or `touchAtr`, and the pattern, gap, run and price-source
   metrics. A level BREAK is a `distance` crossing over the same level, never a `levelInteraction`
   label.
 - **Swing structure is its own section.** Swing highs and lows, the `HH`/`HL`/`LH`/`LL` label and the
@@ -178,22 +179,34 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   compose on it. Window and offset carry a declared `minimum`, a `bound` and a served `maximum` on the
   transform entry, or `null` when none fits. A `lookback` bound is the largest value whose read size
   fits the lookback cap. A `depth` bound — the length of `aggregate` (the SMA, `ta.sma`), `ema`
-  (`ta.ema`), `rma` (Wilder's average, `ta.rma`), `wma` (`ta.wma`), `rsi` (`ta.rsi`, 0–100) and `cci` (`ta.cci`),
-  or of a statistic (`zscore`, `stddev`, `linregSlope`, `pctl` (`ta.percentrank`), `rollingMin`, `rollingMax`) — is the longest window whose one-value read fits the readable depth beside the lookback cap (936
-  for an SMA, WMA, CCI or a statistic, 935 for `pctl`, 269 for an EMA, 118 for an RMA or RSI at the shipped cap);
+  (`ta.ema`), `rma` (Wilder's average, `ta.rma`), `wma` (`ta.wma`), `rsi` (`ta.rsi`, 0–100), `cci` (`ta.cci`) and `roc`
+  (`ta.roc`, a percent), or of a statistic (`zscore`, `stddev`, `linregSlope`, `pctl` (`ta.percentrank`), `rollingMin`, `rollingMax`) — is the longest window whose one-value read fits the readable depth beside the lookback cap (2,436
+  for an SMA, WMA, CCI or a statistic, 2,435 for `pctl` or `roc`, 704 for an EMA, 308 for an RMA or RSI at the shipped cap);
   `rsi` and `cci` read null over a window whose values are all equal; a longer one is refused with
   `REPORT_COLUMN_DEPTH_EXCEEDED`, and `lookback.used` counts only where the window ends: its newest bar, or a
   rolling extreme's `offset` back (the offset stays lookback-bounded, 63 at the shipped cap). For a
   chained column the outer's declaration is `chainOuterParameters[outer]` (served beside `metric`)
   and its bound is `chainedOuters[outer].windowMaximum`; `chainedOuters[outer].offsetMinimum` is the least
-  offset the chain accepts — `1` for a rolling extreme chained into `distance` (the breakout level), `null`
+  offset the chain accepts — `1` for a rolling extreme chained into `distance` (the breakout level) or
+  `levelInteraction` (a touch or rejection of that level, the Donchian prior rail at any length), `null`
   on every other chain — so stage the inner's offset at or above it. A chain outer never takes an offset:
-  the offset belongs to the inner. The window carries a `unit`
+  the offset belongs to the inner. A source-series transform (`aggregate`, `ema`, `rma`, `wma`, `rsi`, `cci`, `roc`)
+  chains under a depth-bounded outer (an average or a statistic, never `trajectory`, `efficiency` or `maxShare`):
+  `CLOSE × ema × rsi` is the RSI of an EMA, `CLOSE × rsi × aggregate` the RSI smoothing line. Both halves declare a
+  window, so the inner's length is `window` and the outer's is `chainedWindow` (`{ window: 200, chainedWindow: 14 }`
+  is `close_ema200_rsi14`); `chainedOuters[outer].windowParameter` names the key its `windowMaximum` bounds, and
+  `innerWindowMaximum` bounds the inner's `window` under that outer, each at the other's default. The two lengths
+  are judged together: one value reads both windows' bars less one (803 for `ema(200) × rsi(14)`), and a pair that
+  does not fit is refused at the length to lower with its largest fitting value. A stored length has its own code:
+  the RSI of `EMA50` is `EMA50 × rsi`, and the chain is only for a length with no stored point. The window carries a `unit`
   (`seriesElements`, `seriesChanges` for `efficiency`, which reads one bar more than its window,
   `priorElements` for `pctl`, `smoothingLength` for `ema`, `wilderLength` for `rma` or `wilderChanges` for `rsi`,
   whose lengths read more bars than they name — `ema(20)` reads 73, `rma(14)` reads 108, `rsi(14)` reads 109). An average reads null until its whole window is present. Stage at most
   that maximum. A chained column's operands come from
-  `chainedOuters[outer].operands`, never from the metric's full `spreadOperands`.
+  `chainedOuters[outer].operands`, never from the metric's full `spreadOperands`. On any rung but the
+  anchor (`{rel: 'anchor'}`) the operands are `spreadOperandsOffAnchor` and
+  `chainedOuters[outer].operandsOffAnchor`, which omit the per-bar session-profile levels a relation
+  meets only at the anchor.
 - A metric can declare its own knobs on `parameters` (served on the metric entry, `null` when it
   declares none). The seven swing metrics declare `leftBars` and `rightBars` — the bars before and the
   closed bars after a pivot — default 2/2, minimum 1, `bound: 'depth'`: the pair reads
@@ -211,9 +224,10 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   default 3) and `equalThreshold` (`range`: stage exactly one of the served steps, 0 to 0.5 by 0.1).
   Leave a knob off at its default. They read `null` until the column's bars prove a value, so a
   short history reads more `null`. A trend reads `bullish` or `bearish`. They never take `rank`, `relativeTo` or a depth-bounded window (an average or a statistic).
-- `MFI14`, `WILLR14` and `CMF20` declare one knob, `period` (`depth`, minimum 2): its served `defaultValue` is
-  each metric's own registered length (14, 14, 20), and its `maximum` the largest that fits the readable depth
-  (935 for MFI, 936 for %R and CMF at the shipped cap). Leave it off at the default. Off it the header carries
+- `MFI14`, `WILLR14`, `CMF20`, `ATR`, `ADX`, `DI_PLUS`, `DI_MINUS` and `VWMA20` declare one knob, `period` (`depth`,
+  minimum 2): its served `defaultValue` is each metric's own registered length (14, 14, 20, 14, 14, 14, 14, 20), and
+  its `maximum` the largest that fits the readable depth (2,435 for MFI, 2,436 for %R, CMF and VWMA, 308 for the
+  Wilder-smoothed ATR, 154 for ADX and both DIs, whose ADX smooths the DIs a second time, at the shipped cap). Leave it off at the default. Off it the header carries
   `_p<n>` (`MFI14_p21`), and the same refusals as an authored swing pair apply: no `rank`, `relativeTo` or
   depth-bounded window. An operand of another oscillator in the same column reads its own registered length.
 - The Stochastic (`STOCH_K`, `STOCH_D`) declares `period` (the %K length), `kSmoothing` and `dSmoothing`, at
@@ -237,6 +251,10 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   from 0.001 to 0.1 on a 0.001 step, and the maximum from 0.01 to 1 on a 0.01 step. Leave them off at the defaults;
   once any is off, the header writes every setting (`stLine_atr14mult2`, `PSAR_start0.01inc0.01max0.1`) and the
   same refusals apply.
+- Ichimoku (`ICHI_CONV`, `ICHI_BASE`, `ICHI_SPAN_A`, `ICHI_SPAN_B`, `ICHI_LAG`) declares `conversionPeriod`,
+  `basePeriod`, `spanBPeriod` and `displacement`, at TradingView's 9, 26, 52, 26. Each is `depth`-bounded; the windows
+  have minimum 1 and the displacement minimum 2. The spans apply, and the lagging close is read, `displacement − 1` bars back. Leave them off at the defaults;
+  once any is off, the header writes all four (`senkouA_conv20base60spanB120disp30`) and the same refusals apply.
 - `get_metric_construction_hints` → `rankOrderings`. Present only when rank is composable on that
   metric, already range-gated server-side — read the offered set rather than deriving one from
   the metric's native output.

@@ -94,9 +94,12 @@ Three reads, and they are not interchangeable:
   failed row's `rejection` names why its order was refused. `list_agent_trades` narrowed by `agentId`,
   `list_agent_market_grid_decisions` and `get_agent_activity_feed` for what did happen, and
   `get_signal_log`'s `thesisReasoning` for why a trade was taken.
-- **`get_agent_conviction_calibration` honours `readiness`.** An `INSUFFICIENT_DATA` calibration
-  carries no win rate — report that there is not yet enough history, never a rate derived from a
-  handful of trades.
+- **`get_agent_conviction_calibration` honours `readiness`.** It serves one row per model the
+  agent's closed trades were decided by, under `calibration.rows`; read the row whose `isCurrentModel`
+  is true and name its model. An `INSUFFICIENT_DATA` group carries no win rate — report that there is not
+  yet enough history on the current model, never a rate derived from a handful of trades, and never
+  another model's row in its place. Bands compare in R (`averageGrossR` over `rTradeCount` trades), never
+  in USD.
 
 **Every stated cause cites the typed reason or journal entry it came from.** "It is blocked" is not
 a diagnosis; "OPEN_POSITION_CONFLICT, 14 times, most recently 2h ago" is.

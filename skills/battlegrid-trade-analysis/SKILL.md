@@ -39,9 +39,15 @@ Not "what were its returns" — whether it did *the thing it was told to do*.
   `signalSource`, and quote its KPIs as served — win rate, net P&L, best and worst trade, entry
   rate, average conviction and risk/reward, durations — recomputing none. `get_agent_performance`
   measures from the budget baseline, not over a period. A `{ profile: null }` result is
-  **UNDETERMINED** for that agent: the read serves the player's own private agents only. The fixed
-  Decision Quality window and its regime, hour, weekday and coin slices are
-  `get_agent_review_analytics`'s, not this read's.
+  **UNDETERMINED** for that agent: the read serves the player's own private agents only. The regime,
+  hour, weekday and coin slices of the decisions made over a period are
+  `get_agent_review_slices`'s, not this read's.
+- `get_agent_conditions` when the question is whether the mandate's conditions are doing their job: each
+  condition the agent's decisions cited over the last 90 days (the served `window`), by verdict against what
+  those decisions became — one row per strategy revision, because a revision may redefine a condition, so never
+  add two rows of one condition together. `get_agent_entry_discipline` answers what waiting for confirmation cost
+  over the same window. For every agent on one strategy, pass its `strategyId` to `get_conditions_breakdown` or
+  `get_entry_discipline_breakdown`.
 - `get_trade_outcome_by_decision` (a trade row's `decisionId`) / `get_trade_chart` when a specific trade
   needs explaining: the outcome carries the fills, fees, slippage, leverage, duration and exit label. A
   measurable trade's `tradeExcursion` reads in R: `mfeR` and `maeR` (the best and worst it reached),
@@ -76,7 +82,10 @@ the platform's recorded forward marks, never from today's price.
 
 - Select the decisions with `list_signal_logs`, then read each one's `get_signal_debrief` (the row's
   `agentId`, and its `id` as `logId`). When the question is the agent-wide pattern rather than named
-  decisions, read `get_agent_decision_quality`.
+  decisions, read `get_agent_decision_quality`: one row per model the agent's decisions ran on under
+  `quality.rows`, the `isCurrentModel` row being the model it runs now — name a row's model beside every
+  figure quoted from it, and never pool two rows. For your account, a team or a strategy cohort, read
+  `get_decision_quality_breakdown`.
 - **Never mark a past decision against a current price.** A market-context read, a live mark or any
   price read now answers a different question. The debrief's marks are anchored at the decision
   (`decisionAnchor`) and, for a closed trade, at the exit (`exitAnchor`).
