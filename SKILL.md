@@ -89,8 +89,10 @@ as a rebind. **`battlegrid-radar-deployment`** carries putting an agent on stand
 
 ## Play a game (Market Grid)
 
-Predict UP or DOWN for each coin in the pool; exactly one coin is your **Captain** (2x score
-multiplier). **The arc lives in `battlegrid-arena-play`** — activate it to find a session, read its
+Predict UP or DOWN for each coin in the pool; exactly one coin is your **Captain**. Points scale with
+how far each coin moves, and what a correct or wrong cell and the captain are worth is each session's
+own `scoringRules` (`get_market_grid_session`) — never a fixed multiplier; the exported skill's "How a
+round scores" and the `battlegrid://rules/overview` resource explain them. **The arc lives in `battlegrid-arena-play`** — activate it to find a session, read its
 market context, stage picks with real per-coin reasoning into the player's entry draft (the same draft
 their builder writes), read it back, commit it on the player's word, and read the results.
 **`battlegrid-market-analysis`** carries the market read that informs the picks, and
