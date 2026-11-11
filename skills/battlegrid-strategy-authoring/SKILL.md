@@ -79,6 +79,12 @@ you found. The cues, none of them subtle:
 - **an ordering between events** — "after X fires, then wait for Y"
 - **anything phrased as a sequence, a delay, or a dependency**
 
+An ordering of bar-level events inside a window IS expressible: an entry condition's root group may
+be `SEQUENCE` (**In order**, with `within` bars) — see `## Conditions` in the `strategy-examples`
+skill. Discover its window (the steps' served `conditionHold`) before you lock it. An ordering it
+cannot carry — an exit rule, a nested sequence, a step that counts closes of its own, or a gap
+between steps with a minimum — is still a gap, and is named as one.
+
 Locking first and discovering second is how the third failure happens: the form goes out while the
 gap is still invisible, so the ask arrives as a product question — *what did you mean?* — when the
 honest answer was *the grammar cannot do that*. The arc reads 1 → 2 → 3 for an ordinary ask; for
@@ -102,6 +108,14 @@ anywhere; if the two ever disagree, you have created the exact ambiguity this st
 
 `list_strategy_categories` → `list_strategy_vocabulary` → `get_strategy_column_contract` and
 `get_strategy_section_template`.
+
+`list_strategy_vocabulary` browses one `category`, or searches with `query` — words that must all
+appear in a metric's key, name, description or family, across every family unless you also name a
+`category`. Search by the words the catalog uses (`rsi`, `support`, `relative volume`); a word no
+metric uses matches nothing, so try fewer or plainer words. A family too large to return whole
+refuses with `nextAct: narrow`: read it again with a `query`. The tools that take a metric accept a
+plain key and refuse one the catalog lacks, naming the nearest keys — take the key from the
+vocabulary, never from memory.
 
 The player's own saved sections are listed among the vocabulary's templates as `kind: "saved"`.
 When the player names one, fetch it with `get_strategy_section_template` and place its title, note,
@@ -144,13 +158,13 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   one — and omit it on a section you add. This is the one composition field whose right answer is
   "leave it out".
 - **The `entry` axis is a union keyed by its trigger.** `ON_CANDLE_CLOSE` is sent alone —
-  `{ "entry": { "trigger": "ON_CANDLE_CLOSE" } }` — and a `levelOffsetAtrMultiple` or
-  `validForBars` beside it is refused as an unrecognized key. A level trigger (`STOP_THROUGH_LEVEL`,
-  `ON_RETEST`) sends both of them, with no defaults. A CREATE that stages no entry takes the
+  `{ "entry": { "trigger": "ON_CANDLE_CLOSE" } }` — and a `levelOffsetAtrMultiple`,
+  `validForBars` or `levels` beside it is refused as an unrecognized key. A level trigger (`STOP_THROUGH_LEVEL`,
+  `ON_RETEST`) sends all three, with no defaults: `levels` names the level the order rests at for each
+  trade direction, `{ "LONG": <level reference>, "SHORT": <level reference> }`, a level the report yields. A CREATE that stages no entry takes the
   platform's seed entry, so the axis is not required on every CREATE — stage it whenever the locked
   spec names an entry. Every trigger is decided at the close of the strategy's OWN bar, so there is
-  no confirm-timeframe key; for the level triggers the level itself is derived from the trigger and
-  the trade's direction, never named. A multi-bar hold belongs to the clause or group that needs
+  no confirm-timeframe key. A multi-bar hold belongs to the clause or group that needs
   it — its own `hold: { atLeast, of }`, which the editor calls **Hold** (Once, In a row, Within, At
   least), counted in completed bars of the column's own timeframe — not to this axis. Every clause
   and group carries `hold`; `{ "atLeast": 1, "of": 1 }` is Once. The `strategy-examples` skill
@@ -202,11 +216,19 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   (`seriesElements`, `seriesChanges` for `efficiency`, which reads one bar more than its window,
   `priorElements` for `pctl`, `smoothingLength` for `ema`, `wilderLength` for `rma` or `wilderChanges` for `rsi`,
   whose lengths read more bars than they name — `ema(20)` reads 73, `rma(14)` reads 108, `rsi(14)` reads 109). An average reads null until its whole window is present. Stage at most
-  that maximum. A chained column's operands come from
-  `chainedOuters[outer].operands`, never from the metric's full `spreadOperands`. On any rung but the
-  anchor (`{rel: 'anchor'}`) the operands are `spreadOperandsOffAnchor` and
-  `chainedOuters[outer].operandsOffAnchor`, which omit the per-bar session-profile levels a relation
+  that maximum. Every operand field carries a key (`operands-<n>`), not a list: look the key up in the
+  `operandSets` served beside `metric`, which holds exactly the lists the entry names. A chained column's
+  operands are the list `chainedOuters[outer].operands` names, never the metric's full `spreadOperands`. On
+  any rung but the anchor (`{rel: 'anchor'}`) they are the lists `spreadOperandsOffAnchor` and
+  `chainedOuters[outer].operandsOffAnchor` name, which omit the per-bar session-profile levels a relation
   meets only at the anchor.
+- A `spread` operand is `{ metric }`, or a metric under one average at a length,
+  `{ metric, transformId, window }` — `transformId` one of `aggregate`, `ema`, `rma`, `wma`, `window` at least 2 —
+  where the metric is in the list the metric's `spreadAverageOperands` names (`spreadAverageOperandsOffAnchor` off the anchor):
+  the base itself first, so `CLOSE × spread` against `ema(CLOSE, 100)` is the close against an EMA with no stored
+  point. Two custom-length averages are `CLOSE × ema(34)` chained into `spread` against `ema(CLOSE, 89)`, offered on
+  the four averages' `chainSuccessors`. An operand length past the readable depth is refused at `inputs[0].window`,
+  naming the largest that fits. No `rank` or series outer chains over an averaged operand.
 - A metric can declare its own knobs on `parameters` (served on the metric entry, `null` when it
   declares none). The seven swing metrics declare `leftBars` and `rightBars` — the bars before and the
   closed bars after a pivot — default 2/2, minimum 1, `bound: 'depth'`: the pair reads
@@ -216,26 +238,48 @@ question you would otherwise guess — and a refusal you would otherwise earn:
   transform knobs, and leave it off for 2/2 — an explicit 2/2 is the same column. Off 2/2 the header
   carries `_l<left>r<right>` after the code (`fractalHi_l5r5_1h`). Stage a pair only on a transform
   (or chained outer) whose entry serves `metricParametersAccepted: true`; `rank`, `relativeTo`
-  and the depth-bounded windows (the averages and the statistics) read the stored 2/2 and refuse it. A condition hold over a column off 2/2 is
-  served a window of 1: each of its bars needs the full readable depth behind it.
-- The eight market-structure metrics (`INTERNAL_STRUCTURE_*`, `SWING_STRUCTURE_*` event, trend and
-  level, `EQH`, `EQL`) declare their own knobs, each served with its `bound`: `swingLength` (`depth`,
+  and the depth-bounded windows (the averages and the statistics) read the stored 2/2 and refuse it. A condition
+  over a column off 2/2 reads one bar, because each of its bars needs the full readable depth behind it:
+  - a hold beyond one close is refused with `CONDITION_HOLD_ILLEGAL`;
+  - an **In order** step over it is refused with `CONDITION_SEQUENCE_WINDOW_INVALID`;
+  - every operator that reads the bar before (`crossesAbove`, `crossesBelow`, `increased`, `decreased`,
+    `enters` and `exits`) is refused with `CONDITION_OPERATOR_UNSUPPORTED`.
+
+  That leaves `lt`, `lte`, `gte`, `gt`, `between`, `is` and `in`, so a crossing reads as its state
+  (`dist_fractalHi_l5r5 gt 0`). These, with the three transform refusals, are what "the same refusals as an
+  authored swing pair" means below.
+- The market-structure metrics (`INTERNAL_STRUCTURE_*`, `SWING_STRUCTURE_*` event, trend and
+  level, the pending levels `INTERNAL_PENDING_HIGH`/`_LOW` and `SWING_PENDING_HIGH`/`_LOW`, `EQH`, `EQL`,
+  the equal-pivot levels `EQH_LEVEL`, `EQL_LEVEL`, and the liquidity pools `LIQUIDITY_POOL_ABOVE`/`_BELOW` with
+  their `_INTACT`, `_TOUCHES`, `_RETIRED` and `_RECLAIMED`) declare their own knobs, each served with its `bound`: `swingLength` (`depth`,
   default 50, minimum 10, maximum 100), `confluenceFilter` (`flag`, internal structure only), `equalBars` (`depth`,
   default 3) and `equalThreshold` (`range`: stage exactly one of the served steps, 0 to 0.5 by 0.1).
   Leave a knob off at its default. They read `null` until the column's bars prove a value, so a
-  short history reads more `null`. A trend reads `bullish` or `bearish`. They never take `rank`, `relativeTo` or a depth-bounded window (an average or a statistic).
+  short history reads more `null`. A trend reads `bullish` or `bearish`. A pending level is the active, not-yet-crossed high or low (`null` from the bar after a close crosses it); an equal-pivot level is the newer pivot of the latest pair that read equal, held until the side's next equal-length pivot (`EQH`/`EQL` reads true only on the deciding bar), and takes `equalBars` and `equalThreshold`. A liquidity pool is the nearest equal-high (above) or equal-low (below) pivot no close has gone beyond yet, several kept at once: `_INTACT` reads false on the bar whose close retires it, `_TOUCHES` counts the later bars whose `levelInteraction` against it is a touch or reject, `_RETIRED` is the pool the previous bar's close retired (on the next bar only, a level the level verbs take) and `_RECLAIMED` reads true when this bar's close is back at or inside it; they take `equalBars` and `equalThreshold`. They never take `rank`, `relativeTo` or a depth-bounded window (an average or a statistic), and the server computes them over the column's own bars at every setting, so a condition over one reads one bar, as over an authored swing pair, at the defaults too.
+- The structure-zone columns (`STRUCT_ZONES` under its zone transforms, the edges `ZONE_SUPPORT_HIGH`/`_LOW`,
+  `ZONE_RESIST_HIGH`/`_LOW`, and the midpoints `ZONE_SUPPORT_MID`/`ZONE_RESIST_MID`) declare one knob, `usedUpOnClose` (`flag`, default false). Off, a zone is used up by a
+  wick past its far edge (a low below a support zone, a high above a resistance zone), as the stored sets are; on, by
+  a close past it, computed by the server over the zone timeframe's own bars, and the header carries `_close`
+  (`zones_close…`, `zoneSupLo_close`). Leave it off for the wick rule. On, a condition over the column reads one
+  bar, as over an authored swing pair.
+- The supply/demand levels (`PRIOR_DAY_SUPPLY_EDGE`/`_AVG`/`_WAVG`, `PRIOR_DAY_DEMAND_*`, and the same six for
+  `PRIOR_ASIA_`, `PRIOR_LONDON_` and `PRIOR_NEW_YORK_`) declare two knobs, both `range`: `supplyDemandThreshold`
+  (default 10, 0 to 100 by 0.5) and `supplyDemandResolution` (default 50, 2 to 500 by 1). Leave each off at its
+  default. Off the default threshold the header carries `_vt<p>`, off the default resolution `res<n>`
+  (`pdSupEdge_vt20res100`); a resolution off its default is rebuilt from the server's 1m bars and reads `null` for a
+  window older than two UTC days. A level reads `null` until its window closes.
 - `MFI14`, `WILLR14`, `CMF20`, `ATR`, `ADX`, `DI_PLUS`, `DI_MINUS` and `VWMA20` declare one knob, `period` (`depth`,
   minimum 2): its served `defaultValue` is each metric's own registered length (14, 14, 20, 14, 14, 14, 14, 20), and
   its `maximum` the largest that fits the readable depth (2,435 for MFI, 2,436 for %R, CMF and VWMA, 308 for the
   Wilder-smoothed ATR, 154 for ADX and both DIs, whose ADX smooths the DIs a second time, at the shipped cap). Leave it off at the default. Off it the header carries
-  `_p<n>` (`MFI14_p21`), and the same refusals as an authored swing pair apply: no `rank`, `relativeTo` or
-  depth-bounded window. An operand of another oscillator in the same column reads its own registered length.
+  `_p<n>` (`MFI14_p21`), and the same refusals as an authored swing pair apply. An operand of another oscillator
+  in the same column reads its own registered length.
 - The Stochastic (`STOCH_K`, `STOCH_D`) declares `period` (the %K length), `kSmoothing` and `dSmoothing`, at
   TradingView's 14, 1, 3; the Stoch RSI (`STOCH_RSI_K`, `STOCH_RSI_D`) declares `rsiPeriod`, `period` (the
   stochastic length), `kSmoothing` and `dSmoothing`, at 14, 14, 3, 3. Each is `depth`-bounded; the lengths have
   minimum 2 and the smoothings minimum 1 (1 is unsmoothed). Leave every setting off at the defaults. Once any is
-  off, the header writes all of them (`K_p21s3d3`, `stochRsiK_rsi14_p21s3d3`) and the same refusals apply: no
-  `rank`, `relativeTo` or depth-bounded window.
+  off, the header writes all of them (`K_p21s3d3`, `stochRsiK_rsi14_p21s3d3`) and the same refusals as an authored
+  swing pair apply.
 - MACD (`MACD_LINE`, `MACD_SIGNAL`, `MACD_HIST`) and PPO (`PPO_LINE`, `PPO_SIGNAL`, `PPO_HIST`) declare `fast`,
   `slow` and `signal`, the two close EMAs' lengths and the signal EMA's, at TradingView's 12, 26, 9. Each is
   `depth`-bounded with minimum 1. Leave them off at the defaults; once any is off, the header writes all three
@@ -298,9 +342,11 @@ changing; send no other axis.
 
 **A whole axis restates what it keeps.** "Raise the ATR floor to 0.8%" is one TRADE_LEVEL_POLICY
 stage carrying all four of its dials — `minStopLossAtrMultiple`, `maxStopLossAtrMultiple`,
-`minRiskRewardRatio` and `minAtrPct` — the three you are not changing exactly as they stand now:
-read them from the draft's TRADE_LEVEL_POLICY when the draft holds it, otherwise from
-`get_strategy`. The same holds for a condition: CONDITIONS carries every condition, each with its
+`minRiskRewardRatio` and `minAtrPct` — and its `tradeLevelMenu`, everything you are not changing exactly as it stands
+now: read them from the draft's TRADE_LEVEL_POLICY when the draft holds it, otherwise from
+`get_strategy`. Raising `minRiskRewardRatio` above an R target in the menu is refused until that option leaves the
+menu, so a raise restates the menu without it. The `strategy-examples` skill's *Trade levels* section carries the
+menu's options, how pairs are built and what the save refuses. The same holds for a condition: CONDITIONS carries every condition, each with its
 `required` flag and verdict as they stand. Never set `required` or a verdict from memory, and never
 change either unless the player asked: a wrong value there is how a building block silently becomes
 a mandatory trade gate, or a gate silently disappears.

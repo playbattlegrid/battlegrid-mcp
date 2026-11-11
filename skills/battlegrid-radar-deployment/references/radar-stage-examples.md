@@ -106,9 +106,10 @@ Here the agent works the bear trend and stands down while a crash or a momentum 
 ## On duty only in named hours and days
 
 Hours are UTC, 0–23. Days run 0 (Sunday) to 6. Each is listed once. For a named exchange session —
-including the London and Tokyo opens and the London–New York overlap — stage the `hours` `get_radar_market_hours`
-serves for it rather than a set of your own; the example below is a shape, not a session. No session
-close is served: a close is staged only as hours the player names.
+including the London and Tokyo opens, the London–New York overlap and the Asia trading session — stage the
+`hours` `get_radar_market_hours` serves for it rather than a set of your own; the example below is a shape, not a
+session. For weekends, stage the served `weekends` `hours` and `days` together. No session close is served: a close
+is staged only as hours the player names.
 
 ```json stage_radar_deployment_draft
 {

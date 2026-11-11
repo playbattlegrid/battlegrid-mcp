@@ -1,6 +1,6 @@
 ---
 name: battlegrid-arena-play
-description: Enter the player into Market Grid sessions — find an open session, read its coin pool and live market context, read the player's entry draft and stage picks with real per-coin reasoning into it or have one of their agents generate a grid, commit it against the session's entry fee, then read the results and the player's own entry record after settlement. Activate whenever the player wants to play, enter, join or submit to a session, asks what their grid looks like or to fill it in, wants their agent to enter one, asks what is open to play, or asks how a session they entered turned out.
+description: Enter the player into Market Grid sessions — find an open session, read its coin pool and live market context, read the player's entry draft and stage picks with real per-coin reasoning into it or have one of their agents generate a grid, commit it against the session's entry fee, then read the results and the player's own entry record after settlement. Activate whenever the player wants to play, enter, join or submit to a session, asks what their grid looks like or to fill it in, wants their agent to enter one, asks what is open to play, asks how a session they entered turned out, or asks how a session scores, pays or triggers the jackpot.
 ---
 
 # Arena Play
@@ -11,6 +11,28 @@ so the draft is the shared grid: you read it to know what they have picked and s
 picks. Staging is free and enters nothing. **Committing it is the wager**: with no entry the commit
 enters the session and the entry fee moves inside that call; over an entry it replaces the picks for no
 fee. The grid you commit is the one that gets scored, and there is no undo.
+
+## How a round scores
+
+The values named here are the session's `scoringRules` and other fields from `get_market_grid_session`.
+Explain a score, a payout or a captain choice from them, never from a remembered number.
+
+- **The scored window** is set by the session's `finalScoringSource`. `MDS_CANDLE`: one candle, from its open at `startsAt` to its close at `settleAt`. `ONCHAIN_MARK_PX`: the oracle mark price captured when the session goes LIVE, to the mark price at `settleAt`. A coin that ends exactly where it started counts as UP.
+- **A cell is correct when its prediction matches that direction, and points scale with how far the coin moved** — not just which way. A correct cell scores the absolute % move × `scoringRules.changeMultiplier`; a wrong cell loses the absolute % move × `scoringRules.wrongPenaltyMultiplier` (0 means a wrong cell costs nothing). A big move called right is worth far more than a small one, and a big move called wrong costs the same way.
+- **`CELL_0` is the captain.** Its points are multiplied by `scoringRules.captainMultiplier` when it is correct, and its penalty by `scoringRules.captainWrongPenaltyMultiplier` when it is wrong.
+- **A grid's score is the sum of its cells.** Ranks order by score, and a tie goes to the earlier submission; replacing an entry's picks resets its submission time.
+- **Paid places** are the top `scoringRules.itmPercent`% of entrants, rounded down to whole places, paid more for a higher rank (`payoutBandSummary`). With `scoringRules.scoreGateEnabled`, a grid scoring 0 or below is never paid, and if no grid in the paid places scores above 0 the winners pool goes to the War Bond instead. The jackpot is decided separately.
+- **No jackpot pattern pays unless the captain's direction is correct and no other coin in that grid moved more than the captain.** The cells form a `gridRows` × `gridCols` grid read left to right, top to bottom (`CELL_0` top-left). The patterns:
+  - **PERFECT GRID** (`PERFECT_GRID`) — Every cell predicted correctly
+  - **GRID LOCK** (`GRID_LOCK`) — At least one complete row AND column
+  - **GRID STORM** (`GRID_STORM`) — At least two complete rows
+  - **GRID FORTRESS** (`GRID_FORTRESS`) — At least two complete columns
+  - **GRID CROSS** (`GRID_CROSS`) — Any complete diagonal
+  - **GRID LINE** (`GRID_LINE`) — At least one complete row
+  - **GRID PILLAR** (`GRID_PILLAR`) — At least one complete column
+  - **GRID SURGE** (`GRID_SURGE`) — At least 6 correct predictions
+- **Only the highest pattern a grid hits counts**, by the order of `jackpotPayoutHighlights`, and its share is split evenly among the grids that hit it.
+- So captain the pick you are most confident will make the largest move in its called direction.
 
 ## The three failures this flow exists to prevent
 
@@ -89,11 +111,8 @@ ask. The commit requires a `RATIONALE` axis — `reasoning`, `confidenceScore`, 
 `pickReasoning` — covering the whole grid it composes. Complete stage payloads are in
 `references/entry-stage-examples.md`.
 
-- **`CELL_0` is the captain.** The session's preset sets what that is worth: a correct captain's
-  points are multiplied by its `captainMultiplier`, and a wrong captain's penalty by its
-  `captainWrongPenaltyMultiplier` — both published by `list_game_presets`, and different per preset.
-  Read them rather than assuming a number, and captain the pick you are most confident in among
-  those with a move worth amplifying.
+- **`CELL_0` is the captain.** What that is worth is the session's `scoringRules` — see
+  [How a round scores](#how-a-round-scores). Read them rather than assuming a number.
 - **`pickReasoning` carries one entry per grid cell — every cell, no coin twice.** Compose it
   correctly because it is yours to compose, not because something downstream will catch it: the
   read reports an incomplete one as a diagnostic and the commit refuses it before the fee moves, and

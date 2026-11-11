@@ -16,6 +16,7 @@ rather than events all live there. This document assumes them.
 - Column recipes
 - Cross detection
 - Recency and structure
+- Candle at a swing and liquidity-pool sweeps
 - Board-relative rank recipes
 - Cross-venue and perp/spot basis
 - Crowd positioning
@@ -132,6 +133,109 @@ step down of the decided pivot, which is a lower high against the pivot before i
 ```json
 { "conditionKey": "TWO_LOWER_HIGHS_IN_8", "name": "Two lower highs in 8 closes", "verdict": null, "required": true, "exitSide": null,
   "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "fractalHi" }, "op": "decreased", "hold": { "atLeast": 2, "of": 8 } } }
+```
+
+## Candle at a swing and liquidity-pool sweeps
+
+A candle pattern AT a swing, and a sweep OF a liquidity pool, are compositions of shipped columns — no
+one column reads either whole. Each recipe below is a whole condition; adapt its verdict and its `required`,
+and keep its shape.
+
+| Intent | Column | Header |
+|---|---|---|
+| Swing low age at a 21/21 pair | `{ "metric": "SWING_FRACTAL_LOW_BARS_AGO", "transformId": "value", "timeframe": { "rel": "anchor" }, "leftBars": 21, "rightBars": 21 }` | `fractalLoAgo_l21r21` |
+| Swing high age at a 21/21 pair | `{ "metric": "SWING_FRACTAL_HIGH_BARS_AGO", "transformId": "value", "timeframe": { "rel": "anchor" }, "leftBars": 21, "rightBars": 21 }` | `fractalHiAgo_l21r21` |
+| Pin bar of the bar 21 back | `{ "metric": "CANDLE_PIN", "transformId": "value", "timeframe": { "rel": "anchor" }, "offset": 21 }` | `pin_o21` |
+| Engulfing of the bar 21 back | `{ "metric": "CANDLE_ENGULFING", "transformId": "value", "timeframe": { "rel": "anchor" }, "offset": 21 }` | `engulf_o21` |
+| Buyside pool interaction | `{ "metric": "LIQUIDITY_POOL_ABOVE", "transformId": "levelInteraction", "timeframe": { "rel": "anchor" } }` | `poolAbove_lvl` |
+| Sellside pool interaction | `{ "metric": "LIQUIDITY_POOL_BELOW", "transformId": "levelInteraction", "timeframe": { "rel": "anchor" } }` | `poolBelow_lvl` |
+| Closed back under the buyside pool the last bar retired | `{ "metric": "LIQUIDITY_POOL_ABOVE_RECLAIMED", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `poolAboveRecl` |
+| Closed back over the sellside pool the last bar retired | `{ "metric": "LIQUIDITY_POOL_BELOW_RECLAIMED", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `poolBelowRecl` |
+
+**Candle at a swing** — LuxAlgo's *Swing Highs/Lows & Candle Patterns* at its length 21: a swing pivot of
+21 bars each side, and the candle pattern of the pivot bar itself, Pine's `[21]`. A pivot is decided on
+the bar that completes its right side, where the swing age reads the pair's `rightBars`, so on that bar
+the pivot bar is `rightBars` bars back and the pattern column reads it at that offset. **The offset
+equals the swing pair's `rightBars` and changes with it**: a 10/5 pair reads `fractalLoAgo_l10r5 between 5 5`
+beside `pin_o5`. The age never reads below `rightBars`, so `between 21 21` is "decided on this bar": the
+condition reads TRUE once per pivot, on its deciding bar — where LuxAlgo draws the label back on the pivot
+bar, the condition never paints back. The patterns are the `candlePatterns` rules (the skill body,
+`## Bar geometry`), each judged against the ten bars before the pivot bar. LuxAlgo's script tests bullish
+and bearish engulfing with one identical condition; `engulf` reads `bullish` for a white body over a black
+one and `bearish` for the mirror, so that defect never arises here. An offset column and a column off the
+2/2 pair each hold Once.
+
+A hammer at the swing low:
+
+```json
+{ "conditionKey": "HAMMER_AT_SWING_LOW", "name": "Hammer at a 21/21 swing low", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "fractalLoAgo_l21r21" }, "op": "between", "low": 21, "high": 21, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "pin_o21" }, "op": "is", "label": "lower_wick", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
+A shooting star at the swing high, the mirror:
+
+```json
+{ "conditionKey": "SHOOTING_STAR_AT_SWING_HIGH", "name": "Shooting star at a 21/21 swing high", "verdict": "DOWN", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "fractalHiAgo_l21r21" }, "op": "between", "low": 21, "high": 21, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "pin_o21" }, "op": "is", "label": "upper_wick", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
+A bullish engulfing at the swing low:
+
+```json
+{ "conditionKey": "BULLISH_ENGULFING_AT_SWING_LOW", "name": "Bullish engulfing at a 21/21 swing low", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "fractalLoAgo_l21r21" }, "op": "between", "low": 21, "high": 21, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "engulf_o21" }, "op": "is", "label": "bullish", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
+A bearish engulfing at the swing high, the mirror:
+
+```json
+{ "conditionKey": "BEARISH_ENGULFING_AT_SWING_HIGH", "name": "Bearish engulfing at a 21/21 swing high", "verdict": "DOWN", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "fractalHiAgo_l21r21" }, "op": "between", "low": 21, "high": 21, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "engulf_o21" }, "op": "is", "label": "bearish", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
+**Sweep of a liquidity pool** — two forms. On ONE candle, the bar's high traded through the nearest
+buyside pool above price and its close came back under it: `levelInteraction` over `LIQUIDITY_POOL_ABOVE`
+reads `reject_from_below` (sellside: `reject_from_above` on `LIQUIDITY_POOL_BELOW`). Over TWO candles, a
+close beyond the pool retires it (`poolAboveOk` reads false on that bar) and the next bar closes back:
+from that next bar `poolAbove` already reads the next pool up, so the second bar is read through the
+retired pool instead — `LIQUIDITY_POOL_ABOVE_RETIRED` (`poolAboveRetired`) is the pool the previous bar's
+close retired, on that one bar only, and `LIQUIDITY_POOL_ABOVE_RECLAIMED` (`poolAboveRecl`) is true when
+this bar's close is back at or under it. The "same or next candle" sweep is an `ANY` over the two. The
+retired pool is a level, so `poolAboveRetired_lvl is "reject_from_above"` reads a retest that held after
+the breakout, and `dist_poolAboveRetired` how far the close sits from it.
+
+```json
+{ "conditionKey": "BUYSIDE_POOL_SWEPT", "name": "Swept the buyside pool and closed back under it", "verdict": "DOWN", "required": false, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "poolAbove_lvl" }, "op": "is", "label": "reject_from_below", "hold": { "atLeast": 1, "of": 1 } } }
+```
+
+```json
+{ "conditionKey": "SELLSIDE_POOL_SWEPT", "name": "Swept the sellside pool and closed back over it", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 1 } } }
+```
+
+The same or next candle, on either side:
+
+```json
+{ "conditionKey": "BUYSIDE_POOL_SWEPT_TWO_BAR", "name": "Swept the buyside pool and closed back under it, on the same or the next candle", "verdict": "DOWN", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ANY", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolAbove_lvl" }, "op": "is", "label": "reject_from_below", "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolAboveRecl" }, "op": "is", "label": "true", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
+```json
+{ "conditionKey": "SELLSIDE_POOL_SWEPT_TWO_BAR", "name": "Swept the sellside pool and closed back over it, on the same or the next candle", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ANY", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelowRecl" }, "op": "is", "label": "true", "hold": { "atLeast": 1, "of": 1 } } ] } }
 ```
 
 ## Board-relative rank recipes

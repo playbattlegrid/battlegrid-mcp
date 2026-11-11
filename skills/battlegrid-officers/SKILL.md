@@ -85,7 +85,7 @@ them as served, through their display names.
 
 ## 4. Work the inbox
 
-- **Read.** `list_officer_reviews`, by officer or by agent, newest first; `includeClosed` adds the applied,
+- **Read.** `list_officer_reviews`, by officer, and by agent or by team, newest first; `includeClosed` adds the applied,
   dismissed and superseded history. Show each review's verdict, findings, diff, impact and warnings exactly as
   served; `applyAvailable` says Apply is offered, `heldAxes` names every axis the target's draft holds and who wrote
   it, and `baseMoved` says the target was committed since the review. `awaitingOwner` says the review waits on the
