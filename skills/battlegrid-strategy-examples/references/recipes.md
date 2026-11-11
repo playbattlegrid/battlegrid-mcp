@@ -31,6 +31,8 @@ rather than events all live there. This document assumes them.
 | Momentum build-up | `{ "metric": "RSI14", "transformId": "trajectory", "timeframe": { "rel": "anchor" }, "window": 4 }` | `RSI14_t3…_now`, `RSI14_trend` |
 | Closed-bar-only trajectory | add `"bars": "closed"` to any trajectory | same, drawn from closed bars |
 | Extension from trend | `{ "metric": "SMA50", "transformId": "distance", "timeframe": { "rel": "anchor" } }` | `dist_SMA50` (signed %) |
+| Touch of the 20 EMA within half an ATR | `{ "metric": "EMA20", "transformId": "levelInteraction", "timeframe": { "rel": "anchor" }, "touchAtr": 0.5 }` | `EMA20_lvl_a0.5` — a column carries a buffer or an ATR multiple, never both |
+| Touch of VWAP within 10 bps | `{ "metric": "VWAP", "transformId": "levelInteraction", "timeframe": { "rel": "anchor" }, "buffer": 10 }` | `VWAP_lvl_b10` |
 | Funding paid over a day | `{ "metric": "FUNDING_RATE", "transformId": "aggregate", "timeframe": { "rel": "anchor" }, "window": 24 }` | `rate_mean24` |
 | Chop filter on the entry rung | `{ "metric": "CLOSE", "transformId": "efficiency", "timeframe": { "rel": "lower" }, "window": 4, "bars": "closed" }` | `close_ltf_er` (≥0.6 directional; 4 changes, the last 5 closes) |
 | One-bar volume concentration | `{ "metric": "VOLUME", "transformId": "maxShare", "timeframe": { "rel": "lower" }, "window": 4, "bars": "closed" }` | `volBase_ltf_maxShare` |

@@ -63,13 +63,15 @@ rules about the columns themselves, not about porting — they live in the skill
 - **VWAP reversion** → `dist_VWAP` band + `dist_VWAP_rank_far lte 5` for board-relative
   stretch; required `NOT [ADX14_state in ["trending","extreme"]]` veto; scalp geometry +
   aggressive timeDecay (`VWAP` anchors daily at 00:00 UTC; `VWAP_WEEK`, `VWAP_MONTH`, `VWAP_TRADING_SESSION` and
-  the rolling `VWAP_ROLLING_1H`/`4H`/`24H` are the other anchors, each with ±1/2/3σ bands `_UB<k>`/`_LB<k>` — a
-  band-touch entry reads `CLOSE × spread(VWAP_LB2)` rather than a hand-computed σ).
+  the rolling `VWAP_ROLLING_1H`/`4H`/`24H` are the other anchors, each with ±1/2/3σ bands `_UB<k>`/`_LB<k>` — the
+  close's position against a band is `CLOSE × spread(VWAP_LB2)` rather than a hand-computed σ, and the bar's contact
+  with it is `VWAP_LB2 × levelInteraction`).
 - **Donchian / Turtle breakout** (`close > ta.highest(high, 20)[1]`) → `dist_donchianHiPrior20 crossesAbove 0`
   over `DONCHIAN_UPPER_PRIOR × distance` (the breakout bar; `dist_donchianHiPrior20 gt 0` holds on every
   close of the run) + `RVOL20 gte 1.5`; turtle exits = trend preset (trail from 1R, giveback 50). Mirror with
-  `dist_donchianLoPrior20 crossesBelow 0`. The same-bar rail (`dist_donchianHi20`) includes the breakout bar's
-  own high, so it can never confirm a close-based break — do not AND it in. `zone is "breakout high"` reads
+  `dist_donchianLoPrior20 crossesBelow 0`. The same-bar rail is refused under `distance`: it includes the
+  breakout bar's own high, so it can never confirm a close-based break. Its gap, `close_donchianHi20_spread`, is
+  never above 0 — do not AND it in. `zone is "breakout high"` reads
   the prior-bar rail: it is the label form of the `dist_donchianHiPrior20 gt 0` state, holds on every close of
   the run, and adds nothing to the crossing; `"breakdown low"` mirrors it.
   **Daily-breakout variant on any anchor:** pin the rail at 1d — `dist_donchianHiPrior20_1d crossesAbove 0`
@@ -92,7 +94,7 @@ rules about the columns themselves, not about porting — they live in the skill
   `DAY_OF_WEEK between 1 and 5`) is an ordinary condition; the glosses state the windows.
 - **ICT / SMC (FVG + order blocks)** → `STRUCT_ZONES` is the native zone engine:
   `zones_htf_support_type` (`bullish FVG`/`bullish order block`), `zones_htf_support_dist
-  between 0 1.5`, `_age_h gte 12`, HTF bias required via `MAalign_htf`. A killzone is a session window
+  between 0 1.5`, `_age_bars gte 3`, HTF bias required via `MAalign_htf`. A killzone is a session window
   (`TRADING_SESSION`, `UTC_HOUR`) and a sweep of a previous session's extreme is `PRIOR_<S>_HIGH_SWEPT` /
   `_LOW_SWEPT`; displacement and event *sequencing* are shapes the
   grammar does not have — a clause compares one column with a literal or with its own previous
@@ -126,7 +128,8 @@ rules about the columns themselves, not about porting — they live in the skill
   and signals (`MACD_LINE`/`MACD_SIGNAL`, `PPO_LINE`/`PPO_SIGNAL` — the line's zero cross is
   `MACD_LINE × crossDetect`, and the signal-line cross is `MACD_HIST × crossDetect`, the histogram being
   line minus signal), the 15-bar rate of change (`ROC15`), the Donchian break memory
-  (`DONCHIAN_BROKEN_HI`/`DONCHIAN_BROKEN_LO`), daily pivots of
+  (`DONCHIAN_BROKEN_HI`/`DONCHIAN_BROKEN_LO`, and as of the bar before — Pine's `brk[1]` —
+  `DONCHIAN_BROKEN_HI_PRIOR`/`DONCHIAN_BROKEN_LO_PRIOR`, the level a retest or failed-breakout clause reads), daily pivots of
   all six Pivot Points Standard types (Traditional `PIVOT_P`/`PIVOT_R1`–`R5`/`PIVOT_S1`–`S5`, then
   `PIVOT_FIB_*`, `PIVOT_CLASSIC_*`, `PIVOT_CAM_*`, `PIVOT_WOODIE_*`, `PIVOT_DM_*` — a level one type shares
   with Traditional is read from the Traditional key) and the same six types on the previous ISO week,
@@ -154,6 +157,12 @@ rules about the columns themselves, not about porting — they live in the skill
   - `ta.rsi(x, n)` and `ta.cci(x, n)` are `x × rsi` and `x × cci` at window `n` (`hlc3_rsi21`, `close_cci50`),
     each null over a window whose values are all equal; the stored `RSI14`, `RSI7`, `RSI2` and `CCI20` (on HLC3)
     are the exact source at their own length, and `EMA50 × rsi` is the RSI of the stored 50-bar average;
+  - one of those over another is a chain, the inner's length on `window` and the outer's on `chainedWindow`:
+    `ta.rsi(ta.ema(x, n), m)` is `x × ema(n) × rsi(m)` (`close_ema200_rsi14`), `ta.cci(ta.sma(x, n), m)` is
+    `x × aggregate(n) × cci(m)`, and the built-in RSI's smoothing line `ta.sma(ta.rsi(x, n), m)` is
+    `x × rsi(n) × aggregate(m)`. The outer may be any average or statistic; the chained outer's catalog entry names
+    the key it bounds (`windowParameter`) and serves `innerWindowMaximum` for the inner. Under an average or an RSI
+    the chain is the windowed composite, within a few RSI points of a full-history chart on a slow average;
   - `ta.percentrank(x, n)` is `x × pctl` at window `n` — the `n` bars BEFORE the newest, ties at or below;
   - `ta.highest(x, n)` / `ta.lowest(x, n)` are `x × rollingMax` / `x × rollingMin` (`high_max20`
     is `DONCHIAN_UPPER`'s same-bar rail);

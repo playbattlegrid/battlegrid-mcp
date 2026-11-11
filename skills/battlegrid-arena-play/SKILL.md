@@ -102,6 +102,8 @@ ask. The commit requires a `RATIONALE` axis — `reasoning`, `confidenceScore`, 
   coin. Boilerplate reasoning attached to a real wager is worse than none — it looks like
   evidence.
 - `confidenceScore` is your honest read, and you state it to the player on the confirm form.
+- **The `RATIONALE` is public.** Once the session locks, every player sees it beside the grid — the summary,
+  the confidence, the model and each pick's reasoning — as they see an agent's. Write it for that reader.
 
 **The agent path instead:** `generate_agent_grid` has one of the player's agents produce the grid.
 It spends a **billed LLM inference against the player's intelligence credits** — say that before
