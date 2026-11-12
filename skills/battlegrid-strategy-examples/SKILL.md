@@ -888,7 +888,7 @@ header is. Worked sections and conditions: `references/recipes.md`, *Market and 
 ## Trade levels
 
 `{ minStopLossAtrMultiple, maxStopLossAtrMultiple, minRiskRewardRatio, minAtrPct, tradeLevelMenu }` — where stops
-and targets may sit, which stops and targets the agent may choose from, and how much a coin must move before it is
+and targets may sit, which stops and exit plans the agent may choose from, and how much a coin must move before it is
 worth trading at all. `minStopLossAtrMultiple < maxStopLossAtrMultiple` (≤ the 5×ATR structural cap),
 `minRiskRewardRatio` within the served range. `minAtrPct` is the ATR floor: a coin whose ATR% sits below it is refused
 (`ATR_VOLATILITY_BELOW_MIN`) before any condition is read, with bounds from
@@ -896,34 +896,52 @@ worth trading at all. `minStopLossAtrMultiple < maxStopLossAtrMultiple` (≤ the
 a high floor with a wide stop needs more capital per trade. The axis is staged whole — all five keys.
 Sizing is risk-budget based — a wider stop means a smaller position, never more risk.
 
-**The menu: the author lists the options, the agent picks a pair.** `tradeLevelMenu` is `{ "LONG": { stops, targets },
-"SHORT": { stops, targets } }` — each direction authored on its own, never mirrored, each list 1–8 options. Every ATR
+**The menu: the author lists the options, the agent picks a pair.** `tradeLevelMenu` is `{ "LONG": { stops, exitPlans },
+"SHORT": { stops, exitPlans } }` — each direction authored on its own, never mirrored, each list 1–8 entries. Every ATR
 below is the strategy timeframe's.
 
 - A **stop** option is one of `{ "kind": "ATR", "atrMultiple": m }` (0 < m ≤ 5), `{ "kind": "LEVEL", "level": <level
   reference>, "bufferAtrMultiple": b }` (0 ≤ b ≤ 5: the stop sits b × ATR beyond the level on the loss side), or
   `{ "kind": "PERCENT", "percent": p }` (0 < p < 100, a fixed percent from entry).
-- A **target** option is `{ "kind": "R_MULTIPLE", "multiple": r }` (0 < r ≤ 10) or `{ "kind": "LEVEL", "level": <level
-  reference> }`.
+- An **exit plan** is `{ "targets": [ { "method": <target option>, "closePct": c }, … ] }` — 1–4 targets, nearest
+  first, each closing a whole-number `closePct` of the position. A **target** option is
+  `{ "kind": "R_MULTIPLE", "multiple": r }` (0 < r ≤ 10) or `{ "kind": "LEVEL", "level": <level reference> }`.
+
+**Shares, the runner and the trail objective.** The shares sum to at most 100; the first target closes a share; every
+closing target closes at least 5%. What the plan does not close is the **runner**, 0% or at least 5%: no take-profit
+order rests for it, and only Trailing exits it, so a plan that leaves a runner is refused while `trailingEnabled` is
+false. A `closePct` of 0 is allowed only on the last target of a plan that leaves a runner and closes a share before it:
+that target is the **trail objective** — it places no order and only sets how far the runner's trail measures.
+`[2R closing 50%, 6R closing 0%]` banks half at 2R and trails the rest with a trail sized to 6R. One target closing
+100% is today's single take-profit.
 
 A level reference is the same shape the entry axis names, and must be a level the report yields. At each decision the
-platform pairs every stop with every target, prices them on the decided bar, and drops a pair whose stop is not on
-the loss side of entry or whose target is not on the profit side, a stop tighter than `minStopLossAtrMultiple` or wider
-than `maxStopLossAtrMultiple` (or the 5×ATR cap), and a level target whose reward is under `minRiskRewardRatio`. A
-level with no reading on the bar drops its options; nothing is stretched or substituted. Pairs that land on the same
-two prices are one setup naming every option that made it. The agent chooses one setup; a one-option list is a fixed
-choice.
+platform pairs every stop with every exit plan and prices each target on the decided bar beside that stop. It drops a
+pair whose stop is not on the loss side of entry, a stop tighter than `minStopLossAtrMultiple` or wider than
+`maxStopLossAtrMultiple` (or the 5×ATR cap), a plan whose targets do not run away from entry in plan order beside that
+stop, a pair whose plan risk-reward is under `minRiskRewardRatio`, and — for an agent — a plan one of whose target
+legs would fall under the exchange's minimum order value at the smallest order the agent can place. A level with no
+reading on the bar drops the plans that name it; nothing is stretched, merged or substituted. Pairs that land on the
+same stop, target prices and shares are one setup naming every option and plan that made it. The agent chooses one
+setup; a one-entry list is a fixed choice.
 
-**R is the pair's own risk.** An `R_MULTIPLE` target sits `r × |entry − stop|` from entry for the stop it is paired
-with, so 2R beside a 2×ATR stop is twice as far as 2R beside a 1×ATR stop. Its reward is exactly r, so the save refuses
-an R option below `minRiskRewardRatio` (it could never trade) rather than dropping it per trade.
+**R is the pair's own risk; the plan's risk-reward is share-weighted.** An `R_MULTIPLE` target sits `r × |entry −
+stop|` from entry for the stop it is paired with, so 2R beside a 2×ATR stop is twice as far as 2R beside a 1×ATR stop.
+A plan's risk-reward is each share at its target's distance plus the runner at the distance of the last target that
+closes a share, over the stop's risk; a trail objective adds nothing. `[1R closing 50%, 3R closing 50%]` pays 2.0 and
+`[1R closing 50%]` pays 1.0. An all-R plan has the same risk-reward beside every stop, so the save refuses one below
+`minRiskRewardRatio` (it could never trade) rather than dropping it per trade; a plan's early target may sit below
+the minimum when the plan as a whole clears it.
 
-**What the save refuses, per direction** (each naming its field): a list outside 1–8 options; an option outside its
-bounds; a level the report does not yield; an R target below `minRiskRewardRatio`; a target level that is the
-direction's entry level (no reward); and one level in both the stop and the target list. The entry level may also be a
-stop. A CREATE that stages no menu opens with the seed — stops ATR 1× / 1.5× / 2× plus the Donchian edge and Bollinger
-band on the loss side, targets 1.5R / 2R / 3R (those at or above the minimum) plus the Donchian edge and Bollinger band
-on the profit side, never a target at its own entry level — keeping only the levels its report yields.
+**What the save refuses, per direction** (each naming its field): a list outside 1–8 entries; an option outside its
+bounds; a plan that breaks a share rule above; consecutive R targets whose multiples do not increase, or one level
+named twice in a plan; a level the report does not yield; an all-R plan below `minRiskRewardRatio`; a plan that leaves
+a runner while Trailing is off (an update that only switches Trailing off is refused the same way); a target level that
+is the direction's entry level (no reward); and one level in both the stop list and an exit plan. The entry level may
+also be a stop. A CREATE that stages no menu opens with the seed — stops ATR 1× / 1.5× / 2× plus the Donchian edge and
+Bollinger band on the loss side, one-target plans closing 100% at 1.5R / 2R / 3R (those at or above the minimum) plus
+the Donchian edge and Bollinger band on the profit side, never a target at its own entry level — keeping only the
+levels its report yields.
 
 ## Position management
 
