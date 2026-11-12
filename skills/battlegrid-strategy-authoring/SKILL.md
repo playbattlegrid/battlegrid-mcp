@@ -344,9 +344,18 @@ changing; send no other axis.
 stage carrying all four of its dials — `minStopLossAtrMultiple`, `maxStopLossAtrMultiple`,
 `minRiskRewardRatio` and `minAtrPct` — and its `tradeLevelMenu`, everything you are not changing exactly as it stands
 now: read them from the draft's TRADE_LEVEL_POLICY when the draft holds it, otherwise from
-`get_strategy`. Raising `minRiskRewardRatio` above an R target in the menu is refused until that option leaves the
-menu, so a raise restates the menu without it. The `strategy-examples` skill's *Trade levels* section carries the
-menu's options, how pairs are built and what the save refuses. The same holds for a condition: CONDITIONS carries every condition, each with its
+`get_strategy`. The menu lists stops and **exit plans**: a plan is 1–4 targets, each closing a whole-number share of the
+position, and what it does not close is the **runner**, which only Trailing exits — a plan that leaves one is refused
+while `trailingEnabled` is false, and switching Trailing off under one is refused too. A plan's risk-reward is
+share-weighted: each share at its target, the runner at the last target that closes a share; a last target closing 0%
+is the **trail objective**, which sets how far the runner's trail measures and earns no reward. Raising
+`minRiskRewardRatio` above an all-R plan's risk-reward is refused until that plan changes or leaves the menu, so a
+raise restates the menu without it. The `strategy-examples` skill's *Trade levels* section carries the menu's
+options, how pairs are built and what the save refuses. Before committing a TRADE_LEVEL_POLICY change, show the
+player `preview_strategy_trade_levels({ coinTicker, source: { kind: "DRAFT", strategyId, draftVersion } })`: every
+stop with its verdict and its distance in ATR, the pairs that survive with each target's price and close %, each
+runner's trail distance in ATR and R, the pairs refused and why, and the reachable stop band, per direction. An R
+target there is measured from its own pair's stop; `minRiskRewardRatio` judges each pair's plan risk-reward. The same holds for a condition: CONDITIONS carries every condition, each with its
 `required` flag and verdict as they stand. Never set `required` or a verdict from memory, and never
 change either unless the player asked: a wrong value there is how a building block silently becomes
 a mandatory trade gate, or a gate silently disappears.

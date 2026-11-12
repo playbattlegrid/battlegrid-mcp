@@ -1,6 +1,6 @@
 {
   "generator": "battlegrid-app/server/scripts/export-mcp-skills.mjs",
-  "contractVersion": "168.3.0",
+  "contractVersion": "170.0.0",
   "files": {
     "battlegrid-agent-management/SKILL.md": "324ef8181bfcfc99b955d9644ed543c6ab91071153d43f77ccf0a4979b896b09",
     "battlegrid-agent-management/references/agent-stage-examples.md": "dffcc353d61dfc7b5bb6a2b3077fc6bf8c760a34c287cafb3b59b99306f24195",
@@ -13,10 +13,10 @@
     "battlegrid-radar-deployment/SKILL.md": "bffe54bb209ccaf1f6df3bf86a811e6768db0d11c52ae0c460cbe1494a459e43",
     "battlegrid-radar-deployment/references/arena-stage-examples.md": "65af54b67c3248c53fb8911df769ad32824e1f1f1d83ffc007b42a888d5e3076",
     "battlegrid-radar-deployment/references/radar-stage-examples.md": "6d898a49c42861d6efb5d1b136996e6fb64beca7cac8b8c5dba7fed17a1c3bf5",
-    "battlegrid-strategy-authoring/SKILL.md": "a1e8166445ea2632ed0d60b08f879a3a4f5336e3b472342e759b191a30bacf23",
-    "battlegrid-strategy-authoring/references/strategy-stage-examples.md": "f9da084ed057b20f7554184445b1bdc6410e1c612a79392182823982f63513a7",
+    "battlegrid-strategy-authoring/SKILL.md": "f1375d1de10433161291c6c0f1c58f1abfe42bec8ecc6af6967c7086f0e77a79",
+    "battlegrid-strategy-authoring/references/strategy-stage-examples.md": "0eb41edd013f95092f5822a922c7cdd731584892ed90da575dbb65c93a1a00b6",
     "battlegrid-strategy-doctor/SKILL.md": "133fe2ff3e8ca634822e02c7e30032c59c8b37b0b685023bfb98d280a678b5ae",
-    "battlegrid-strategy-examples/SKILL.md": "50c7e6121e792f4ddeb6babf5679af2e2bdefc6247d86d0d88853a68c21f6636",
+    "battlegrid-strategy-examples/SKILL.md": "906a64e881f8bad0fd5fc8ec9bdb5f090c94c9b85cd80933183311ef49cc98d5",
     "battlegrid-strategy-examples/references/playbooks.md": "3134fde92a6ce6fecc6d610629d02450f92e47f3a1a1f33d456658267b5ce123",
     "battlegrid-strategy-examples/references/recipes.md": "e24483ec52cbcedba08ed6fa7f2a28b0fde170b2d4b1876162d180538cd789f2",
     "battlegrid-strategy-examples/references/tradingview-ports.md": "5d65b5299ddfddd80f413a0301de25861607aeb0840b89416c3f0603a4b7cb37",
