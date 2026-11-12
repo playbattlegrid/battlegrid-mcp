@@ -103,8 +103,9 @@ Name the `coinId` and the `teamId` on every call below:
 1. `stage_radar_deployment_draft` with `draftVersion` = the `version` you read (0 when there was
    no draft) and only the axes you are changing, each WHOLE: `RULES` (the complete ordered rule list
    — first is highest priority; every rule that matches is on duty, so priority decides only which
-   agent is offered the deployment's one fire on a pass) and `DEFAULT_SLOT` (the catch-all, on duty only
-   when no rule is, or null for none). A Radar policy has **no timeframe**: each rule's regime
+   agent is offered the deployment's one fire on a pass; always-on rules come last) and `DEFAULT_SLOT`
+   (the catch-all, on duty only when no rule is, or null for none — null beside always-on rules). A
+   Radar policy has **no timeframe**: each rule's regime
    condition is read at its agent's own regime timeframe, which every slot reports as
    `agentRegimeTimeframe`. Staging writes nothing live and shows the change in the player's builder as
    a proposal. A refusal naming axes means the player changed them after your read: read again and
@@ -128,16 +129,25 @@ Name the `coinId` and the `teamId` on every call below:
 To try a slot set without touching the draft, preview `{ kind: "SLOTS", slots }` — it resolves
 explicit slots and nothing can commit it.
 
-**Shaping a Radar rule.** A rule carries one or two conditions — never none. Pick the construction
-from what the player asked for:
+**Shaping a Radar rule.** A rule carries one or two conditions, or `always` alone — never zero
+conditions. A rule with none is refused, and is never read as always-on. Pick the construction from
+what the player asked for:
 
 | The player wants the agent on duty… | Construction |
 |---|---|
 | whenever no rule matches | `DEFAULT_SLOT` — on duty only while no rule matches, so on a coin with no rules it is on duty at every instant |
+| always, behind the rules | a rule whose one condition is `always`, after every other rule, with `DEFAULT_SLOT` null |
 | only in named regimes | a rule with a regime condition |
 | in a named regime, standing down while a warning holds | a rule with a regime condition whose `duringWarnings` is `pause` |
 | only in named hours and days | a rule with an hours condition |
 | in named regimes during named hours | a rule with one hours condition and one regime condition |
+
+A coin's fallback is either the default slot or always-on rules, never both. The difference is the
+player's choice, so say it when they ask for a backup: the default is on duty only when no rule
+matches; an always-on agent is on duty at every sweep and acts whenever the agents above it do not
+qualify — it still needs its own entry. Several always-on rules back each other up in the order
+listed. An always-on agent trades the coin in every regime, and a team holds one position and one
+cooldown per coin, so its trade can hold the coin's position and cooldown ahead of a rule's agent.
 
 A regime condition reads three facts of one reading. `regimes` names the market structures (`bull_trend`,
 `bear_trend`, `bull_range`, `bear_range`); `volatilities` names the volatility levels it runs in, all three meaning no
@@ -170,30 +180,37 @@ ask the player which construction they mean, naming the rows that fit — never 
 choose. Complete stage payloads for every row are in `references/radar-stage-examples.md`.
 
 **One agent onto several Radar coins** — when the player wants the same agent on more than one coin,
-always on or under one rule. Never stage it coin by coin: one preview and one write cover every coin,
-on the team the agent trades on (the preview names it; there is no `teamId` to pass).
+as the default, always-on, or under one rule. Never stage it coin by coin: one preview and one write
+cover every coin, on the team the agent trades on (the preview names it; there is no `teamId` to pass).
 
-1. `preview_agent_radar_deploy({ agentId, slot, coinIds })`, with `slot` either
-   `{ kind: "DEFAULT", minConviction }` (always on: the agent is on duty whenever no rule matches) or
-   `{ kind: "RULE", minConviction, conditions }` (one rule, conditions shaped as a staged rule's), and
-   `coinIds` resolved through the coin-metadata read. It writes nothing. Each coin is `PLACED` with its
-   served `placement`, rule `priority` and `enabledAfterCommit`, or `REFUSED` with the reason a Save of
-   that coin would give; `admission` is the plan's coin cap for the new coins.
+1. `preview_agent_radar_deploy({ agentId, slot, coinIds })`, with `slot` one of
+   `{ kind: "DEFAULT", minConviction }` (the coin's default: the agent is on duty only when no rule
+   matches), `{ kind: "RULE", minConviction, conditions }` (one rule, conditions shaped as a staged
+   rule's), or `{ kind: "RULE", minConviction, conditions: [{ kind: "always" }] }` (always-on: on duty
+   at every sweep, behind the coin's other rules), and `coinIds` resolved through the coin-metadata
+   read. It writes nothing. Each coin is `PLACED` with its served `placement`, rule `priority` and
+   `enabledAfterCommit`, or `REFUSED` with the reason a Save of that coin would give; `admission` is
+   the plan's coin cap for the new coins.
 2. Read every coin's placement — never work it out yourself:
    - `FIRST_DEPLOYMENT`: a new, active deployment holding just this slot;
    - `ADD_DEFAULT`: the coin had no default, so the agent now covers the windows it sat out;
-   - `APPEND_RULE`: one rule below the coin's existing rules — **while it matches, the coin's default
-     is off duty**; name that default by `defaultAgentDisplayName` when it is non-null.
-   A coin refused for "already has a default" can still take the agent as a rule: offer that as a
-   second preview, never silently.
+   - `APPEND_RULE`: a rule placed below the coin's other rules and above its always-on agents, which
+     each move one priority down; an always-on rule goes last. **While the new rule matches, the
+     coin's default is off duty**; name that default by `defaultAgentDisplayName` when it is non-null.
+   A coin with a default refuses an always-on spec, and a coin with always-on agents refuses a
+   `DEFAULT` spec. An always-on spec the coin already holds for the same agent at the same bar is
+   refused as already held, as a repeated regime or hours rule is. A coin refused for "already has a
+   default" can still take the agent as a conditional rule: offer that as a second preview, never
+   silently — and never swap one fallback kind for the other without the player's word.
 3. Confirm as step 3 says for a batch, then one `deploy_agent_to_radar({ agentId, slot, coins })`.
 
 **Arena** — the same shape, keyed on `presetId`:
 
 1. `stage_deployment_policy_draft` with `draftVersion` = the `version` you read (0 when there was no
    draft) and only the axes you are changing, each WHOLE: `RULES` (the complete ordered rule list —
-   first is highest priority; a rule's regime condition names a set), `DEFAULT_SLOT` (the catch-all, or null for none)
-   and `REGIME_ANCHOR` (the anchor override, or null to inherit the arena's). Pausing is never staged.
+   first is highest priority; a rule's regime condition names a set; always-on rules come last),
+   `DEFAULT_SLOT` (the catch-all, or null for none — null beside always-on rules) and
+   `REGIME_ANCHOR` (the anchor override, or null to inherit the arena's). Pausing is never staged.
 2. `get_deployment_policy_draft` — its `draftVersion`, `committedRevision`, diff, `diagnostics` and
    `impact` (the next session's resolution and whether it will play), exactly as for Radar.
 3. `preview_deployment_resolution({ presetId, request: { kind: "DRAFT", draftVersion } })` at the
@@ -204,15 +221,24 @@ A draft that would hold no rule and no catch-all is a withdrawal, which a commit
 
 **Shaping an Arena rule.** A rule needs at least one condition by the time it is committed — a draft
 may hold a rule with none while the player is still choosing, and the draft read's diagnostics flag
-it. Pick the construction from what the player asked for:
+it. A rule never carries zero conditions once committed, and a rule with none is never read as
+always-on: `always` is spelled out, and is its rule's only condition. Pick the construction from what
+the player asked for:
 
 | The player wants the agent to play… | Construction |
 |---|---|
 | whenever no rule matches | `DEFAULT_SLOT` — plays only when no rule wins the session |
+| always, behind the rules | a rule whose one condition is `always`, after every other rule, with `DEFAULT_SLOT` null |
 | only in named regimes | a rule with a regime condition |
 | in a named regime, sitting out while a warning holds | a rule with a regime condition whose `duringWarnings` is `pause` |
 | only at named session starts, or one scheduled occurrence | a rule with one session condition — a start or an occurrence |
 | in named regimes at those sessions | a rule with a regime condition and one session condition |
+
+An arena's fallback is either the default slot or always-on rules, never both. The difference is the
+player's choice, so say it when they ask for a backup: the default is on duty only when no rule
+matches; an always-on agent is on duty at every session and plays whenever the agents above it do
+not qualify — it still needs a full admitted grid. Several always-on rules back each other up in the
+order listed.
 
 When the ask maps to no single row, or a refusal rules out the construction the player asked for,
 ask the player which construction they mean, naming the rows that fit — never stage one they did not

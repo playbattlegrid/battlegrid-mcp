@@ -193,6 +193,44 @@ first agent's regimes.
 }
 ```
 
+## Rules plus an always-on agent
+
+An always-on rule's one condition is `always`, and it comes after every other rule. It is on duty at every sweep and
+is offered the coin's fire whenever the agents above it do not take it, so here the second agent trades the coin in
+every regime, behind the first. A coin's fallback is the default slot or always-on rules, never both, so this example
+also clears `DEFAULT_SLOT`. Several always-on rules back each other up in the order listed.
+
+```json stage_radar_deployment_draft
+{
+  "coinId": "<COIN_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": null,
+          "conditions": [
+            {
+              "kind": "regime",
+              "regimes": ["bull_trend", "bull_range"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "run"
+            }
+          ]
+        },
+        {
+          "agentId": "<OTHER_AGENT_ID>",
+          "minConviction": null,
+          "conditions": [{ "kind": "always" }]
+        }
+      ]
+    },
+    "DEFAULT_SLOT": { "defaultSlot": null }
+  }
+}
+```
+
 ## Clear the default slot on a deployed coin
 
 This stages only `DEFAULT_SLOT`, so the deployed rules stay as they are. Send `RULES` only when the rules change, and
