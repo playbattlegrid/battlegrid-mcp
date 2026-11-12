@@ -38,6 +38,28 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v169 (one exact rule for realized net; the hub's per-agent average is gone)
+
+**v169 is MAJOR: one published output loses a field.** No input moves, and nothing v168 accepted is refused.
+
+### Removed output — the reason v169 is MAJOR
+
+- **`get_agents_hub` no longer serves `summary.avgPnlPerAgentUsd`.** It was a lifetime average per agent, rounded
+  differently from the fleet's. Read `get_agents_portfolio_pnl`'s `avgRealizedNetPnlPerAgentUsd`, the one per-agent
+  average, over the period you ask for.
+
+### Changed values — the same schemas serve exact values
+
+Realized trade money is now summed by one rule: exact at the persisted 8-decimal scale, never rounded to the cent on
+the server. Round to the cent yourself when you display it.
+
+- **`get_agents_hub`'s `summary.totalRealizedNetPnl`** — the roster's lifetime realized net, now described as
+  all-time. Rows of `-100` and `30.555` used to total `-69.44`; they now total `-69.445`.
+- **`get_agents_portfolio_pnl`'s `realizedNetPnlUsd`, `avgRealizedNetPnlPerAgentUsd` and every `agentTrades[]`
+  `realizedNetPnlUsd`** — they served whole cents and now serve the exact values. The fleet's `LIFETIME` realized net
+  equals `get_cost_economics_breakdown`'s `ACCOUNT` pooled `netPnl` at `LIFETIME`. An agent's figure may print one
+  cent from the others' total, and from its own `agents[]` `pnlUsd` when it sits exactly on a half cent.
+
 ## Contract history — v156 (a crowd reading no bar can serve is not a condition; trades name their config version)
 
 **v156 is MAJOR: writes v155.1 accepted are refused, and one published result narrows.** No input schema moves.
