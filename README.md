@@ -38,6 +38,55 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v169.2 to v169.4 (one win-rate rounding; every realized figure exact)
+
+**All three are MINOR: the same schemas serve different values.** No input moves, no output narrows, and nothing
+v169.1 accepted is refused. Round money to the cent, and a percent to the decimals you want, when you display it.
+
+### Changed values — the same schemas serve a different value
+
+**v169.2 — every closed-trade win rate rounds once.** Wins × 1000 ÷ closed trades, to whole thousandths, served as a
+one-decimal percent or the equal three-decimal fraction.
+
+- **`get_agent_explorer`'s `winRatePercent`** on `entries[]`, `stats` and `aggregations.modelVendors[]` is a
+  one-decimal percent: 2 of 3 serves `66.7`, where it served `67`.
+- **`get_agent_profile`'s `tradeWinRatePct`** is a one-decimal percent: 2 of 3 serves `66.7`, where it served
+  `66.66666666666666`.
+- **`get_public_agent_signal_performance`'s `winRatePercent`** multiplies before it divides: 201 of 400 serves `50.3`,
+  where it served `50.2`.
+- **`get_signal_log`'s `log.trackRecord` READY rows' `winRate`**, for a thesis written after the deploy: 201 of 400
+  serves `0.503`, where it served `0.502`. A stored record keeps the value its model read.
+
+**v169.3 — the remaining realized figures are exact.** Each serves the exact 8-decimal realized sum where it served
+whole cents: trades of `12.345` and `-4.10` serve `8.245`, where they served `8.25`.
+
+- **`get_agent_llm_spend` and `get_llm_spend_breakdown`**: `realizedNetUsd` and `netAfterLlmUsd`, pooled and per
+  member. Net after LLM is the exact net less the platform spend rounded once to cents. The
+  `LLM_SPEND_FLIPS_NET_AFTER_LLM` highlight is decided on, and valued at, that served figure.
+- **`get_account_review_analytics`**: `agents[]` and `totals` `realizedNetUsd` and `netAfterLlmUsd`.
+- **`get_agent_review_analytics`, `get_agent_review_slices` and `get_review_slices_breakdown`**: every row's
+  `realizedNetUsd`, and the coin rows' `feesUsd`.
+- **`list_agent_trades`'s `summary.netPnlUsd`**, **`list_strategies`' `viewerPerformance.realizedPnlUsd`** and
+  **`get_public_strategy_library`'s `rows[].performance.realizedPnlUsd`**. The library's `TOP` order now separates
+  cohorts less than a cent apart.
+
+**v169.4 — one closed-trade rollup.** Averages are the exact mean of the total, and best and worst are the persisted
+amounts.
+
+- **`get_agents_hub`'s `roster[].closedTrades` and `get_agents_portfolio_pnl`'s `agentTrades[].closedTrades`**:
+  `avgNetPnlUsd` is the exact mean of `totalNetPnl` over `closedTradeCount`, and `bestNetPnlUsd` / `worstNetPnlUsd`
+  are the persisted amounts. Trades of `5.678, -2.5, 0, 1.004` serve `1.0455`, `5.678` and `-2.5`, where they served
+  `1.05`, `5.68` and `-2.5`.
+- **`performance.avgPnl`** on `list_intelligence_agents`, `get_intelligence_agent` and the receipts that carry the
+  agent record (`activate_intelligence_agent`, `archive_intelligence_agent`, `commit_agent_draft`): 8 decimals, no
+  longer the database's binary-float average (`0.6666666666666666` serves `0.66666667`).
+- **`get_agent_profile`'s `avgNetPnl`**: the same mean.
+
+### Changed text
+
+- **`get_agent_llm_spend` and `get_llm_spend_breakdown`** (v169.3) say each spend figure is rounded once to cents,
+  and the realized net and net after LLM are exact.
+
 ## Contract history — v169 (one exact rule for realized net; the hub's per-agent average is gone)
 
 **v169 is MAJOR: one published output loses a field.** No input moves, and nothing v168 accepted is refused.
