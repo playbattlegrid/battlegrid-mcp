@@ -7,6 +7,7 @@ Every `<UPPER_SNAKE>` value is a placeholder. Replace it with the id a read retu
 
 - `<PRESET_ID>` comes from `list_game_presets`.
 - `<AGENT_ID>` comes from your agent list.
+- `<OTHER_AGENT_ID>` is a second agent from your agent list, where an example deploys two.
 - `<COIN_ID>` comes from the arena's coin pool.
 
 Never send a placeholder as written, and never invent an id. `draftVersion` is the version
@@ -111,6 +112,44 @@ This rule plays a bear trend at the US open and sits out while a crash or a mome
         }
       ]
     }
+  }
+}
+```
+
+## Rules plus an always-on agent
+
+An always-on rule's one condition is `always`, and it comes after every other rule. It is on duty at every session
+and plays whenever the agents above it do not qualify, provided it admits a full grid itself. An arena's fallback is
+the default slot or always-on rules, never both, so this example also clears `DEFAULT_SLOT`. Several always-on rules
+back each other up in the order listed.
+
+```json stage_deployment_policy_draft
+{
+  "presetId": "<PRESET_ID>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConfidence": null,
+          "conditions": [
+            {
+              "kind": "regime",
+              "regimes": ["bear_trend", "bear_range"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "run"
+            }
+          ]
+        },
+        {
+          "agentId": "<OTHER_AGENT_ID>",
+          "minConfidence": null,
+          "conditions": [{ "kind": "always" }]
+        }
+      ]
+    },
+    "DEFAULT_SLOT": { "defaultSlot": null }
   }
 }
 ```
