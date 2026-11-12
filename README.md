@@ -38,6 +38,47 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v175 (a Developing read decides at the decided close)
+
+**v175 is MAJOR: a published output vocabulary gains a member.** No input schema moves, and everything v174
+accepted is still accepted. Authoring now accepts compositions v174 refused.
+
+A **Developing read** is a column selecting Developing above the strategy timeframe, or a change over a horizon above
+it (`chg4h` on a `1h` strategy, `oiRegime` on a `15m` one). On a decided bar it is now read as the higher-timeframe bar
+stood at the decided bar's final minute, so the radar close step, the trade evaluation and the exit sweep all read
+one value for that bar. At the latest values it is the latest bar in progress.
+
+### Widened output — the reason v175 is MAJOR
+
+- **`FORMING_CANDLE` joins the per-bar families a decision's missing data names.** It is the higher timeframe's bar
+  in progress, read at the decided bar's final minute. A decision waits on it while it is `ABSENT` and misses naming
+  it when it is `GONE`. It is served wherever a shortfall's family is: `get_signal_log`,
+  `get_public_agent_signal_log_detail`, `list_gate_blocks`, `get_radar_close_decisions`,
+  `get_agent_coin_qualification` and `preview_radar_resolution`. A client whose decoder closes the family enum refuses
+  these reads.
+
+### Widened acceptance
+
+- **`stage_strategy_draft` and `commit_strategy_draft` accept a verdict-carrying condition and an exit rule over a
+  Developing read**, and a column turning Developing under one. `CONDITION_VERDICT_READ_ILLEGAL` is no longer raised,
+  and `CONDITION_EXIT_READ_ILLEGAL` now names only a closure no completed bar moves.
+- **Still refused:** a hold over more than one bar, or a sequence step, over a Developing read (`DEVELOPING`).
+
+### Changed values — the same schemas serve a different value
+
+- **A Required condition decided by a Developing read gates as evaluated.** It passes on `TRUE` and blocks naming its
+  `FALSE` or `UNRESOLVED`, where it used to block as `UNRESOLVED` whatever it read. This moves what
+  `list_gate_blocks` records, what `get_agent_coin_qualification` judges, and which picks a Market Grid entry is
+  offered.
+- **`get_strategy_column_contract`'s `anchorRelation`** for a Developing column above the anchor serves `readSummary`
+  "Includes the bar in progress, read at each strategy close." and `readCost` "Holds one close.".
+
+### Changed text
+
+- **The rendered report sections' `bars` description** restates `Developing`: the higher-timeframe bar still in
+  progress, as it stands at each close of the strategy bar. This is served by `preview_strategy_report`,
+  `get_market_context`, `get_context_sources_preview` and `get_context_source_full_preview`.
+
 ## Contract history — v169.2 to v169.4 (one win-rate rounding; every realized figure exact)
 
 **All three are MINOR: the same schemas serve different values.** No input moves, no output narrows, and nothing
