@@ -150,12 +150,14 @@ Radar's market hours answer *when may this agent trade*, and shift with daylight
 `TRADING_SESSION` condition answers *which session is this bar in*, over fixed UTC windows — the two are
 different questions, and a player asking for one is not asking for the other.
 
-When the player names an exchange session — New York, the New York open, London, the London open,
-the London–New York overlap, Tokyo, the Tokyo open — call `get_radar_market_hours` and stage that session's `hours`
+When the player names a market session — New York, the New York open, London, the London open,
+the London–New York overlap, Tokyo, the Tokyo open, the Asia session — call `get_radar_market_hours` and stage that session's `hours`
 exactly as served, merged with any other session they name; never work session hours out yourself,
 because New York and London shift with daylight saving on their own dates and the overlap changes
 shape on each of those dates. The three opens are one hour wide, so they suit agents on 1h bars or
-faster. The days stay the player's choice. Tell the player the staged hours are UTC, that an hour is
+faster. The Asia session is fixed in UTC (00:00–08:00) and its served hours include 08, so an agent on 1h bars
+decides all eight Asia bars. The days stay the player's choice. When the player asks for weekends, stage the served
+`weekends` hours and days together; it decides every weekend bar except the one closing at Monday 00:00. Tell the player the staged hours are UTC, that an hour is
 on duty from :00 through :59, and, when the session carries a `nextShift`, the date its hours change
 and that the rule keeps the hours it was given.
 
@@ -471,7 +473,10 @@ Four reads, cheapest first. Stop as soon as the player's question is answered.
    2's: pass `agentId` for one agent's rows, and omit it for the coin feed, which carries no agent's
    gate crossings, verdict flips or regime changes. Rows are lean by default — pass `detail: 'FULL'`
    for the margin surface, and `includeCurve: true` only if something will actually plot the points;
-   `includeCurve` requires `agentId`, and is refused without it.
+   `includeCurve` requires `agentId`, and is refused without it. The curve covers the last 24 hours and
+   stays continuous off duty: an `onDuty: false` point is a strategy bar that closed while the agent was
+   off duty — its `atrPct` is over the bar's close (a sweep's is over the level anchor; equal at a bar's
+   close), no sweep judged it, and the summary's `curveDigest` never counts it.
 
 **Neither of the first two substitutes for the other, and the reason is structural.** The journal is
 a TRANSITION log, not a state log: a gate that has blocked continuously without crossing again

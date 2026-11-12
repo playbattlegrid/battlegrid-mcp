@@ -13,6 +13,9 @@ engine) and names its substitutions where the catalog lacks a primitive.
 - Donchian / Turtle breakout
 - ICT / SMC (FVG + order blocks)
 - Pivot highs / lows, HH-HL structure and break of structure
+- Any pivot length (`leftBars` / `rightBars`)
+- Swing Highs/Lows & Candle Patterns [LuxAlgo]
+- Liquidity pools and their sweeps
 - Chaikin Money Flow
 - Now native, formerly substituted
 - Statistics over a series' own history
@@ -96,27 +99,69 @@ rules about the columns themselves, not about porting — they live in the skill
   `zones_htf_support_type` (`bullish FVG`/`bullish order block`), `zones_htf_support_dist
   between 0 1.5`, `_age_bars gte 3`, HTF bias required via `MAalign_htf`. A killzone is a session window
   (`TRADING_SESSION`, `UTC_HOUR`) and a sweep of a previous session's extreme is `PRIOR_<S>_HIGH_SWEPT` /
-  `_LOW_SWEPT`; displacement and event *sequencing* are shapes the
-  grammar does not have — a clause compares one column with a literal or with its own previous
-  completed bar, never with another column or an earlier event, so an ordered sequence of events
-  cannot be stated at all. That is a grammar limit, not a missing metric; name it as
-  one.
-- **Pivot highs / lows, HH-HL structure and break of structure** (`ta.pivothigh(2, 2)` /
-  `ta.pivotlow(2, 2)`) → `SWING_FRACTAL_HIGH` / `SWING_FRACTAL_LOW` are the native swing levels and
+  `_LOW_SWEPT`. Event *sequencing* is an entry condition's root **In order** (`op: "SEQUENCE"`,
+  `within` bars — see `## Conditions` in the skill body): sweep → displacement → return to the zone is
+  `In order within 12 [ PRIOR_ASIA_LOW_SWEPT step, the displacement step, the zone-touch step ]`, each
+  step one bar's reading. What it cannot state is still a grammar limit, not a missing metric: an exit
+  that waits on an ordering, an ordering inside another, or a step that counts its own closes — name
+  it as one.
+- **Pivot highs / lows, HH-HL structure and break of structure** (`ta.pivothigh(left, right)` /
+  `ta.pivotlow(left, right)`) → `SWING_FRACTAL_HIGH` / `SWING_FRACTAL_LOW` are the native swing levels and
   `SWING_FRACTAL_LABEL` the structure label (`HH`/`HL`/`LH`/`LL`/`none`) — see `## Swing structure` in
-  the skill body. Pine's tie rule holds (an equal extreme on the left is allowed, on the right it is
-  not), and each level is the stepped, non-repainting series — held from the bar that completes the
-  pivot's right side, not plotted back on the pivot bar. Break of structure is
-  `dist_fractalHi crossesAbove 0` / `dist_fractalLo crossesBelow 0`; "structure is bullish" is
-  `fractalLabel in ["HH","HL"]`. The pivot each latest one is compared with is native too:
+  the skill body, which states the default pair, `ta.pivothigh(2, 2)`. Pine's tie rule holds (an equal
+  extreme on the left is allowed, on the right it is not), and each level is the stepped, non-repainting
+  series — held from the bar that completes the pivot's right side, not plotted back on the pivot bar.
+  Break of structure is `dist_fractalHi crossesAbove 0` / `dist_fractalLo crossesBelow 0`; "structure is
+  bullish" is `fractalLabel in ["HH","HL"]`. The pivot each latest one is compared with is native too:
   `PRIOR_SWING_FRACTAL_HIGH` / `PRIOR_SWING_FRACTAL_LOW` (`pFractalHi` / `pFractalLo`, Pine's
   `ta.valuewhen(not na(ph), ph, 1)`) are price levels held while the prior pivot is in reach, so
   `dist_pFractalHi crossesAbove 0` is a close through the swing high before the last one. A pivot's age is
   `SWING_FRACTAL_HIGH_BARS_AGO` / `SWING_FRACTAL_LOW_BARS_AGO` (`fractalHiAgo` / `fractalLoAgo`), counted
-  from the pivot's own bar: 2 on the bar that completes it, so it reads Pine's
-  `ta.barssince(not na(ph)) + 2`, and `fractalLoAgo lte 5` keeps a setup to a fresh swing low. Only two
-  bars each side is native: a `ta.pivothigh(5, 5)` or longer script ports onto the two-bar swing, and the
-  spec-lock question says so.
+  from the pivot's own bar: `rightBars` on the bar that completes it, so it reads Pine's
+  `ta.barssince(not na(ph)) + rightBars` (`+ 2` at the default), and `fractalLoAgo lte 5` keeps a setup to
+  a fresh swing low — the deciding bar and the three after it, which at 5/5 is `fractalLoAgo_l5r5 lte 8`.
+- **Any pivot length ports exactly — `ta.pivothigh(5, 5)` is the swing column at 5/5, not a
+  substitution.** The seven swing metrics (the two levels, the two prior pivots, the two ages and the
+  label) declare `leftBars` / `rightBars`: default 2/2, minimum 1, `bound: 'depth'`. Stage Pine's two
+  lengths on the swing column beside its transform knobs, and leave the pair off for 2/2 — an explicit
+  2/2 is the same column. This column is the distance to `ta.pivothigh(5, 5)`'s held level, with the same
+  tie rule and held step:
+  `{ "metric": "SWING_FRACTAL_HIGH", "transformId": "distance", "timeframe": { "rel": "anchor" }, "leftBars": 5, "rightBars": 5 }`.
+  Off 2/2 the header carries `_l<left>r<right>` after the code: `dist_fractalHi_l5r5`, `fractalLabel_l5r5`,
+  `fractalLoAgo_l5r5` (`fractalHi_l5r5_1h` pinned to 1h).
+  The pair reads `left + right + 1` bars to decide one pivot and must fit the readable depth; a wider pair
+  is refused with `REPORT_COLUMN_DEPTH_EXCEEDED` on `leftBars`, and each side's served `maximum` is the
+  bound (`strategy-authoring`'s knob rules). Off 2/2 the server computes the pivots over the column's own
+  bars, so two refusals follow:
+  - `rank`, `relativeTo` and the depth-bounded windows (the averages and the statistics) read the stored
+    2/2 and refuse an off-default pair — stage a pair only on a transform whose entry serves
+    `metricParametersAccepted: true`;
+  - a condition over the column admits one bar: a hold over more than one close is refused
+    (`CONDITION_HOLD_ILLEGAL`), so is an **In order** step over it (`CONDITION_SEQUENCE_WINDOW_INVALID`),
+    and every prior-bar operator (`crossesAbove`, `crossesBelow`, `increased`, `decreased`, `enters`,
+    `exits`) is refused with `CONDITION_OPERATOR_UNSUPPORTED`, leaving `lt`, `lte`, `gte`, `gt`, `between`,
+    `is` and `in`.
+
+  So at 5/5 the levels, the label, the prior pivots and the ages port as states
+  (`fractalLabel_l5r5 in ["HH","HL"]`, `fractalLoAgo_l5r5 lte 8`), and the one-bar break the default pair
+  reads as `dist_fractalHi crossesAbove 0` reads at 5/5 as the state `dist_fractalHi_l5r5 gt 0`: the close
+  stands above the last 5/5 swing high, from the break until the close falls back or the level steps to
+  the next swing. That edge-for-state reading is what the spec-lock question names; the pivot length
+  itself is the script's own and is never named as a substitution.
+- **Swing Highs/Lows & Candle Patterns [LuxAlgo]** (length 21, the pattern read at Pine's `[21]`, the
+  pivot bar) → the swing age at the 21/21 pair pinned to 21 beside the candle pattern at offset 21:
+  `fractalLoAgo_l21r21 between 21 21` AND `pin_o21 is "lower_wick"` is the hammer at a swing low, and
+  `engulf_o21` the engulfing. The offset equals the pair's `rightBars` and changes with it. The condition
+  reads TRUE on the bar that decides the pivot, where the script draws its label back on the pivot bar;
+  the patterns are the `candlePatterns` rules, so the script's identical bullish and bearish engulfing
+  test never arises. Whole conditions: `recipes.md`, *Candle at a swing and liquidity-pool sweeps*.
+- **Liquidity pools and their sweeps** (LuxAlgo Liquidity Swings' close retirement over SMC's equal
+  pivots) → `LIQUIDITY_POOL_ABOVE` / `LIQUIDITY_POOL_BELOW` (`poolAbove` / `poolBelow`) are native. A
+  one-candle sweep is `poolAbove_lvl is "reject_from_below"`, mirrored with `poolBelow_lvl is
+  "reject_from_above"`. A sweep over two bars — the outbreak's close retires the pool, the next close
+  comes back — is `poolAboveRecl is "true"` (`poolBelowRecl`), and the retired pool itself is
+  `poolAboveRetired` / `poolBelowRetired`, a level a retest reads with `levelInteraction`. Whole
+  conditions: `recipes.md`, *Candle at a swing and liquidity-pool sweeps*.
 - **Chaikin Money Flow** (TradingView's built-in "Chaikin Money Flow" script, length 20; Pine has no
   `ta.cmf`) → `CMF20` is native: each bar's volume weighted by where it closed in its range, summed over
   20 closed bars and divided by their volume, −1 to +1. `CMF20 gt 0` is the accumulation state and

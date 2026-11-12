@@ -76,7 +76,7 @@ weak/developing/trending/extreme), `includeMovingAverages` (`dist_EMA20`, `MAali
 
 Platform `includePerpSpotFlow` (`perpSpotFlow` vocab: confirmed_bull / confirmed_bear /
 perp_led_fragile / spot_led_accumulation / neutral), `includeStructureZones`
-(`zones_htf_support_dist` signed % of price from the zone midpoint, positive above a support zone; `_age_bars`, whole bars of the zone timeframe), custom `Tape`
+(`zones_htf_support_dist` signed % of price from the zone's near edge (its high), positive above a support zone and 0 inside it; `_age_bars`, whole bars of the zone timeframe), custom `Tape`
 (`BUY_PRESSURE value`→`buyPres` 0–1, `RVOL value`, `CLOSE_CHANGE value`). Conditions:
 `SPOT_ACCUM` (`perpSpotFlow is "spot_led_accumulation"`); `NEAR_SUPPORT`
 (`zones_htf_support_dist between 0 2` + `zones_htf_support_age_bars gte 3`); `DIP_BID` verdict

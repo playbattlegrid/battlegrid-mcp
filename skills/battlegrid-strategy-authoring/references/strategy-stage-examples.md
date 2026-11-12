@@ -34,8 +34,11 @@ and TIMEFRAME_PROFILE before it can be created.
 
 ## Change an existing strategy's trade levels
 
-TRADE_LEVEL_POLICY is sent whole: all four dials, even when only one changes. `minAtrPct` is the ATR% volatility floor
-a coin must clear before any condition is read; the other three are the stop-loss band and the reward-to-risk floor.
+TRADE_LEVEL_POLICY is sent whole: all four dials and the menu, even when only one changes. `minAtrPct` is the ATR%
+volatility floor a coin must clear before any condition is read; the next three are the stop-loss band and the
+reward-to-risk floor; `tradeLevelMenu` lists, per trade direction, the stop and target options the agent picks a pair
+from. A level option names a level the strategy's report yields — here the platform support/resistance section's
+Donchian edges.
 
 ```json stage_strategy_draft
 {
@@ -46,7 +49,27 @@ a coin must clear before any condition is read; the other three are the stop-los
       "minStopLossAtrMultiple": 1,
       "maxStopLossAtrMultiple": 2,
       "minRiskRewardRatio": 1.5,
-      "minAtrPct": 0.8
+      "minAtrPct": 0.8,
+      "tradeLevelMenu": {
+        "LONG": {
+          "stops": [
+            { "kind": "ATR", "atrMultiple": 1.5 },
+            {
+              "kind": "LEVEL",
+              "level": { "metric": "DONCHIAN_LOWER", "timeframe": { "rel": "anchor" }, "bars": null, "offset": 0, "knobs": {}, "windowExtreme": null },
+              "bufferAtrMultiple": 0.25
+            }
+          ],
+          "targets": [
+            { "kind": "R_MULTIPLE", "multiple": 2 },
+            { "kind": "LEVEL", "level": { "metric": "DONCHIAN_UPPER", "timeframe": { "rel": "anchor" }, "bars": null, "offset": 0, "knobs": {}, "windowExtreme": null } }
+          ]
+        },
+        "SHORT": {
+          "stops": [{ "kind": "PERCENT", "percent": 2 }],
+          "targets": [{ "kind": "R_MULTIPLE", "multiple": 2 }]
+        }
+      }
     }
   }
 }
