@@ -38,6 +38,51 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v176 (a strategy is private or published)
+
+**v176 is MAJOR: one enum member leaves served outputs, and two public reads are reshaped.** No input schema moves,
+and everything v175 accepted is still accepted.
+
+A strategy now has two visibilities. `UNLISTED` is private: it has no page and no name on any public read, and its
+agents' public signal logs say nothing of it. `PUBLIC` is published: its page carries the whole strategy, which is
+what a fork copies, and its agents' public signal logs carry its reasoning. `PROTECTED`, which published a strategy
+with its reasoning withheld, is gone, and so is the plan entitlement that gated it.
+
+### Narrowed output — one reason v176 is MAJOR
+
+- **A strategy's `visibility` is `UNLISTED` or `PUBLIC`.** `get_strategy`, `list_strategies`, `archive_strategy`,
+  `restore_strategy` and `commit_strategy_draft` no longer serve `PROTECTED`.
+- **The strategy reference a public read names has two arms:** `{ visibility: "PUBLIC", id, name }` and
+  `{ visibility: "UNLISTED" }`. It is served by `get_agent_explorer` and `get_public_agent_signal_log_detail`;
+  `get_public_strategy_library`'s row `ref` is the `PUBLIC` arm alone.
+
+### Reshaped output — the other reasons
+
+- **`get_public_strategy` is one object and carries the strategy in full.** It has no `visibility`: the read serves
+  published strategies only, and a private or unknown id is not found. Beside the identity it now serves
+  `marketReadText`, `conditions`, `sections` in the shape `get_strategy` serves (a custom section with its subject,
+  note and columns), `entry`, the trade-level policy (`minAtrPct`, `minStopLossAtrMultiple`,
+  `maxStopLossAtrMultiple`, `minRiskRewardRatio`, `tradeLevelMenu`) and the thirteen exit-policy fields.
+  `sectionTitles` names each section's kind, key and title in order; `columnContracts` carries the contract of every
+  custom section's columns, positional over the custom sections; `forkable` stays. It carries none of its owner's
+  agent or position counts. A client that discriminated on `visibility`, or whose decoder closes the object, refuses
+  this read.
+- **`get_public_agent_signal_log_detail` says nothing of a private strategy outside `reasoning`.** Removed from the
+  common shape: `candidateLevels`; `reasoning` on `pipeline.decision` and on `linkedEntryDecision`;
+  `closeTriggerConditionKey` on `pipeline.outcome`; `setupOptions` on `pipeline.attempt`; and every key of a reason
+  detail except its six figures (`atrPct`, `minAtrPct`, `closestSlDistancePct`, `minSlDistancePct`, `bestRiskReward`,
+  `minRiskReward`). The `FULL` arm of `reasoning`, served exactly when the recorded strategy is `PUBLIC`, gains
+  `decisionReasoning`, `setupOptions`, `candidateLevels`, `rrRejectedPairs` and `closeTriggerConditionKey`. Under a
+  private strategy, or none recorded, the arm is `WITHHELD` and the detail carries the trade alone: direction,
+  conviction, chosen levels, execution and outcome. `get_signal_log`, the owner's read, is unchanged.
+
+### Changed text
+
+- **The notice that another player's prose is data** now also names a published strategy's description and its custom
+  section titles and notes. It is carried by `get_public_strategy_library`, `get_public_strategy` and `fork_strategy`.
+- **`fork_strategy`, `get_public_strategy`, `get_public_strategy_library`, `get_agent_explorer` and
+  `get_public_agent_signal_log_detail`** describe the two visibilities.
+
 ## Contract history — v175 (a Developing read decides at the decided close)
 
 **v175 is MAJOR: a published output vocabulary gains a member.** No input schema moves, and everything v174
