@@ -38,6 +38,44 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v179 (radar tools name a coin by its ticker)
+
+**v179 is MAJOR: fifteen radar tools rename the input that names a coin, and two reshape their result.** Nothing else
+moves, and every other tool accepts what v178 accepted.
+
+A radar tool that addresses a coin now takes the coin as the player names it — its ticker or exchange symbol, in any
+case (`SOL`, `AAPL`, `kPEPE`) — and the server resolves it. No `get_coin_metadata` read comes first. A HIP-3 coin's
+id is not its ticker (`xyz_aapl` for `AAPL`), so a guessed id used to fail on those coins.
+
+### Rejected input — the reason v179 is MAJOR
+
+- **`coinId` is refused; name `coinTicker`.** On `get_radar_deployment`, `pause_radar_deployment`,
+  `resume_radar_deployment`, `delete_radar_deployment`, `preview_radar_resolution`, `get_radar_activity`,
+  `get_radar_activity_summary`, `get_radar_close_decisions`, `stage_radar_deployment_draft`,
+  `get_radar_deployment_draft`, `commit_radar_deployment_draft` and `discard_radar_deployment_draft`. Every input is
+  strict, so a call still naming `coinId` is refused as an unrecognized key.
+- **`coinIds` is refused; name `coinTickers`.** On `preview_agent_radar_deploy`.
+- **Each entry names `coinTicker`.** Each `deploy_agent_to_radar` coin and each `withdraw_agent_from_radar` holding.
+- **A coin the platform does not list is refused naming its field.** A list resolves whole, so one unknown ticker
+  refuses the call, and two spellings of one coin in one list are refused as a repeat.
+- **Name the coin on `commit_radar_deployment_draft` exactly as on the draft read.** The approval a player sees pairs
+  the two by the value you named.
+
+### Reshaped output
+
+- **`stage_radar_deployment_draft` and `discard_radar_deployment_draft` name `coinTicker`** — the coin's canonical
+  ticker — in place of `coinId`. Every other radar output keeps `coinId`.
+
+### Added output — officer runs only
+
+- **A Radar target in the officer's review context serves `coinTicker`** beside `teamId` and `coinId`. Only
+  BattleGrid's officer runs read that context; no connected client is offered `get_officer_review_context`.
+
+### Changed text
+
+- **`get_agents_hub`** tells you to pass a radar row's `symbol` as `coinTicker`, with its `teamId`, to
+  `get_radar_deployment`.
+
 ## Contract history — v176 (a strategy is private or published)
 
 **v176 is MAJOR: one enum member leaves served outputs, and two public reads are reshaped.** No input schema moves,
