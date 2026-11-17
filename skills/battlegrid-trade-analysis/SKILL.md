@@ -53,7 +53,11 @@ Not "what were its returns" — whether it did *the thing it was told to do*.
   measurable trade's `tradeExcursion` reads in R: `mfeR` and `maeR` (the best and worst it reached),
   `exitR`, and `giveBackR` (what it surrendered between its peak and the close). `exitEfficiency` is
   a union — branch on its `state` before reading `efficiencyPercent`. All of them are gross of
-  costs; `netPnl` is the after-fee figure.
+  costs; `netPnl` is the after-fee figure. A level entry's `entryDiscipline` names the order it rested as
+  (`restedOrderType`) and `repriceCount`, how many closed bars moved that order with its level; the
+  moves themselves, and a follow that cancelled the entry, are `ENTRY_REPRICED` events in
+  `get_position_audit_history`. An entry that expired `LEVEL_FOLLOW_REFUSED` was cancelled while
+  following its level, and its audit event's `refusalStage` names the step that refused it.
 - The record around the trades: `list_agent_market_grid_decisions` (an agent's arena decisions),
   `get_signal_log` (a trade's pipeline, its thesis as `thesisReasoning`), `list_my_market_grid_entries` / `get_my_market_grid_entry` (an
   arena entry's reasoning — `agentId` for one agent's entries, none for every entry),

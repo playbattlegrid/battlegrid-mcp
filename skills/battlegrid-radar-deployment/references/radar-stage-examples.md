@@ -4,14 +4,15 @@ Complete `stage_radar_deployment_draft` inputs, one per construction in **Shapin
 checked in CI against the live stage schema and composed into a policy the aggregate accepts, so its
 shape is current.
 
-Every `<UPPER_SNAKE>` value is a placeholder. Replace it with the id a read returned:
+Every `<UPPER_SNAKE>` value is a placeholder. Replace it with the value it names:
 
-- `<COIN_ID>` comes from `get_coin_metadata`.
+- `<COIN_TICKER>` is the coin as the player names it — its ticker or exchange symbol, in any case (`SOL`,
+  `AAPL`, `kPEPE`); the server resolves it.
 - `<AGENT_ID>` comes from your agent list.
 - `<OTHER_AGENT_ID>` is a second agent from your agent list, where an example deploys two.
 
 Every example addresses the player's Main team's deployment of the coin. For another team's deployment,
-add its `teamId` (from `list_radar_deployments` or `get_account_state.teams`) beside `coinId`.
+add its `teamId` (from `list_radar_deployments` or `get_account_state.teams`) beside `coinTicker`.
 
 Never send a placeholder as written, and never invent an id. `draftVersion` is the version
 `get_radar_deployment_draft` returned: 0 when the deployment has no draft. Each axis you send is written whole, and an axis
@@ -24,7 +25,7 @@ on this coin" with no condition named.
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 0,
   "axes": {
     "DEFAULT_SLOT": { "defaultSlot": { "agentId": "<AGENT_ID>", "minConviction": null } }
@@ -49,7 +50,7 @@ selected volatilities.
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 0,
   "axes": {
     "RULES": {
@@ -80,7 +81,7 @@ Here the agent works the bear trend and stands down while a crash or a momentum 
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 0,
   "axes": {
     "RULES": {
@@ -113,7 +114,7 @@ is staged only as hours the player names.
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 0,
   "axes": {
     "RULES": {
@@ -137,7 +138,7 @@ This rule trades either trend, but only while volatility is expanding, and only 
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 0,
   "axes": {
     "RULES": {
@@ -169,7 +170,7 @@ first agent's regimes.
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 0,
   "axes": {
     "RULES": {
@@ -193,6 +194,44 @@ first agent's regimes.
 }
 ```
 
+## Rules plus an always-on agent
+
+An always-on rule's one condition is `always`, and it comes after every other rule. It is on duty at every sweep and
+is offered the coin's fire whenever the agents above it do not take it, so here the second agent trades the coin in
+every regime, behind the first. A coin's fallback is the default slot or always-on rules, never both, so this example
+also clears `DEFAULT_SLOT`. Several always-on rules back each other up in the order listed.
+
+```json stage_radar_deployment_draft
+{
+  "coinTicker": "<COIN_TICKER>",
+  "draftVersion": 0,
+  "axes": {
+    "RULES": {
+      "rules": [
+        {
+          "agentId": "<AGENT_ID>",
+          "minConviction": null,
+          "conditions": [
+            {
+              "kind": "regime",
+              "regimes": ["bull_trend", "bull_range"],
+              "volatilities": ["contracting", "normal", "expanding"],
+              "duringWarnings": "run"
+            }
+          ]
+        },
+        {
+          "agentId": "<OTHER_AGENT_ID>",
+          "minConviction": null,
+          "conditions": [{ "kind": "always" }]
+        }
+      ]
+    },
+    "DEFAULT_SLOT": { "defaultSlot": null }
+  }
+}
+```
+
 ## Clear the default slot on a deployed coin
 
 This stages only `DEFAULT_SLOT`, so the deployed rules stay as they are. Send `RULES` only when the rules change, and
@@ -201,7 +240,7 @@ returned.
 
 ```json stage_radar_deployment_draft
 {
-  "coinId": "<COIN_ID>",
+  "coinTicker": "<COIN_TICKER>",
   "draftVersion": 3,
   "axes": {
     "DEFAULT_SLOT": { "defaultSlot": null }

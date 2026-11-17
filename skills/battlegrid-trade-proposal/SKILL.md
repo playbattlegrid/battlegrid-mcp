@@ -49,11 +49,13 @@ close executes.
 - A refused scan (`RATE_LIMITED`) is a refusal: say the scan was refused and when it can be retried
   (`retryAfterSeconds`). Never say "nothing fits".
 
-## 3. Confirm, then queue the request
+## 3. State the request, then queue it on the player's consent
 
-- **Confirm with the player before queueing.** Name the agent, the coin and the bar it will be
-  decided on, and say that a qualifying close places the agent's entry at once, sized by the agent's
-  own risk budget, with no further step. Ask, and queue only on their yes.
+- **State the request before queueing.** Name the agent, the coin and the bar it will be decided on,
+  and say that a qualifying close places the agent's entry at once, sized by the agent's own risk
+  budget, with no further step. A client that prompts for tool approval collects the player's
+  approval on the queueing call itself — ask no separate question; a client that does not asks in its
+  reply and queues only on their yes.
 - **The player's own words can already be the consent.** "Trade SOL with Atlas at its next close" is
   consent: queue without asking again. So is a standing instruction the player gave you to trade for
   them. Interest is not consent — "what fits SOL right now?" is a question, so report the fit and ask

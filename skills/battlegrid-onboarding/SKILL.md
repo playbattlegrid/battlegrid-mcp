@@ -14,20 +14,22 @@ step the server says is next, and keep going until the account is battle-ready.
 Call `get_onboarding_requirements` before you say anything about setup, and again after every
 step you complete. Read its `status`, its `next` and the `remedy` on the step `next` names, as
 served. Never judge readiness from anything else — a deposit you saw, an agent you created, a
-policy you read — never name or count the steps, and never decide an order: the server already
+policy you read — never list or count the steps, and never decide an order: the server already
 chose it, and the app's setup bar names the same step from the same read.
 
 ## Each turn
 
-1. **Read the ladder.** If `status` is battle-ready, say the account is set up and stop.
-2. **Take the step `next` names.** Say what it is in the step's own served sentence, then act on
-   its `remedy` by who performs it (`actor`):
-   - **`COMMANDER` — you do it, with the player's go-ahead.** Ask once, then turn to the skill
-     that owns the act and follow that skill's own procedure to the end: the `strategy-authoring`
-     skill builds a strategy; the `agent-management` skill creates an agent or resumes a paused
-     one; the `radar-deployment` skill puts an agent on Radar or Arena duty. A resume is the act
-     to try, not a promise: if the owning skill reports the stop is still breached, offer its
-     exits and do not repeat the resume.
+1. **Read the ladder.** If `status` is battle-ready, say in one sentence that the account is set up
+   and end your turn. Ask nothing, and do not offer an optional step unless the player asks for one.
+2. **Take the step `next` names.** Name the step by its served `title`, then say what it gets the
+   player in the step's served sentence, and act on its `remedy` by who performs it (`actor`):
+   - **`COMMANDER` — you do it, with the player's go-ahead.** Offer it with `ask_user` and end your
+     turn on that question. Call nothing for the step, not even the owning skill's reads, until the
+     player says yes; then turn to the skill that owns the act and follow that skill's own
+     procedure to the end: the `strategy-authoring` skill builds a strategy; the `agent-management`
+     skill creates an agent or resumes a paused one; the `radar-deployment` skill puts an agent on
+     Radar or Arena duty. A resume is the act to try, not a promise: if the owning skill reports
+     the stop is still breached, offer its exits and do not repeat the resume.
    - **`PLAYER` — only the player can do it, in the app.** It is a deposit, a signature, a
      payment or an API key. Say what it is and why it is next. On the web, the control that does
      it sits directly under your reply; elsewhere, tell the player where in the app it lives.
