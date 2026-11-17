@@ -191,6 +191,10 @@ Recipes — each one clause:
   came back under it. `dist_donchianHiPrior20 crossesBelow 0` is NOT "fell back into the channel": the rail
   rises to each breakout bar's high, so it fires once on the first bar of a breakout run that does not
   close above the raised rail — the run of new closing highs ended.
+- **Near the all-time high** — `dist_ath gt -3`, over an `ATH × distance` column: the close is within 3% below the
+  coin's all-time high, or past it. `ATH` is the highest high before the bar since the coin listed on its venue
+  (Pine's `ta.max(high)[1]` over the venue's whole history), so the distance is negative below the level and
+  `dist_ath crossesAbove 0` is the first close above a new all-time high. It is absent on a coin's first bar.
 - **RSI crossed above 50 within the last 3 closes** — `RSI14_now crossesAbove 50` holding
   `{ "atLeast": 1, "of": 3 }`.
 - **Close crossed above a 100 EMA** (a length with no stored point) — `close_close_ema100_spread crossesAbove 0`,
@@ -262,17 +266,17 @@ FALSE, so `NOT [dist_donchianHiPrior20 gt -0.52]` reads TRUE on a coin with no c
 `CVD_state in ["bullish", "neutral"]` part the same way. Flip only a header that always carries a
 value, or choose deliberately which answer a missing value gives.
 
-A verdict carrier must read no DEVELOPING bar. A verdict is refused over any closure that reads a
-column selecting Developing above the strategy timeframe (`CONDITION_VERDICT_READ_ILLEGAL`). The
-closure is what the condition reads directly plus everything reached through `conditionRef`,
-transitively: a referenced condition contributes what IT reads, so moving the clause into a building
-block does not launder it. A closure whose candle columns all read Confirmed — or whose operands no
-bar moves at all, such as a published regime label or a funding rate — admits a verdict at every
-decision, because a decision reads the completed strategy bar and a level is compared against that
-bar's close. A change over a horizon above the strategy timeframe — `chg4h` or `chg24h` on a `1h`
-strategy, and `oiRegime`, which reads the `1h` change, below `1h` — is a developing read whatever its
-selector: its bar is still in progress at the close, so it carries no verdict. Read a horizon at or
-below the strategy timeframe instead, or a Confirmed `CLOSE_CHANGE` on the higher timeframe.
+A verdict carrier may read a DEVELOPING bar. A verdict binds on the frame its decision reads,
+whichever bar set its closure — what the condition reads directly plus everything reached through
+`conditionRef`, transitively — reads. A closure that reads a column selecting Developing above the
+strategy timeframe reads, on a decided bar, the higher-timeframe bar as it stood at the decided bar's
+close, so the side is chosen by the value at the strategy close and never by the instant the
+evaluation runs; the radar's close decision, the compose and the exit sweep read that one value. A
+change over a horizon above the strategy timeframe — `chg4h` or `chg24h` on a `1h` strategy, and
+`oiRegime`, which reads the `1h` change, below `1h` — is a developing read whatever its selector: its
+bar is still in progress at the close, so it reads the change up to the decided close, renders
+provisional, and may carry a verdict. What a developing read cannot do is count closes: a clause over
+one holds Once and steps no sequence (`DEVELOPING`, below), whatever verdict its condition carries.
 
 Evaluation is three-valued: UNRESOLVED never collapses to FALSE; a developing read is provisional,
 and so is any reading taken on the display lane's forming bar.
@@ -312,9 +316,10 @@ a header admits only Once:
   `LIQUID_FLOOR` holds Once because `vol24hUsd` is a bundle scalar. A structure-zone column is not one of
   these: it holds on its own timeframe up to the window its `conditionHold` serves, each counted bar
   reading the zone set stored for that bar.
-- `DEVELOPING` — the column reads a bar still forming: a Developing candle column above the strategy
-  timeframe, or a change over a horizon above it. **Developing columns cannot be held**; set a candle
-  column Confirmed to count closes, or read a change at or below the strategy timeframe.
+- `DEVELOPING` — the column reads a bar still in progress: a Developing candle column above the strategy
+  timeframe, or a change over a horizon above it. A decision reads that bar once, as it stood at the
+  decided close, so no earlier reading of it exists to count: **Developing columns cannot be held**; set
+  a candle column Confirmed to count closes, or read a change at or below the strategy timeframe.
 - `OFFSET` — the column already reads an earlier bar; remove the offset to count closes.
 - `BAR_STATE` — the header describes only the bar being decided.
 - `HISTORY` — not enough history is stored on that timeframe to count more than one close.
@@ -392,13 +397,17 @@ bar reads the reclaim column, `poolAboveRecl is "true"` (`## Market structure le
 
 **Confirmed / Developing, per candle column.** Every transform whose home is the coin's candle series
 carries `bars`: `"closed"` is Confirmed — the newest bar completed at the strategy close — and
-`"all"` is Developing, the higher-timeframe bar still in progress at that close, which REPAINTS until
-it completes. Left unset a column reads Confirmed at every timeframe; Developing applies only where
-you choose it. At or below the strategy timeframe a Developing choice sets only what the live lane
-shows — no bar is in progress at the anchor's own close — so there it is legal and changes no decision
-taken at that close. A condition reading a
-developing bar is single-frame: its clause holds Once (a Developing column cannot be held), it
-carries no verdict and it cannot be an exit rule. One exception overrides both the stored value and the default: a column reading a metric with
+`"all"` is Developing, the higher-timeframe bar still in progress, as it stands at each close of the
+strategy bar; its value moves from one strategy bar to the next until that bar completes. Left unset a
+column reads Confirmed at every timeframe; Developing applies only where you choose it. At or below the
+strategy timeframe a Developing choice sets only what the live lane shows — no bar is in progress at the
+anchor's own close — so there it is legal and changes no decision taken at that close. A condition
+reading a developing bar holds one close: its clause holds Once (a Developing column cannot be held)
+and steps no sequence. It may be required, carry a verdict or take the exit role: a decision reads the
+bar as it stood at the decided bar's close, and a read with no decided bar (the arena's entry
+admission, a live preview) reads the bar as it stands now. A Developing read of a spot-tape, market-breadth or
+stablecoin-pair column reads no bar in progress at a decision, so a clause over one is UNRESOLVED there
+— a required condition over it blocks. One exception overrides both the stored value and the default: a column reading a metric with
 no live value (itself, or a `spread` operand) reads completed bars at every rung, because the forming
 bar publishes nothing for it. A change (`chg5m` … `chg24h`, and `oiRegime`'s `1h` change) carries its
 horizon in the metric, so above the strategy timeframe it is Developing at every rung and under every
@@ -460,8 +469,10 @@ the side: an exit rule carries `verdict: null` and `required: false` (`CONDITION
 an exit rule may reference anything, so "exit when the entry setup stops holding" is an exit rule
 whose definition is `NOT` a `conditionRef` to the entry condition. An exit rule is legal only over a
 closure every operand of which a completed bar MOVES (`CONDITION_EXIT_READ_ILLEGAL`), which rules out
-a developing read — a bar in progress is the forming bar, and an exit fired on one is an intrabar
-exit — and rules out a frame-inert operand, which could never fire. A position stamps the exit rules
+a frame-inert operand, which could never fire. A developing read is legal: the exit sweep reads the
+higher-timeframe bar as it stood at the judged candle's close, so every completed strategy candle moves
+it and the rule fires on the value at that close, never on an intrabar one; held over more than one
+close it is refused (`DEVELOPING`). A position stamps the exit rules
 it opened under, with the report and timeframes they read: an exit-rule edit applies to positions
 opened after it, and an open position keeps the exit rules it opened with, so an open position never
 refuses a commit or a rebind.
@@ -563,7 +574,7 @@ where the CLOSE sits in the envelope — `pctB20 lt 0.05` closed in the bottom 5
 threshold, never a touch. `BB_UPPER × levelInteraction` says what the bar's RANGE did at the edge — touched it,
 or pierced it and closed back.
 
-**Candle patterns** — the bar's shape against the ten bars before it (TA-Lib's default settings). A
+**Candle patterns** — the bar's shape against the ten bars before it (the default candle settings). A
 pattern carries no trend context: "a hammer in a downtrend" is `pin is "lower_wick"` plus a separate
 trend clause.
 
@@ -723,9 +734,9 @@ Recipes — the five structure reads are at the default pair; off it, read them 
   and `upper_wick` at a swing high, and `engulf_o21` for an engulfing. The whole conditions are
   `references/recipes.md`, *Candle at a swing and liquidity-pool sweeps*.
 
-## Market structure levels (LuxAlgo SMC)
+## Market structure levels (SMC)
 
-The levels LuxAlgo's Smart Money Concepts v7.0 draws, at its own defaults unless a column sets a knob:
+The Smart Money Concepts levels, at their defaults unless a column sets a knob:
 swing length 50, internal length 5 (fixed), equal-pivot length 3 (`equalBars`), equal threshold 0.1 ×
 ATR(200) (`equalThreshold`), confluence filter off. A header carries only a knob off its default, so
 the default columns read `structHi`, `iStructLo`, `eqhLvl`. The server computes them over the column's
@@ -743,7 +754,7 @@ Every reading in this section is therefore a state.
 
 | Key | Header | Reads |
 |---|---|---|
-| `SWING_PENDING_HIGH` / `_LOW` | `structHi` / `structLo` | the swing high / low the next swing break is tested against — LuxAlgo's current level while no close has crossed it |
+| `SWING_PENDING_HIGH` / `_LOW` | `structHi` / `structLo` | the swing high / low the next swing break is tested against — the current level while no close has crossed it |
 | `INTERNAL_PENDING_HIGH` / `_LOW` | `iStructHi` / `iStructLo` | the same on the internal structure (length 5) |
 | `EQH_LEVEL` / `EQL_LEVEL` | `eqhLvl` / `eqlLvl` | the newer pivot of the latest equal-high / equal-low pair, held until the next equal-length pivot on its side |
 | `SWING_STRUCTURE_LEVEL` | `structLvl` | the level the latest swing break crossed |
@@ -755,16 +766,16 @@ Every reading in this section is therefore a state.
 
 - **A pending level reads on the bar whose close crosses it**, and nothing from the next bar until a new
   pivot is recorded. So `dist_structHi gt 0` is true on that bar alone: every close through the pending swing
-  high, the bar LuxAlgo marks BOS or CHoCH. The state is the crossing. It also reads the first, anchoring break,
+  high, the bar a break of structure (BOS) or change of character (CHoCH) is marked on. The state is the crossing. It also reads the first, anchoring break,
   which `structEvt` leaves untagged because its tag depends on a bias the column's bars have not yet proven.
-- **An internal crossing LuxAlgo does not count stays pending**: where the internal level is the swing
+- **An internal crossing the structure does not count stays pending**: where the internal level is the swing
   level's own price, or the confluence filter refuses the bar, the close goes through and the internal
   level still reads, so `dist_iStructHi` reads above 0 while the close stays through it, and the internal
   event does not fire.
-- **No close retires an equal-pivot level** — LuxAlgo tests no break on equal highs. A sweep is its REJECT
+- **No close retires an equal-pivot level** — no break is tested on equal highs. A sweep is its REJECT
   (`eqhLvl_lvl is "reject_from_below"`). A close through it is the state `dist_eqhLvl gt 0`, which holds while
   the close stays above, not the crossing bar alone.
-- **A close beyond a liquidity pool retires it** (LuxAlgo Liquidity Swings): the pool still reads on that
+- **A close beyond a liquidity pool retires it**: the pool still reads on that
   bar, and from the next bar `poolAbove` reads the next pool out. A pool's sweep takes two forms: on one
   candle its REJECT, and over two candles the close beyond followed by a close back, which the next bar
   reads through the retired pool — `poolAboveRetired` (the pool the last close took, on that bar only)
@@ -797,7 +808,7 @@ Every reading in this section is therefore a state.
 `{ trigger, levelOffsetAtrMultiple, validForBars, levels }` — the axis's keys, and the trigger decides
 which of them you send. `ON_CANDLE_CLOSE` is sent ALONE, as `{ "trigger": "ON_CANDLE_CLOSE" }`: a
 `levelOffsetAtrMultiple`, `validForBars` or `levels` beside it is refused as an unrecognized key. A level
-trigger — `STOP_THROUGH_LEVEL` or `ON_RETEST` — sends all three, no defaults. The axis is staged
+trigger — `STOP_THROUGH_LEVEL`, `ON_RETEST` or `EITHER_SIDE_OF_LEVEL` — sends all three, no defaults. The axis is staged
 WHOLE, so a level trigger missing one is refused rather than half-kept. It is not required on every
 CREATE: a CREATE that stages no entry takes the platform's seed entry, so stage it whenever the
 setup names one. There is no confirm-timeframe key: the bar whose close decides an entry is the
@@ -811,7 +822,7 @@ directions are authored separately and never mirrored, so an asymmetric strategy
 not yield is refused at save, naming `entry.levels.LONG` or `entry.levels.SHORT`; add a column that reads it, or choose
 one the report has.
 
-**Every trigger is decided at the close of the strategy's own bar — there are three, and the close
+**Every trigger is decided at the close of the strategy's own bar — there are four, and the close
 is the only entry clock.** The newest completed bar is read on the closed basis — every one-close
 condition resolves on that bar and the gates read its close — and a reading that still qualifies
 fires at that close. A bar that does not qualify decides nothing and is not revisited. The fill lands
@@ -828,10 +839,29 @@ and is REFUSED on every stage and save; there is no live-reading entry to author
   for a return to it (a pullback: the broken 20-bar high `DONCHIAN_BROKEN_HI` for a long, the broken low
   `DONCHIAN_BROKEN_LO` for a short). The level must sit behind the mark. Not filling is a correct outcome, not a
   failure.
+- `EITHER_SIDE_OF_LEVEL` — at the qualifying close the order rests at the same placed price (level ± offset × ATR)
+  and its type is chosen from the side of the mark that price sits on: a stop when it is beyond the mark in the
+  trade's direction, a limit when it is in front of it. A price exactly at the mark is no setup. Nothing is bought
+  past the level: the stop is the same order `STOP_THROUGH_LEVEL` rests and the limit the same `ON_RETEST` rests.
+  Choose it when the level should be traded from whichever side price reaches it.
+
+**Each level has a side of price, by definition.** A resistance zone, the 20-bar high and a naked POC above sit above
+price; a support zone, the 20-bar low and a naked POC below sit below it; moving averages, VWAPs, pivots and session
+levels can sit on either side. A breakout stop needs a level beyond price in the trade's direction (above for a long),
+a pullback limit one in front of it (below for a long). A level on the wrong side for its trigger still saves, and
+the draft warns `ENTRY_LEVEL_USUALLY_SKIPPED`, because the entry will be skipped on most bars; `EITHER_SIDE_OF_LEVEL`
+never warns.
 
 Either way a level with no reading on the decided bar, or on the wrong side of the mark, is no setup — refused with
-its stage, never substituted by another level. The entry price is fixed at the decision: a level that moves while the
-order waits does not move the order.
+its stage, never substituted by another level.
+
+**A resting entry follows its level.** On each closed strategy bar while the order waits, the platform reads the level
+again and re-prices the order to the new level ± offset × ATR, with its stop, targets and size rebuilt from the same
+setup. It never chases: no read happens between closes. If the level now sits on the wrong side of the mark, a
+`STOP_THROUGH_LEVEL` or `ON_RETEST` entry is cancelled, and an `EITHER_SIDE_OF_LEVEL` entry switches between stop and
+limit. The entry is also cancelled when the rebuilt setup fails its reward-to-risk floor or stop band, or its sizing or
+budget. Once any part of the order has filled, the entry is frozen where it filled. Every re-price, switch and cancel is
+in the position's audit history (`ENTRY_REPRICED`), and `validForBars` still counts from the decision.
 
 **A multi-bar hold belongs to the CLAUSE (or group) that needs it.** Declare that clause's own
 `hold` — "3 closes in a row", "within 5 closes" — the entry axis counts no bars, and there is no displacement band: the

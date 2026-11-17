@@ -43,7 +43,7 @@ default above the strategy timeframe); plus `includeCvd`. Conditions:
 `FADE_SHORT` verdict DOWN (ref + `RSI14 gte 65` + `closeChg_1d gte 5`); mirrored `SQUEEZED_SHORTS`
 / `SQUEEZE_LONG` verdict UP (`closeChg_1d lte -5`). The confirmation is the prior completed UTC day's
 move, not today's: today's (`chg24h`) is a 1d bar still in progress at every 1h close, a developing
-read no verdict may carry. Levels 1.0–2.5 ATR, RR 1.5, ATR floor 0.5%. PM: BE 0.8R, no trail, timeDecay ON (120/60, 10→40, stale 25).
+read that measures only the part of the day already traded and cannot be held. Levels 1.0–2.5 ATR, RR 1.5, ATR floor 0.5%. PM: BE 0.8R, no trail, timeDecay ON (120/60, 10→40, stale 25).
 
 ### 3 · Relative-Strength Rotation with a Benchmark Gate — 4h cross-sectional
 

@@ -9,7 +9,7 @@ You are commissioning and governing **soldiers**. Commander does not trade — t
 under server policy, with the player's real capital. Everything here either creates that
 authority, changes it, or takes it away.
 
-## The four failures this flow exists to prevent
+## The five failures this flow exists to prevent
 
 Each one has a trigger cue. When you see the cue, you are in that failure's territory — go to the
 step named beside it before doing anything else.
@@ -19,31 +19,36 @@ step named beside it before doing anything else.
    `strategyId` is required. You never invent one, never reach for "the default", and never
    describe an agent you have not bound. → step 2.
 2. **Acting without blast radius.** *Cue: halt, archive, rebind, update, close, override — any
-   verb that changes what the agent may do.* Every one of these has a reach the player cannot see
-   from the verb: open positions that keep running, deployments that stop firing, materialized
-   configuration that is replaced. State the reach from the reads BEFORE the confirm form. And a
+   verb that changes what the agent may do.* Each has a reach the player cannot see from the verb:
+   open positions that keep running, deployments that stop firing, materialized configuration that
+   is replaced — except an archive, which the server admits only once nothing is left to reach
+   (failure 5). State the reach from the reads BEFORE the call. And a
    configuration change is staged into the agent's draft and committed only on the player's
-   explicit pick. → steps 3 and 4.
+   approval. → steps 3 and 4.
 3. **Mis-lever'd halt recovery.** *Cue: "why is it stopped", "start it again", any halted agent.*
    The halt reason says why the agent stopped, not what clears it. Offering an exit the server's
    resume verdict does not offer is offering something that cannot work. → step 5.
 4. **Driving strategy writes from this arc.** *Cue: the answer to an agent problem turns out to be
    "change the strategy".* You can SEE strategies here because you must name what you bind. That is
    not permission to author them. → the cross-skill rule below.
+5. **Pre-judging an archive.** *Cue: archive, retire or decommission an agent.* What blocks an
+   archive is the server's to say: its refusal lists every blocker with its count, paused radars
+   included. A blocker list you build from reads is a second copy that misses what those reads do
+   not count — the agents hub and the draft impact count only ENABLED radars. Never offer a clean-up
+   before the archive; call it and report what it refuses. → step 4.
 
 ## Cross-skill rule: strategy changes are not yours
 
 `list_strategies` and `get_strategy` are yours — the binding lookup is part of commissioning, and
 which strategy an agent is bound to is the agent's own STRATEGY_BINDING axis (step 4).
-`stage_strategy_draft`, `commit_strategy_draft`, `discard_strategy_draft`, `fork_strategy`,
-`archive_strategy`, `restore_strategy`, `save_report_section` and `remove_saved_report_section` are
-**not**, even though this skill's tools put them in view in the conversation.
+Creating, editing, forking, archiving or restoring a strategy, and saving or removing a saved report
+section, are **not**: they belong to the `strategy-authoring` skill.
 
 When the work is a strategy change, activate `strategy-authoring` and let its arc run — its
-evidence, spec-lock, stage-review and confirm rules bind from that point. Do not drive a strategy
-write from this arc's own steps. (Visibility is not authority: those tools keep their own server
-fences — the draft version, the revision, ownership — and this rule is about which arc's discipline
-governs the change, not about what the server would accept.)
+evidence, spec-lock, stage-review and approval rules bind from that point. Do not drive a strategy
+write from this arc's own steps, even where every tool is in view. (Visibility is not authority: a
+strategy write keeps its own server fences — the draft version, the revision, ownership — and this
+rule is about which arc's discipline governs the change, not about what the server would accept.)
 
 ## Sequence
 
@@ -64,7 +69,7 @@ governs the change, not about what the server would accept.)
 Read each thing once. A roster or agent you already fetched in this conversation is still in front
 of you; re-fetching costs the player the same payload twice and it rides every later step.
 
-### 2. Commission: interview, restate, draft, confirm, commit
+### 2. Commission: interview, restate, draft, state, commit
 
 **No strategy, no agent.** If the player has no committed strategy they could bind, say so and
 offer the `strategy-authoring` arc first. Do not fabricate a binding, do not pick one on their
@@ -87,17 +92,18 @@ the Agents Hub as *not yet created*, and opens on the create screen, where **the
 Create creates it**. Staging creates nothing and spends no slot. The avatar is minted by the server
 at creation — there is no avatar to stage.
 
-**Then read it, confirm it, and commit it.** `get_agent_draft` serves the draft, its
+**Then read it, state it, and commit it.** `get_agent_draft` serves the draft, its
 `draftVersion`, a `committedRevision` of `null` and the diagnostics: a missing or invalid axis is
 an error there, named, before anything is spent. Its impact is `operation: CREATE` with the
 create's capital reading: the smallest order its configuration — drafted, or the platform seed —
-places, against the order floor, and whether that is `feasible`. Then one confirmation naming **the
+places, against the order floor, and whether that is `feasible`. Then one statement naming **the
 strategy, the model, and the budget posture** — the capital ceiling and stops the trading
 configuration will carry, or that it will take the platform seed, with the smallest order against
-the floor — and on the player's explicit pick call `commit_agent_draft` with the `agentId`, that
-read's `draftVersion`, `expectedRevision: null` and the `teamId` of the team the agent is created on.
+the floor — and, on the player's approval as step 4 describes, call `commit_agent_draft` with the
+`agentId`, that read's `draftVersion`, `expectedRevision: null` and the `teamId` of the team the
+agent is created on.
 **The team is the commit's, never the draft's**: read `get_account_state`, which lists the player's
-`teams`, name the team in the confirmation — the agent trades on that team's wallet and spends its
+`teams`, name the team in the statement — the agent trades on that team's wallet and spends its
 balance — and default to the Main team unless the player names another. A create commit without a
 team is refused. A reading with `feasible: false` is a create the
 commit will refuse: say so, and stage a larger ceiling or a looser configuration first. Where the player has the create screen open, their own Create is the
@@ -121,7 +127,7 @@ and not readiness — the pipeline's own refusal at the fee is the authority.
 locally in the browser, and no tool provisions it. Without one the agent can be created but cannot
 place an order — say so with the create, never after the first refused trade.
 
-### 3. Stage, read, confirm, commit — every change goes through the draft
+### 3. Stage, read, state, commit — every change goes through the draft
 
 Before proposing any change to an existing agent, `get_agent_draft`. **A draft means the player is
 mid-edit in their form**, and every change you make joins it. Then:
@@ -133,22 +139,22 @@ mid-edit in their form**, and every change you make joins it. Then:
   omit keep their values. Complete stage payloads — a create, a behavior change, a rebind — are in
   `references/agent-stage-examples.md`.
 - **Read the stage's diagnostics.** Its `errors` are the refusals the commit would raise, each
-  naming its field: fix the axis and stage again before you ask for anything.
+  naming its field: fix the axis and stage again before you propose a commit.
 - A staging call refused **`DRAFT_AXIS_CONTESTED`** names an axis the player changed after the
   version you named: read again and propose against what they now have — never re-send the same
   values. One refused **`DRAFT_VERSION_MOVED`** names a version the draft never reached, or a draft
   that is gone: read again. Never raise the number to get past either refusal.
 - **Commit** through step 4: read the draft with `get_agent_draft`, state the radius from its diff
-  and impact, confirm, and on the player's explicit pick call `commit_agent_draft` with the
+  and impact, and on the player's approval call `commit_agent_draft` with the
   `agentId` and exactly the `draftVersion` and, as `expectedRevision`, the `committedRevision` that
   read returned, and `teamId: null`: a commit never moves an agent to another team, and an edit
   commit naming a team is refused. Moving an agent between teams is the player's step in the web
   app, allowed only once the agent is drained. The commit publishes every axis the draft holds — the player's own unsaved edits
-  included — so the confirmation reads out the whole diff, not only your proposal. Where their form
+  included — so the statement reads out the whole diff, not only your proposal. Where their form
   is open, their own Save is the other way to commit it.
-- **Discard** only on the player's word. `get_agent_draft` is the read of what a discard destroys:
-  tell them what the draft holds, when it was last written and from which surface, ask, and call
-  `discard_agent_draft` with the `agentId` and the `draftVersion` you read. There is no dry run and
+- **Discard** only when the player asks for it. `get_agent_draft` is the read of what a discard
+  destroys: tell them what the draft holds, when it was last written and from which surface, and on
+  their approval call `discard_agent_draft` with the `agentId` and the `draftVersion` you read. There is no dry run and
   no confirmation parameter: a draft written since your read is refused with `DRAFT_VERSION_MOVED`
   and nothing is removed — read again and show them.
 
@@ -156,25 +162,31 @@ mid-edit in their form**, and every change you make joins it. Then:
 id — the player's form is open on that agent whether or not a draft exists yet. Stage every change
 into that agent's draft, naming that id as `agentId`, create or edit alike: the create recipe's
 omitted id does not apply there, because the screen already holds the id the agent will be created
-at. Their own Create or Save commits it; commit it yourself only when they explicitly confirm
-through `ask_user`. On an existing agent a strategy change is staged into the draft's
+at. Their own Create or Save commits it; you may commit it yourself, on their approval as step 4
+describes. On an existing agent a strategy change is staged into the draft's
 STRATEGY_BINDING like any other axis, and lands in their Strategy step as a proposed binding. An
 axis their form rewrote after your proposal — typed over or undone — is their answer: propose it
 again only on their word.
 
-### 4. Lifecycle verbs: read first, state the radius, then confirm
+### 4. Lifecycle verbs: read first, state the radius, then call on the player's approval
 
 Every one of a draft commit (an edit or a rebind), halt, resume, activate and archive runs this
-shape. The reads (`get_agent_budget`, `list_user_active_positions`, `get_agent_automation_status`,
-`get_agent_performance`, `list_agent_market_grid_decisions`) need no confirm and
-cost nothing but a call — do them first, always.
+shape. For a draft commit, halt, resume and activate, the reads (`get_agent_budget`,
+`list_user_active_positions`, `get_agent_automation_status`, `get_agent_performance`,
+`list_agent_market_grid_decisions`) need no approval and cost nothing but a call — do them first,
+always. An archive does not survey them: its bullet below says why.
 
-State the blast radius **from server fields, as numbers**, before the confirm form:
+State the blast radius **from server fields, as numbers**, before the call:
 
 - **Halt** — the open-position count (they keep running; halting opens no exit) and the deployment
   coverage that stops producing entries.
-- **Archive** — the same, plus that the agent stops entering games and signal evaluations, that
-  `activate_intelligence_agent` reverses it, and that the player's draft of it is kept.
+- **Archive** — the server admits an archive only once the agent is drained, so a successful one
+  moves nothing but the agent. Say that the agent stops entering games and signal evaluations, that
+  `activate_intelligence_agent` reverses it, and that the player's draft of it is kept; then call
+  `archive_intelligence_agent` on the player's approval, as below. **Never assemble, state or offer a list of
+  blockers from reads, and never propose a clean-up before the call**: the agents hub and the draft
+  impact count only enabled radars, and no read in this arc lists the paused ones. The archive's
+  own refusal is the complete list — report it as below.
 - **Rebind** — a strategy change is the draft's STRATEGY_BINDING axis: stage `{ strategyId }`, read
   `get_agent_draft`, and take both strategies from its `impact.rebind` — the strategy it replaces
   (`fromStrategyName`) and the one it binds (`toStrategyName`, at `toStrategyRevision`). Say that
@@ -184,30 +196,37 @@ State the blast radius **from server fields, as numbers**, before the confirm fo
   a refusal names the coin and the condition — surface it, never retry it unchanged.
 - **Any other draft commit** — the concrete diff from the read: each field, from what, to what. And
   the read's `impact`: the presets it is deployed to (`deployedPresetCount`), its open positions,
-  the coins its radar is armed on (`radarArmedCoinCount`), and the capital reading — its smallest
+  the ENABLED radar coins it is armed on (`radarArmedCoinCount` — a paused deployment still holding
+  the agent is not counted; the Radar & Deployment playbook's holdings read lists every one), and
+  the capital reading — its smallest
   order (`smallestOrderUsd`) against the order floor (`orderFloorUsd`). `feasible: false` means the
-  agent could not place an order at those limits; say so before the form.
+  agent could not place an order at those limits; say so before the call.
 
-Then one confirmation. Act only on an explicit pick — one of the options you offered. Free text
-while a confirmation is open is not consent, whether it arrives in chat or in the form's own
-answer-in-your-own-words box — answer what they said and re-present the same confirmation.
+Then make the call, **only on the player's approval**. A client that prompts the player to approve
+tool calls collects it: call right after stating the radius and ask no separate confirming
+question — the client asks the player, or applies the standing setting they chose, and the call runs
+only if approved. A client that does not asks in its reply and waits for the player's word. Words
+typed while an approval prompt is open are not approval: that call does not run, so answer what they
+said and call again only when they ask. **A halt is a stop**: state its radius and call it — never
+hold a stop for a question.
 
 **The numbers a write names come from the latest read** — a commit's `draftVersion` and
 `expectedRevision`, an archive's or activation's `expectedRevision`. A `CONFLICT` means the stored
 agent moved since you read it, and a commit refused `DRAFT_VERSION_MOVED` means the draft did — the
 player's form saved an edit, or another surface staged. Both carry `nextAct: get_draft`: re-read,
-re-state the radius against the NEW state, and re-confirm. Never retry with a bumped number — that
-is voting on a state you have not seen. A commit refused with `nextAct: stage` names the field the
-diagnostics named: fix it in a stage, read, and confirm again.
+re-state the radius against the NEW state, and call again on the player's approval. Never retry
+with a bumped number — that is voting on a state you have not seen. A commit refused with
+`nextAct: stage` names the field the diagnostics named: fix it in a stage, read, and state it again.
 
-**A refused archive names its own blockers.** The refusal carries typed `archiveBlockers[]` —
-DEPLOYED / OPEN_TRADES / ACTIVE_SESSION / RADAR_DEPLOYED, each with a count. Report each blocker and
-its count as the reason, and name what would clear it (un-deploy via the deployment tools, close or
-let the positions resolve, wait for the session to settle). RADAR_DEPLOYED counts paused radars too:
-a paused radar still holds the slot, so pausing does not clear it. Clearing it is a radar-deployment
-write, not this arc's: activate `radar-deployment` and let its arc find the coins whose radar holds
-the agent and un-deploy it there — a radar draft committed without the agent, or the coin's
-deployment deleted. Never paraphrase the refusal into "it didn't work", and never retry it unchanged.
+**A refused archive names its own blockers, and that list is complete.** The refusal carries typed
+`archiveBlockers[]` — DEPLOYED / OPEN_TRADES / ACTIVE_SESSION / RADAR_DEPLOYED, each with a count.
+Report every blocker with its count, exactly as served, as the reason, and name what would clear it
+(un-deploy via the deployment tools, close or let the positions resolve, wait for the session to
+settle). RADAR_DEPLOYED counts paused radars too: a paused radar still holds the slot, so pausing
+does not clear it. Clearing it is the Radar & Deployment playbook's work, not this arc's: tell the
+player you are handing it to the Radar & Deployment playbook, activate `radar-deployment`, and let
+its holdings read and its one withdraw take the agent off every coin — never coin by coin. Never
+paraphrase the refusal into "it didn't work", and never retry it unchanged.
 
 ### 5. Halt recovery: offer exactly the served verdict's exits
 
@@ -246,7 +265,7 @@ stage replaces the drafted one whole, and every agent-owned field is required in
 
 So: **read the current configuration — the draft's TRADING_CONFIG when it holds one, otherwise the
 agent's — and stage the complete object with your change applied**, then name **every changed
-value** in the confirm, from what to what, as the draft read's diff serves it. Never assemble a
+value** before the commit, from what to what, as the draft read's diff serves it. Never assemble a
 partial config and never echo a read config back unchanged: the agent's read shape is wider than
 the axis (`strategyTimeframe` and `regimeTimeframe` are strategy-derived and refused as unknown
 keys). The commit holds the configuration to the same risk rules the agent form's Save applies.
@@ -259,7 +278,7 @@ keys). The commit holds the configuration to the same risk rules the agent form'
    is history, not the live position — and never ask the player for an order id.
 2. **Close.** `close_agent_position({ decisionId, confirm: true })` is irreversible: it submits a
    reduce-only market order and realizes the P&L. Present the position, its unrealized P&L and its
-   protections, and confirm before calling. An exchange rejection comes back as a typed trading
+   protections, then call on the player's approval as step 4 describes. An exchange rejection comes back as a typed trading
    error — report it; a success means the close order was *accepted*.
 3. **Move the stop, the take-profit, or both.**
    `override_agent_protection({ decisionId, stopLossPrice?, takeProfitPrice? })` — send only the
@@ -271,11 +290,12 @@ keys). The commit holds the configuration to the same risk rules the agent form'
    only until an automated candidate beats it, a break-even that already committed never returns,
    and time decay steps from the new stop. A moved take-profit changes nothing the movers compute —
    they keep reading the signal's take-profit.
-5. **Confirm before every write, and read the result leg by leg.** For each leg, name the current
+5. **State every write before the call, and read the result leg by leg.** For each leg, name the current
    level → the requested level and the direction (closer to or further from price). Say, in words,
    that the change **moves the stop outside the platform's protective ratchet** — that is exactly
    what the tool is for — and what automation does afterwards (step 4). Present the current
-   protection first, then the requested levels, then those sentences. The answer's `success` is
+   protection first, then the requested levels, then those sentences, and call on the player's
+   approval as step 4 describes. The answer's `success` is
    true only when every requested leg committed. `level-crossed`, `mark-unavailable` and
    `rate-limited` refused the whole request and wrote nothing; on `level-crossed` report the mark
    it names and, when the player's intent is to exit now, offer `close_agent_position` — never
@@ -284,8 +304,8 @@ keys). The commit holds the configuration to the same risk rules the agent form'
    why that leg did not move — do not assume the write landed.
 
 These tools carry no consent gate on either door: they are ownership-gated and behave identically
-in chat and through an external MCP client. Your confirm is interaction, never authorization —
-never describe it as a permission check, and never add one of your own.
+in chat and through an external MCP client. The player's approval of the call is the client's,
+never authorization — never describe it as a permission check, and never add one of your own.
 
 ### 8. Strategy Officers are the officers skill's
 
@@ -309,8 +329,8 @@ re-create over an unread roster.
 ## Reporting discipline
 
 - Report numbers exactly as the tools return them. Never recompute, re-derive, or round.
-- Reads and stages are free of confirms — a stage changes only the draft. Every commit and every
-  state verb has one, and the radius is stated before the form.
+- Reads and stages need no approval — a stage changes only the draft. Every commit and every
+  state verb but a halt runs on the player's approval, and the radius is stated before the call.
 - A tool that fails is reported as failed, with what could not be checked. Never convert a failed
   read into "no issue".
 - Be concise. Every write on this surface points real capital somewhere, or takes it away.

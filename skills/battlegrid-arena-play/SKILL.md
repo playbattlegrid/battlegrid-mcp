@@ -42,9 +42,10 @@ Explain a score, a payout or a captain choice from them, never from a remembered
 2. **A stale or superseded agent grid submitted.** *Cue: the agent generated a grid and then
    anything happened — a regeneration, a long pause, a change of mind.* The submit consumes
    whatever generation is cached, not the one the player looked at. → step 4.
-3. **Restating a limit number.** *Cue: the urge to say "you have N entries left today" or "your cap
-   is $X".* Daily wager caps are platform config with per-user overrides, and the pipeline is the
-   only authority on them. → the negatives below.
+3. **A limit quoted from memory.** *Cue: the urge to say "you have N entries left today" or "your cap
+   is $X" without having just read it.* Daily wager caps are platform config with per-user overrides;
+   the account state serves today's values, and the pipeline is the authority on an attempt. → step 1
+   and the negatives below.
 
 ## Sequence
 
@@ -66,6 +67,20 @@ instead of `mcpWagerEnabled`.
   consent and nothing else, so an account whose server signer is unregistered reads true here and
   is still refused at the fee. The wager pipeline re-checks at the fee itself and its refusal is
   the authority in either direction.
+
+**`dailyWagerCaps`** — today's MCP entries (`count`) and entry volume in USD (`volumeUsd`) against the
+player's daily caps, each with `used`, `limit`, `remaining`, the server's `status` and `resetsAt`. The
+caps bind every entry made through MCP — this conversation's included — for the player and their agents
+alike; entries made in the web app are outside them.
+
+- **`count.status` EXHAUSTED, or the session's entry fee above `volumeUsd.remaining`** ⇒ a **definite
+  refusal**, before any submission. Say which cap is spent and when it resets (`resetsAt`, a UTC
+  instant), and call no submission tool — a replacement of an agent's entry included.
+- **LOW** ⇒ say how much remains — "this is your last entry today" — before the commit.
+- **`null`** ⇒ the caps could not be read. Say so, quote no figure, and let the pipeline decide: it is
+  neither readiness nor a refusal.
+- **Open** is never a promise. Another client can spend the last entry first; the pipeline's own
+  refusal is the authority for an attempt.
 
 **In a conversation a web Commander surface hosts, the switch renders beneath the account card just
 shown, or beneath the refusal — offer it there.** Say the arena needs Agent Wagers and point at the
@@ -120,7 +135,7 @@ ask. The commit requires a `RATIONALE` axis — `reasoning`, `confidenceScore`, 
 - Each entry's reasoning cites **the market context you read in this conversation**, for that
   coin. Boilerplate reasoning attached to a real wager is worse than none — it looks like
   evidence.
-- `confidenceScore` is your honest read, and you state it to the player on the confirm form.
+- `confidenceScore` is your honest read, and you state it to the player before the commit.
 - **The `RATIONALE` is public.** Once the session locks, every player sees it beside the grid — the summary,
   the confidence, the model and each pick's reasoning — as they see an agent's. Write it for that reader.
 
@@ -133,29 +148,35 @@ Present the generation as a card: the agent, its confidence against the threshol
 (`confidenceThreshold: null` means no deployment declares a bar here, so the grid is **ungated** —
 say that rather than inventing a bar), whether it meets the threshold, and the per-coin picks.
 
-### 4. Read again, confirm, then commit promptly
+### 4. Read again, state it, then commit promptly on the player's approval
 
 `get_market_grid_entry_draft` again after staging: show the player the diff, any diagnostic, and the
-`impact` — `ENTER` with the `entryFee` the commit charges, or `REPLACE` for none. One confirmation
-naming **the session, that fee, and the confidence** — then commit on an explicit pick.
+`impact` — `ENTER` with the `entryFee` the commit charges, or `REPLACE` for none. One statement
+naming **the session, that fee, and the confidence** — then commit, **only on the player's
+approval**. A client that prompts the player to approve tool calls collects it: call right after the
+statement and ask no separate confirming question — the client asks the player, or applies the
+standing setting they chose, and the call runs only if approved. A client that does not asks in its
+reply and waits for the player's word. Words typed while an approval prompt is open are not
+approval: that call does not run, so answer what they said and call again only when they ask.
 
 - Direct → `commit_market_grid_entry_draft({ sessionId, draftVersion, expectedRevision })`,
   naming exactly the `draftVersion` and `committedRevision` the last read returned (`null` with no
-  entry). A refusal naming `get_draft` means the draft or the entry moved: read again and confirm
-  again — never retry with a bumped number.
+  entry). A refusal naming `get_draft` means the draft or the entry moved: read again and state it
+  again before a fresh call — never retry with a bumped number.
 - Agent → `submit_agent_grid`, which consumes the cached generation for that (session, agent).
 
-**A regeneration voids any prior confirm.** The submit takes no generation token — it reads
-whatever is currently cached — so a grid regenerated after the player confirmed would be submitted
-under a confirmation given for different picks. Re-present the confirm for the new generation,
-every time, and submit promptly after the confirmed one.
+**A regeneration voids any prior approval.** The submit takes no generation token — it reads
+whatever is currently cached — so a grid regenerated after the player approved would be submitted
+under an approval given for different picks. State the new generation, every time, and submit it
+promptly, its call waiting on its own approval.
 
 **If the submit is refused with `CONFLICT`**, the player's entry changed after the grid was generated —
 replaced, cancelled, re-placed, or placed where there was none. No fee moved. The recovery is
-`generate_agent_grid` again, a fresh confirm of the new grid, then `submit_agent_grid`.
+`generate_agent_grid` again, a fresh statement of the new grid, then `submit_agent_grid` on the
+player's approval.
 
 **If the submit is refused for a missing pending generation**, the ten-minute window lapsed. The
-recovery is `generate_agent_grid` again and a fresh confirm. **Never** convert the stale picks into
+recovery is `generate_agent_grid` again and a fresh statement. **Never** convert the stale picks into
 a hand-staged draft committed under the player's own name — that enters an agent's reasoning as the
 player's, and the attribution is part of what was scored.
 
@@ -188,7 +209,7 @@ arrives as the attached scope, and the session it names is the one in scope.
 - **Stage, do not enter.** When the player asks you to pick or fill in their grid, read the draft and
   stage the cells into it (step 3). Each staged pick appears in their builder at once, labelled as
   yours; nothing is entered and no fee or deposit is needed. Their own **PLACE ENTRY** places it;
-  offer to place it for them only through step 4's confirmation and the draft commit.
+  offer to place it for them only through step 4's statement and the draft commit, on their approval.
 - **Their picks are in the draft.** A pick they make in the builder lands there as they make it, so
   read the draft before answering what they have picked or staging over it. A pick their builder
   rewrote after you staged it is their answer — stage it again only when they ask.
@@ -196,8 +217,8 @@ arrives as the attached scope, and the session it names is the one in scope.
   `generate_agent_grid` for the session in scope (the billed-inference warning in step 3 still
   applies). The result reaches them as a card with **LOAD INTO GRID**, which puts the picks into their
   builder as a starting point. A loaded grid they have not changed is the agent's: if they want it
-  entered as it stands, run step 4, then `submit_agent_grid` on their explicit pick, never on free
-  text. Once they change a pick, the grid is theirs.
+  entered as it stands, run step 4, then `submit_agent_grid` on their approval as step 4 describes.
+  Once they change a pick, the grid is theirs.
 - **A newer generation for the same agent replaces the older card.** The older one reads SUPERSEDED;
   only the newest is what `submit_agent_grid` would enter.
 
@@ -208,24 +229,25 @@ Each is typed and distinguishable. Read the code, do not paraphrase:
 - **No wallet consent** — the shared wager pipeline's own refusal, carrying its enablement copy.
   Surface that path verbatim. This is the same refusal an external MCP client gets; there is no
   chat-side difference and no chat-side override.
-- **A daily cap** — a typed rate-limit refusal. Say the cap is spent and that it resets on the UTC
-  day. Distinguishable from the run's op budget and from consent — do not merge them into "you
-  can't play right now".
+- **A daily cap** — a typed rate-limit refusal. Say the cap is spent and when it resets — the
+  `resetsAt` of a fresh `get_account_state`. Distinguishable from the run's op budget and from
+  consent — do not merge them into "you can't play right now".
 - **Funds, session state, an already-submitted grid** — ordinary typed refusals. Report what the
   server said.
 
 ## Negatives
 
-- **Never restate a limit number** — not the daily count, not the volume cap. The pipeline holds
-  the real value including per-user overrides, and a number repeated from anywhere else will
-  eventually be wrong on a surface where being wrong costs money.
+- **Never quote a limit from memory** — not the daily count, not the volume cap, not the reset.
+  Quote the served `dailyWagerCaps` of the read you just made: the server holds the real value
+  including per-user overrides, and a number repeated from anywhere else will eventually be wrong on
+  a surface where being wrong costs money.
 - **Never use `random_submit_market_grid`.** It shuffles the pool and wagers on the result with no
   reasoning at all. It exists for other clients; it is not something to offer a player who asked
   you to think.
-- **Your confirmation with the player is interaction, never authorization.** Do not describe it as
-  a permission check, do not add a wager gate of your own, and do not treat free text typed while a
-  confirmation is open as consent — in chat or in the form's own answer-in-your-own-words box. Only
-  an explicit pick from the options you offered confirms.
+- **The player's approval of the call is the client's, never authorization.** Do not describe it as
+  a permission check, do not add a wager gate of your own, and do not ask a separate confirming
+  question where the client already prompts for the call. Words typed while an approval prompt is
+  open never approve the call.
 - **Never re-commit over an unknown outcome.** An interrupted commit may have moved the fee. A retry
   of the same `draftVersion` returns the first commit's receipt; otherwise run
   `check_market_grid_submission` and `get_market_grid_entry_draft` first and report what actually
