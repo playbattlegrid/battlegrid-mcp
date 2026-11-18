@@ -38,6 +38,42 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v181 (a Developing read states when it was read)
+
+**v181 is MAJOR: a published output field is removed.** No input schema moves, and everything v180 accepted is still
+accepted.
+
+Since v175 a Developing read decides on the higher-timeframe bar as it stood at one minute: the decided bar's final
+minute on a decided bar, the newest folded minute at the latest values. v181 serves that minute as the read's
+**cut-off**: an ISO instant, the close of the newest source minute folded into the bar in progress. On a decided bar
+that is the decided bar's close.
+
+### Removed output — the reason v181 is MAJOR
+
+- **A condition outcome loses `developingRead` and serves `developingAsOf` in its place.** `developingAsOf` is the
+  cut-off of the outcome's Developing reads, the earliest across its operands, or `null` where it read no bar in
+  progress. This applies wherever an outcome is served: `preview_strategy_report`'s detailed
+  `authoring.conditionOutcomes`, `get_radar_close_decisions`, `list_gate_blocks`, `preview_radar_resolution` and
+  `get_agent_coin_qualification`. Read `developingAsOf !== null` where you read `developingRead`. It is narrower:
+  a Developing column that read a bar its own close completed, and a fixed-horizon change (`chg4h` on a `1h`
+  strategy), read no bar in progress and serve `null`. A record written before v181 serves `null`.
+- **The authoring inventory keeps `developingRead`.** On a report condition column, a scalar vocabulary entry and an
+  anchor relation it still states which bar a header reads, before anything is read.
+
+### Added output
+
+- **`get_signal_log` and `get_public_agent_signal_log_detail`:** each condition outcome serves `developingAsOf`,
+  `null` on a row written before v181.
+- **Every trade condition register** serves `developingAsOf` on each condition, beside `provisional`.
+- **A rendered section column** serves an optional `asOf`, present only where a row it renders read a bar in progress:
+  the earliest cut-off across its rows. This is served by `preview_strategy_report`, `get_market_context`,
+  `get_context_sources_preview`, `get_context_source_full_preview` and the signal logs' stored report.
+
+### Changed text
+
+- **The trade condition glossary** defines `developingAsOf`, and **the report columns glossary** defines `asOf`. Both
+  warn that volume and range on a bar in progress cover only the part of it elapsed by the cut-off.
+
 ## Contract history — v179 (radar tools name a coin by its ticker)
 
 **v179 is MAJOR: fifteen radar tools rename the input that names a coin, and two reshape their result.** Nothing else
