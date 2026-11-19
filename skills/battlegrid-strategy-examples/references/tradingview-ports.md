@@ -95,6 +95,14 @@ rules about the columns themselves, not about porting — they live in the skill
   day's opening ranges (`OR15_HIGH`/`OR15_LOW`, `OR30_HIGH`/`OR30_LOW`) and the IB extensions
   (`IB_EXT_UP_150` … `IB_EXT_DOWN_200`). A session window (`TRADING_SESSION in ["london","newYork"]`,
   `DAY_OF_WEEK between 1 and 5`) is an ordinary condition; the glosses state the windows.
+- **The week's or day's high so far — `wkHigh[1]` / `dayHigh[1]`** → native as `WEEK_HIGH` / `WEEK_LOW` (the week
+  from Monday 00:00 UTC) and `DAY_HIGH` / `DAY_LOW` (the UTC day), on the strategy's anchor rung. A verb over one
+  reads the level as it stood at the previous strategy bar's close, which is Pine's
+  `inForce = timeframe.change("W") ? na : wkHigh[1]`: a BREAK of the week high is `dist_weekHi crossesAbove 0`
+  (`ta.crossover(close, inForce)`), a close at a new week high is `dist_weekHi gt 0`, and `WEEK_HIGH ×
+  levelInteraction` reads TOUCH / REJECT. Monday's first hour has no level in force, so a verb there is unreadable,
+  and a crossing is unreadable on the second hour too. Last week's high is `PWH`. `HIGH @1d` / `@1w` Developing is a
+  different read: the forming candle at its own rung, not a level met per strategy bar.
 - **ICT / SMC (FVG + order blocks)** → `STRUCT_ZONES` is the native zone engine:
   `zones_htf_support_type` (`bullish FVG`/`bullish order block`), `zones_htf_support_dist
   between 0 1.5`, `_age_bars gte 3`, HTF bias required via `MAalign_htf`. A killzone is a session window
