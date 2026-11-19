@@ -38,17 +38,17 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
-## Contract history — v181 (a Developing read states when it was read)
+## Contract history — v182 (a Developing read states when it was read)
 
-**v181 is MAJOR: a published output field is removed.** No input schema moves, and everything v180 accepted is still
+**v182 is MAJOR: a published output field is removed.** No input schema moves, and everything v181 accepted is still
 accepted.
 
 Since v175 a Developing read decides on the higher-timeframe bar as it stood at one minute: the decided bar's final
-minute on a decided bar, the newest folded minute at the latest values. v181 serves that minute as the read's
+minute on a decided bar, the newest folded minute at the latest values. v182 serves that minute as the read's
 **cut-off**: an ISO instant, the close of the newest source minute folded into the bar in progress. On a decided bar
 that is the decided bar's close.
 
-### Removed output — the reason v181 is MAJOR
+### Removed output — the reason v182 is MAJOR
 
 - **A condition outcome loses `developingRead` and serves `developingAsOf` in its place.** `developingAsOf` is the
   cut-off of the outcome's Developing reads, the earliest across its operands, or `null` where it read no bar in
@@ -56,14 +56,14 @@ that is the decided bar's close.
   `authoring.conditionOutcomes`, `get_radar_close_decisions`, `list_gate_blocks`, `preview_radar_resolution` and
   `get_agent_coin_qualification`. Read `developingAsOf !== null` where you read `developingRead`. It is narrower:
   a Developing column that read a bar its own close completed, and a fixed-horizon change (`chg4h` on a `1h`
-  strategy), read no bar in progress and serve `null`. A record written before v181 serves `null`.
+  strategy), read no bar in progress and serve `null`. A record written before v182 serves `null`.
 - **The authoring inventory keeps `developingRead`.** On a report condition column, a scalar vocabulary entry and an
   anchor relation it still states which bar a header reads, before anything is read.
 
 ### Added output
 
 - **`get_signal_log` and `get_public_agent_signal_log_detail`:** each condition outcome serves `developingAsOf`,
-  `null` on a row written before v181.
+  `null` on a row written before v182.
 - **Every trade condition register** serves `developingAsOf` on each condition, beside `provisional`.
 - **A rendered section column** serves an optional `asOf`, present only where a row it renders read a bar in progress:
   the earliest cut-off across its rows. This is served by `preview_strategy_report`, `get_market_context`,
@@ -73,6 +73,37 @@ that is the decided bar's close.
 
 - **The trade condition glossary** defines `developingAsOf`, and **the report columns glossary** defines `asOf`. Both
   warn that volume and range on a bar in progress cover only the part of it elapsed by the cut-off.
+
+## Contract history — v181 (price is the base of every spread over another reading)
+
+**v181 is MAJOR: a spread that takes a reference price as its second side over another reading is refused.** No
+schema moves, and every other column is accepted as v180 accepted it.
+
+`spread` computes `base − operand`, so the base decides the sign. Price compared with another reading is now always
+the base, so "price above the level" reads positive in every such column, and one question has one stored form.
+
+### Rejected input — the reason v181 is MAJOR
+
+- **A reference price is never the plain operand of a spread whose base is not one.** `EMA20 × spread(CLOSE)`,
+  `PRIOR_TPO_VAH × spread(CLOSE)`, `EMA20 × spread(LAST)` and `HL2 × ema(34) × spread(CLOSE)` are refused with
+  `VALIDATION_ERROR` / `REPORT_COLUMN_OPERAND_UNSUPPORTED` on every surface that builds a report column.
+- **The refusal names the form to write, where the server admits it at the column's rung:** `CLOSE × spread(EMA20)`,
+  `LAST × spread(EMA20)`, or `CLOSE × spread({ metric: HL2, transformId: ema, window: 34 })`. Where no such form is
+  admitted (a session-profile level off the anchor rung, or `LAST` off the anchor), it names none.
+- **Still accepted:** `CLOSE × spread(LAST)` and `LAST × spread(CLOSE)` (two reference prices keep both orders), and an
+  average of price as an operand (`{ metric: CLOSE, transformId: ema, window: 34 }`).
+
+### Narrowed output
+
+- **`get_metric_construction_hints`' plain spread operand lists drop `CLOSE` and `LAST`** for every base that is not
+  a reference price: `spreadOperands`, `spreadOperandsOffAnchor`, and each chained `spread` outer's `operands`. The
+  averaged lists (`spreadAverageOperands*`) are unchanged.
+
+### Moved stored columns
+
+- **The stored `PRIOR_TPO_{VAH,POC,VAL} × spread(CLOSE)` columns are now `CLOSE × spread(PRIOR_TPO_*)`**, headed
+  `close_pTpo{VAH,POC,VAL}_spread`. The conditions that read them flipped their operator and mapped their threshold, so
+  they pass on the same bars. A condition naming `pTpo{VAH,POC,VAL}_close_spread` is refused as an unknown header.
 
 ## Contract history — v179 (radar tools name a coin by its ticker)
 
