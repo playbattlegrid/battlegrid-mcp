@@ -38,6 +38,37 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v181 (price is the base of every spread over another reading)
+
+**v181 is MAJOR: a spread that takes a reference price as its second side over another reading is refused.** No
+schema moves, and every other column is accepted as v180 accepted it.
+
+`spread` computes `base − operand`, so the base decides the sign. Price compared with another reading is now always
+the base, so "price above the level" reads positive in every such column, and one question has one stored form.
+
+### Rejected input — the reason v181 is MAJOR
+
+- **A reference price is never the plain operand of a spread whose base is not one.** `EMA20 × spread(CLOSE)`,
+  `PRIOR_TPO_VAH × spread(CLOSE)`, `EMA20 × spread(LAST)` and `HL2 × ema(34) × spread(CLOSE)` are refused with
+  `VALIDATION_ERROR` / `REPORT_COLUMN_OPERAND_UNSUPPORTED` on every surface that builds a report column.
+- **The refusal names the form to write, where the server admits it at the column's rung:** `CLOSE × spread(EMA20)`,
+  `LAST × spread(EMA20)`, or `CLOSE × spread({ metric: HL2, transformId: ema, window: 34 })`. Where no such form is
+  admitted (a session-profile level off the anchor rung, or `LAST` off the anchor), it names none.
+- **Still accepted:** `CLOSE × spread(LAST)` and `LAST × spread(CLOSE)` (two reference prices keep both orders), and an
+  average of price as an operand (`{ metric: CLOSE, transformId: ema, window: 34 }`).
+
+### Narrowed output
+
+- **`get_metric_construction_hints`' plain spread operand lists drop `CLOSE` and `LAST`** for every base that is not
+  a reference price: `spreadOperands`, `spreadOperandsOffAnchor`, and each chained `spread` outer's `operands`. The
+  averaged lists (`spreadAverageOperands*`) are unchanged.
+
+### Moved stored columns
+
+- **The stored `PRIOR_TPO_{VAH,POC,VAL} × spread(CLOSE)` columns are now `CLOSE × spread(PRIOR_TPO_*)`**, headed
+  `close_pTpo{VAH,POC,VAL}_spread`. The conditions that read them flipped their operator and mapped their threshold, so
+  they pass on the same bars. A condition naming `pTpo{VAH,POC,VAL}_close_spread` is refused as an unknown header.
+
 ## Contract history — v179 (radar tools name a coin by its ticker)
 
 **v179 is MAJOR: fifteen radar tools rename the input that names a coin, and two reshape their result.** Nothing else
