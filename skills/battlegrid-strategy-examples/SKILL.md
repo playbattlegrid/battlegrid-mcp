@@ -66,8 +66,8 @@ includes the bar measured, so a close can never pass it. The offset belongs to t
 never to a chain outer.
 
 **Timeframe references are two families.** *Relative* (`anchor`/`lower`/`regime`) re-resolve
-when the strategy timeframe changes — `regime` is the anchor's ladder successor (1d for a 4h
-anchor). *Pinned* (`{abs: "<tf>"}`) is fixed, ignores anchor retunes, suffixes the literal
+when the strategy timeframe changes — `regime` is the anchor's regime rung, the shortest enabled timeframe at least three times
+the anchor (12h for a 4h anchor, 2h for a 30m anchor). *Pinned* (`{abs: "<tf>"}`) is fixed, ignores anchor retunes, suffixes the literal
 (`RSI14_1d`, `dist_SMA200_1d`, `MAalign_1d` — validated), and binds to discovery's
 `rankedTimeframes`, a **superset** of the authorable anchor set — `{abs: "1d"}` is valid while
 `1d` is not an anchor. `offset` steps back inside the bar set the Read selector admits, counted
