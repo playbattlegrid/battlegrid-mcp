@@ -358,13 +358,16 @@ is the **trail objective**, which sets how far the runner's trail measures and e
 raise restates the menu without it. The `strategy-examples` skill's *Trade levels* section carries the menu's
 options, how pairs are built and what the save refuses. Before committing a TRADE_LEVEL_POLICY change, show the
 player `preview_strategy_trade_levels({ coinTicker, source: { kind: "DRAFT", strategyId, draftVersion } })`: every
-stop with its verdict and its distance in ATR, the pairs that survive with each target's price and close %, each
+stop with its verdict and the ATR distance it was judged at (an ATR option's own multiple, so a stop on a bound is
+kept), the pairs that survive with each target's price and close %, each
 runner's trail distance in ATR and R, the pairs refused and why, and the reachable stop band, per direction. Show it
 for an ENTRY change too: under a level trigger each direction's `entry` says where the order rests on that coin now
-(the level, the placed price, its side of price and whether a stop or a limit rests), and the trade is built from that
-placed price; a verdict that does not rest (`WRONG_SIDE` with the side it needed, `LEVEL_UNREAD`, `ATR_UNAVAILABLE`)
-means the agent would not place that trade on that coin now. An R
-target there is measured from its own pair's stop; `minRiskRewardRatio` judges each pair's plan risk-reward. The same holds for a condition: CONDITIONS carries every condition, each with its
+(the level, the placed price, its side of price, whether a stop or a limit rests, how far it sits from price in percent
+and in ATR, and how many minutes it stays valid), and the trade is built from that placed price; a verdict that does
+not rest (`WRONG_SIDE` with the side it needed, `LEVEL_UNREAD`, `ATR_UNAVAILABLE`) means the agent would not place that
+trade on that coin now. An R
+target there is measured from its own pair's stop; `minRiskRewardRatio` judges each pair's plan risk-reward, stated to
+three decimals. The same holds for a condition: CONDITIONS carries every condition, each with its
 `required` flag and verdict as they stand. Never set `required` or a verdict from memory, and never
 change either unless the player asked: a wrong value there is how a building block silently becomes
 a mandatory trade gate, or a gate silently disappears.

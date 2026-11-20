@@ -2,7 +2,7 @@
   "digestVersion": 2,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "180.4.0"
+    "contractVersion": "182.3.1"
   },
   "axes": {
     "create": [

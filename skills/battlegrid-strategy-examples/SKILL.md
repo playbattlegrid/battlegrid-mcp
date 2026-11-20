@@ -945,11 +945,16 @@ that target is the **trail objective** — it places no order and only sets how 
 `[2R closing 50%, 6R closing 0%]` banks half at 2R and trails the rest with a trail sized to 6R. One target closing
 100% is today's single take-profit.
 
-A level reference is the same shape the entry axis names, and must be a level the report yields. At each decision the
+A level reference is the same shape the entry axis names, and must be a level the report yields. A nearest level — a
+structure-zone edge or midpoint, a liquidity pool, a naked POC or a single print — used as a stop or target is the
+level's own pick among those on that option's side of the entry: the report's level whenever that one is usable there,
+otherwise the next of its kind beyond the entry, and the preview's stop row shows the reading a level stop was built
+from (`levelReading`). At each decision the
 platform pairs every stop with every exit plan and prices each target on the decided bar beside that stop. It drops a
 pair whose stop is not on the loss side of entry, a stop tighter than `minStopLossAtrMultiple` or wider than
-`maxStopLossAtrMultiple` (or the 5×ATR cap), a plan whose targets do not run away from entry in plan order beside that
-stop, a pair whose plan risk-reward is under `minRiskRewardRatio`, and — for an agent — a plan one of whose target
+`maxStopLossAtrMultiple` (or the 5×ATR cap) — judged in ATR multiples, an ATR option at its own multiple, so a stop
+authored on a bound (`ATR 1.5` beside a 1.5 floor) is always kept — a plan whose targets do not run away from entry in
+plan order beside that stop, a pair whose plan risk-reward, stated to three decimals, is under `minRiskRewardRatio`, and — for an agent — a plan one of whose target
 legs would fall under the exchange's minimum order value at the smallest order the agent can place. A level with no
 reading on the bar drops the plans that name it; nothing is stretched, merged or substituted. Pairs that land on the
 same stop, target prices and shares are one setup naming every option and plan that made it. The agent chooses one
@@ -959,7 +964,9 @@ setup; a one-entry list is a fixed choice.
 stop|` from entry for the stop it is paired with, so 2R beside a 2×ATR stop is twice as far as 2R beside a 1×ATR stop.
 A plan's risk-reward is each share at its target's distance plus the runner at the distance of the last target that
 closes a share, over the stop's risk; a trail objective adds nothing. `[1R closing 50%, 3R closing 50%]` pays 2.0 and
-`[1R closing 50%]` pays 1.0. An all-R plan has the same risk-reward beside every stop, so the save refuses one below
+`[1R closing 50%]` pays 1.0. A risk-reward is stated to three decimals, the precision each setup records, and the
+editor, the save and every pair judge that one figure: `[1.4R closing 75%, 1.8R closing 25%]` is 1.5 and meets a 1.5
+minimum. An all-R plan has the same risk-reward beside every stop, so the save refuses one below
 `minRiskRewardRatio` (it could never trade) rather than dropping it per trade; a plan's early target may sit below
 the minimum when the plan as a whole clears it.
 
