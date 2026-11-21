@@ -948,8 +948,9 @@ that target is the **trail objective** — it places no order and only sets how 
 A level reference is the same shape the entry axis names, and must be a level the report yields. A nearest level — a
 structure-zone edge or midpoint, a liquidity pool, a naked POC or a single print — used as a stop or target is the
 level's own pick among those on that option's side of the entry: the report's level whenever that one is usable there,
-otherwise the next of its kind beyond the entry, and the preview's stop row shows the reading a level stop was built
-from (`levelReading`). At each decision the
+otherwise the next of its kind beyond the entry. With none of its kind beyond the entry it is refused `WRONG_SIDE`, at
+its own reading. The preview's stop row shows the reading a level stop was built from (`levelReading`). At each
+decision the
 platform pairs every stop with every exit plan and prices each target on the decided bar beside that stop. It drops a
 pair whose stop is not on the loss side of entry, a stop tighter than `minStopLossAtrMultiple` or wider than
 `maxStopLossAtrMultiple` (or the 5×ATR cap) — judged in ATR multiples, an ATR option at its own multiple, so a stop
