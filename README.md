@@ -38,6 +38,30 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v184 (one refusal for a coin that is not live)
+
+**v184 is MAJOR: a published refusal loses its details.** No input schema moves, everything v183 accepted is still
+accepted, and the refusal for a coin that is not in the catalog does not change.
+
+### Narrowed refusal details — the reason v184 is MAJOR
+
+- **`stage_radar_deployment_draft` and `commit_radar_deployment_draft`** refuse a first deployment on a coin that is
+  not live without `details.nextAct`. v183 answered it with `nextAct: "stage"`, but a radar draft is keyed by its coin,
+  so no staged value repairs it: choose a live coin instead. Every other validation refusal of those two tools still
+  carries `nextAct: "stage"`.
+
+### Narrowed output
+
+- **`propose_entry_decision` and `get_trade_conversation`** no longer list `UNKNOWN_COIN` among the surface error's
+  `reasonCode` values. Neither ever served it: an unknown `coinTicker` is refused at the door as `VALIDATION_ERROR`
+  naming `coinTicker`, as before.
+
+### Changed text
+
+- **The not-live refusal's message** reads "`<ticker>` is delisted, so nothing new can be deployed on it. Choose a
+  live coin." on the two draft tools above, on the diagnostic `get_radar_deployment_draft` serves, and on the per-coin
+  refusals of `deploy_agent_to_radar` and `preview_agent_radar_deploy`. Its `code` is unchanged.
+
 ## Contract history — v182 (a Developing read states when it was read)
 
 **v182 is MAJOR: a published output field is removed.** No input schema moves, and everything v181 accepted is still
