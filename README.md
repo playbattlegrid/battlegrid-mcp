@@ -143,6 +143,29 @@ id is not its ticker (`xyz_aapl` for `AAPL`), so a guessed id used to fail on th
 - **`get_agents_hub`** tells you to pass a radar row's `symbol` as `coinTicker`, with its `teamId`, to
   `get_radar_deployment`.
 
+## Contract history — v183 (a stop's ATR distance is stated once; every trade-level verdict names its dial)
+
+**v183 is MAJOR: two fields leave one tool's output.** No input schema moves, and everything v182 accepted is still
+accepted.
+
+### Removed output — the reason v183 is MAJOR
+
+- **`preview_strategy_trade_levels`: a setup row no longer carries `stopLossDistanceAtrMultiple`, and a refused pair
+  no longer carries `slDistanceAtrMultiple`.** A stop's distance in ATR is stated once, on its stop row:
+  `stopCandidates[].distanceAtrMultiple`, the multiple its verdict was judged at. To read a setup's or a pair's, find
+  the stop row whose `method` and `price` match its `slMethod` and `slPrice`. The distance in percent
+  (`slDistancePct`) is unchanged, and a refused pair is now exactly the `RrRejectedPair` the signal logs serve.
+
+### Changed text
+
+- Every trade-level verdict, stage and reason is described by one meaning that names the dial recovering it. A stop
+  refused `BELOW_FLOOR` names `minStopLossAtrMultiple`, `ABOVE_CEILING` names `maxStopLossAtrMultiple`, and
+  `ABOVE_STRUCTURAL_CEILING` states that no dial recovers it. A refused pair's `RISK_REWARD_TOO_LOW` names
+  `minRiskRewardRatio`. A nearest level's `WRONG_SIDE` states that it is refused only when none of its kind sits beyond
+  the entry, at its own reading.
+- A refused pair's `computedRR` states its three decimals, and the preview's `rejectedPairs` states that
+  `TARGET_LEG_BELOW_ORDER_FLOOR` never appears there. No served value moves.
+
 ## Contract history — v176 (a strategy is private or published)
 
 **v176 is MAJOR: one enum member leaves served outputs, and two public reads are reshaped.** No input schema moves,
