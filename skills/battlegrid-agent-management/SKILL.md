@@ -247,6 +247,10 @@ server's resume verdict. **The verdict decides the recovery**; the reason only e
     the drawdown stop from today (it erases no history and journals the acknowledgement);
   - a `breachedStop` of `DAILY_LOSS` also clears at the UTC-day rollover.
 
+  A `REPEATED_VENUE_REFUSAL` halt names no stop: the venue refused the agent's entry the same way three times in 24
+  hours, and the journal's `AGENT_HALTED_VENUE_REFUSAL` event carries its words. Show the player those words, so the
+  cause can be fixed before they resume.
+
   Then resume. An exit the verdict does not mark open is never offered.
 
 After any resume, read the response's `haltedAt`. The server re-checks every stop once the halt is
