@@ -364,7 +364,8 @@ runner's trail distance in ATR and R, the pairs refused and why, and the reachab
 for an ENTRY change too: under a level trigger each direction's `entry` says where the order rests on that coin now
 (the level, the placed price, its side of price, whether a stop or a limit rests, how far it sits from price in percent
 and in ATR, and how many minutes it stays valid), and the trade is built from that placed price; a verdict that does
-not rest (`WRONG_SIDE` with the side it needed, `LEVEL_UNREAD`, `ATR_UNAVAILABLE`) means the agent would not place that
+not rest (`WRONG_SIDE` with the side it needed, `LEVEL_UNREAD`, `ATR_UNAVAILABLE`, `ATR_INSUFFICIENT_HISTORY` while the
+coin's ATR is still warming up) means the agent would not place that
 trade on that coin now. An R
 target there is measured from its own pair's stop; `minRiskRewardRatio` judges each pair's plan risk-reward, stated to
 three decimals. The same holds for a condition: CONDITIONS carries every condition, each with its

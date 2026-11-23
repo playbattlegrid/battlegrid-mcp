@@ -1,6 +1,6 @@
 {
   "generator": "battlegrid-app/server/scripts/export-mcp-skills.mjs",
-  "contractVersion": "184.6.0",
+  "contractVersion": "184.9.0",
   "files": {
     "battlegrid-agent-management/SKILL.md": "7e0d52dad21a54f566c7e47cedeefe3783d39a26a360ac3e9863f0eff88097b2",
     "battlegrid-agent-management/references/agent-stage-examples.md": "dffcc353d61dfc7b5bb6a2b3077fc6bf8c760a34c287cafb3b59b99306f24195",
@@ -10,10 +10,10 @@
     "battlegrid-officers/SKILL.md": "3bffc8f37e517a84e436141b8ee19bc6109573effdd6710a6675cf96fe72dc32",
     "battlegrid-officers/references/officer-stage-examples.md": "ef46ba26f4b36c9964b5bde95fdf98e5952c3786b77be5f136056cac792f0aec",
     "battlegrid-onboarding/SKILL.md": "dddace95f3aad00191926a20953631a6f880915021b0302a91f2af2e1c2fc156",
-    "battlegrid-radar-deployment/SKILL.md": "fc170e09efe674519d8b5d2dbe3b926de6b24c5f1d8d1f90b706b2ea28a26cf0",
+    "battlegrid-radar-deployment/SKILL.md": "af2107e3e97f58188928acbc3656ebf81ac78175281bb4ccc145a6f6c4ecd64d",
     "battlegrid-radar-deployment/references/arena-stage-examples.md": "0987397c848738881e1d5a871b349f29389e98b2746f92491198ff1297408387",
     "battlegrid-radar-deployment/references/radar-stage-examples.md": "08658ccf548bd680633e75813196e52dd19c2c30ffff37883337b017e461efcd",
-    "battlegrid-strategy-authoring/SKILL.md": "f3df63011e185032973985d002b70fbc06db4290f7e9ea1ac79be6640ef96157",
+    "battlegrid-strategy-authoring/SKILL.md": "423b0c09c8035efaa18f559fa63d8b5cfe39fbf410c0121bfbf6babebdca29fa",
     "battlegrid-strategy-authoring/references/strategy-stage-examples.md": "0eb41edd013f95092f5822a922c7cdd731584892ed90da575dbb65c93a1a00b6",
     "battlegrid-strategy-doctor/SKILL.md": "aa8c7b9b8dde043c1e3d027c2b370979ea18b45e0f7757e77164bd0fffbe8236",
     "battlegrid-strategy-examples/SKILL.md": "4c102256c33828800a43ab6920fc0001c49132f442dc0723d3932a781681fda1",
