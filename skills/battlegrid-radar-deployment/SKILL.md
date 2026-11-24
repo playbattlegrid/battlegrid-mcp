@@ -518,7 +518,7 @@ Four reads, cheapest first. Stop as soon as the player's question is answered.
    `includeCurve` requires `agentId`, and is refused without it. The curve covers the last 24 hours and
    stays continuous off duty: an `onDuty: false` point is a strategy bar that closed while the agent was
    off duty — its `atrPct` is over the bar's close (a sweep's is over the level anchor; equal at a bar's
-   close), no sweep judged it, and the summary's `curveDigest` never counts it.
+   close; while the ATR warms up it is the insufficient-history cell `{ mark, needed, available }`), no sweep judged it, and the summary's `curveDigest` never counts it.
 
 **Neither of the first two substitutes for the other, and the reason is structural.** The journal is
 a TRANSITION log, not a state log: a gate that has blocked continuously without crossing again
