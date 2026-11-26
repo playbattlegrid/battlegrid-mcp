@@ -347,27 +347,35 @@ changing; send no other axis.
 
 **A whole axis restates what it keeps.** "Raise the ATR floor to 0.8%" is one TRADE_LEVEL_POLICY
 stage carrying all four of its dials — `minStopLossAtrMultiple`, `maxStopLossAtrMultiple`,
-`minRiskRewardRatio` and `minAtrPct` — and its `tradeLevelMenu`, everything you are not changing exactly as it stands
+`minRiskRewardRatio` and `minAtrPct` — and its `tradeBracket`, everything you are not changing exactly as it stands
 now: read them from the draft's TRADE_LEVEL_POLICY when the draft holds it, otherwise from
-`get_strategy`. The menu lists stops and **exit plans**: a plan is 1–4 targets, each closing a whole-number share of the
-position, and what it does not close is the **runner**, which only Trailing exits — a plan that leaves one is refused
-while `trailingEnabled` is false, and switching Trailing off under one is refused too. A plan's risk-reward is
-share-weighted: each share at its target, the runner at the last target that closes a share; a last target closing 0%
-is the **trail objective**, which sets how far the runner's trail measures and earns no reward. Raising
-`minRiskRewardRatio` above an all-R plan's risk-reward is refused until that plan changes or leaves the menu, so a
-raise restates the menu without it. The `strategy-examples` skill's *Trade levels* section carries the menu's
-options, how pairs are built and what the save refuses. Before committing a TRADE_LEVEL_POLICY change, show the
-player `preview_strategy_trade_levels({ coinTicker, source: { kind: "DRAFT", strategyId, draftVersion } })`: every
-stop with its verdict and the ATR distance it was judged at (an ATR option's own multiple, so a stop on a bound is
-kept), the pairs that survive with each target's price and close %, each
-runner's trail distance in ATR and R, the pairs refused and why, and the reachable stop band, per direction. Show it
+`get_strategy`. The bracket is `{ "LONG": { stop, exitPlan }, "SHORT": { stop, exitPlan } }`: every trade in a
+direction is built from that direction's stop and **exit plan**, so there is no list of stops or plans to stage and no
+setup for the agent to choose — it decides only whether to enter. A plan is
+1–4 targets, each closing a whole-number share of the position, and what it does not close is the **runner**, which
+only Trailing exits — a plan that leaves one is refused while `trailingEnabled` is false, and switching Trailing off
+under one is refused too. A plan's risk-reward is share-weighted: each share at its target, the runner at the last
+target that closes a share; a last target closing 0% is the **trail objective**, which sets how far the runner's trail
+measures and earns no reward. As the `strategy-examples` skill's *Trade levels* section details, each direction holds
+one stop and one exit plan, an R target is measured from that stop, and `minRiskRewardRatio` judges a plan with a level
+target on each bar, while an all-R plan below it, or an ATR stop outside the Floor–Hard stop band
+(`minStopLossAtrMultiple` to `maxStopLossAtrMultiple`, both inclusive), is refused at save, because it could never
+trade. So moving the Floor or the Hard stop past an ATR stop is refused until the stop moves with it, and raising
+`minRiskRewardRatio` above an all-R plan's risk-reward is refused until that plan changes: the stage restates the
+bracket with the dial. Before committing a
+TRADE_LEVEL_POLICY change, show the player
+`preview_strategy_trade_levels({ coinTicker, source: { kind: "DRAFT", strategyId, draftVersion } })`, per direction:
+the `stop` with its verdict and the ATR distance it was judged at (an ATR stop's own multiple, so a stop on a bound is
+kept); the `setup` it built, with each target's price and close % and the runner's trail distance in ATR and R — or,
+when `setup` is null, the `refusal` naming why the plan built none and the ratio it reached; the plan's refused level
+targets; and the reachable stop band. Show it
 for an ENTRY change too: under a level trigger each direction's `entry` says where the order rests on that coin now
 (the level, the placed price, its side of price, whether a stop or a limit rests, how far it sits from price in percent
 and in ATR, and how many minutes it stays valid), and the trade is built from that placed price; a verdict that does
 not rest (`WRONG_SIDE` with the side it needed, `LEVEL_UNREAD`, `ATR_UNAVAILABLE`, `ATR_INSUFFICIENT_HISTORY` while the
 coin's ATR is still warming up) means the agent would not place that
 trade on that coin now. An R
-target there is measured from its own pair's stop; `minRiskRewardRatio` judges each pair's plan risk-reward, stated to
+target there is measured from the bracket's stop; `minRiskRewardRatio` judges the setup's plan risk-reward, stated to
 three decimals. The same holds for a condition: CONDITIONS carries every condition, each with its
 `required` flag and verdict as they stand. Never set `required` or a verdict from memory, and never
 change either unless the player asked: a wrong value there is how a building block silently becomes

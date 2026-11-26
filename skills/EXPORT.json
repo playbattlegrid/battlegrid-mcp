@@ -1,6 +1,6 @@
 {
   "generator": "battlegrid-app/server/scripts/export-mcp-skills.mjs",
-  "contractVersion": "184.9.0",
+  "contractVersion": "185.0.0",
   "files": {
     "battlegrid-agent-management/SKILL.md": "7e0d52dad21a54f566c7e47cedeefe3783d39a26a360ac3e9863f0eff88097b2",
     "battlegrid-agent-management/references/agent-stage-examples.md": "dffcc353d61dfc7b5bb6a2b3077fc6bf8c760a34c287cafb3b59b99306f24195",
@@ -13,10 +13,10 @@
     "battlegrid-radar-deployment/SKILL.md": "af2107e3e97f58188928acbc3656ebf81ac78175281bb4ccc145a6f6c4ecd64d",
     "battlegrid-radar-deployment/references/arena-stage-examples.md": "0987397c848738881e1d5a871b349f29389e98b2746f92491198ff1297408387",
     "battlegrid-radar-deployment/references/radar-stage-examples.md": "08658ccf548bd680633e75813196e52dd19c2c30ffff37883337b017e461efcd",
-    "battlegrid-strategy-authoring/SKILL.md": "423b0c09c8035efaa18f559fa63d8b5cfe39fbf410c0121bfbf6babebdca29fa",
-    "battlegrid-strategy-authoring/references/strategy-stage-examples.md": "0eb41edd013f95092f5822a922c7cdd731584892ed90da575dbb65c93a1a00b6",
+    "battlegrid-strategy-authoring/SKILL.md": "572f06fde08cebeacbbc9df4a2a010439f0252ed43b23abec800096feab21e02",
+    "battlegrid-strategy-authoring/references/strategy-stage-examples.md": "c9a67390a92666e01158dcc57ef8f507ad68d6a4c7bebfec5379ad8ef9721a54",
     "battlegrid-strategy-doctor/SKILL.md": "aa8c7b9b8dde043c1e3d027c2b370979ea18b45e0f7757e77164bd0fffbe8236",
-    "battlegrid-strategy-examples/SKILL.md": "4c102256c33828800a43ab6920fc0001c49132f442dc0723d3932a781681fda1",
+    "battlegrid-strategy-examples/SKILL.md": "10392753b49b7b9651455ac9d4ff29fc6f5d07bee6bde6cd9d8c0fbadf71c452",
     "battlegrid-strategy-examples/references/playbooks.md": "a08e5dd43a2fd3ff7b9eac7833331464edf6a533845824b80953e1e24422c48c",
     "battlegrid-strategy-examples/references/recipes.md": "e24483ec52cbcedba08ed6fa7f2a28b0fde170b2d4b1876162d180538cd789f2",
     "battlegrid-strategy-examples/references/tradingview-ports.md": "8eddbe31d445080cf772c357f0608c912b620583c7bc62de71ddaf98c10c8820",
