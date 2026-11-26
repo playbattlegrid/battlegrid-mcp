@@ -38,6 +38,28 @@ Seeing package `31.x` alongside handshake `battlegrid@33.x` — the package **be
 
 **What this changes for you:** nothing about how you call anything. Upgrading the package no longer waits on a server deploy, and a server deploy no longer strands you on a package that names the wrong contract — reconnect and the announcement follows. **Contract breaking-change notes are no longer keyed to package versions**, since a contract move is no longer a release here; the v11-and-earlier notes below are kept as history, and the live vocabulary is always discovery.
 
+## Contract history — v185 (a strategy holds one bracket per direction)
+
+**v185 is MAJOR: an input v184 accepted is refused, and served fields are removed.** A strategy no longer lists stops
+and exit plans for the agent to pick a pair from per trade. Each direction holds one bracket — one stop and one exit
+plan — and every trade in that direction runs it. Stop kinds and exit plans themselves are unchanged.
+
+### Rejected input — the reason v185 is MAJOR
+
+- **`stage_strategy_draft`**'s `TRADE_LEVEL_POLICY` axis carries `tradeBracket: { LONG: { stop, exitPlan }, SHORT:
+  { stop, exitPlan } }`. A draft still sending `tradeLevelMenu`, or a direction still sending `stops` / `exitPlans`, is
+  refused as an unrecognised key.
+- **`commit_strategy_draft`** refuses an ATR stop outside the strategy's own Floor–Hard stop band, naming
+  `tradeBracket.<DIRECTION>.stop.atrMultiple`. Such a stop could never place a trade. Every refusal v184 made of a stop
+  or an exit plan still stands.
+
+### Reshaped output
+
+- **`get_strategy`, `archive_strategy`, `restore_strategy`, `commit_strategy_draft` and `get_public_strategy`** serve
+  `tradeBracket` in place of `tradeLevelMenu`.
+- **`preview_strategy_trade_levels`**' construction serves the bracket's one `stop`, its one `setup` (or `null`) and the
+  `refusal` that names the rule skipping it, in place of `stopCandidates`, `setups`, `rejectedPairs` and `counters`.
+
 ## Contract history — v184 (one refusal for a coin that is not live)
 
 **v184 is MAJOR: a published refusal loses its details.** No input schema moves, everything v183 accepted is still
