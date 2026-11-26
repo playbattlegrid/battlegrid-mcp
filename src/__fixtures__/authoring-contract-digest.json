@@ -2,7 +2,7 @@
   "digestVersion": 2,
   "server": {
     "name": "battlegrid",
-    "contractVersion": "184.9.0"
+    "contractVersion": "185.0.0"
   },
   "axes": {
     "create": [
@@ -28,7 +28,7 @@
       "timeDecayStaleThresholdTpProgressPct",
       "timeDecayTightenPct",
       "timeframe",
-      "tradeLevelMenu",
+      "tradeBracket",
       "trailingBufferPct",
       "trailingEnabled",
       "trailingGivebackPct",
@@ -62,7 +62,7 @@
       "minAtrPct",
       "minRiskRewardRatio",
       "minStopLossAtrMultiple",
-      "tradeLevelMenu"
+      "tradeBracket"
     ],
     "positionManagement": [
       "breakEvenEnabled",
