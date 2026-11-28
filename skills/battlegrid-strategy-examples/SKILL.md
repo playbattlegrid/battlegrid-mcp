@@ -322,7 +322,13 @@ a header admits only Once:
   a candle column Confirmed to count closes, or read a change at or below the strategy timeframe.
 - `OFFSET` — the column already reads an earlier bar; remove the offset to count closes.
 - `BAR_STATE` — the header describes only the bar being decided.
-- `HISTORY` — not enough history is stored on that timeframe to count more than one close.
+- `HISTORY` — not enough history is stored on that timeframe to count more than one close. A
+  market-structure column (internal and swing structure, equal highs and lows, every liquidity-pool metric)
+  read one or two fixed slots holds inside the 200-bar look-back reserve: 199 closes for a value, 198 for a
+  `levelInteraction`, one less for a prior-bar operator, shortened by however many more bars a deeper
+  `equalBars` or `swingLength` needs. It still admits only Once when it is a windowed or reduced read
+  (`rollingMax`, `ema`, `rank` and similar transforms), when it also folds a custom swing pair or a custom
+  registered study, or at a knob set whose need leaves no window (`equalBars` from about 1,000).
 
 Candle columns (at, above or below the strategy timeframe), the market and stablecoin-pair columns
 (each counted on its subject's own bars), the regime (counted on the regime rung),
@@ -760,7 +766,8 @@ Every reading in this section is therefore a state.
 | `SWING_STRUCTURE_LEVEL` | `structLvl` | the level the latest swing break crossed |
 | `LIQUIDITY_POOL_ABOVE` / `_BELOW` | `poolAbove` / `poolBelow` | the nearest intact buyside pool above price / sellside pool below it — an equal-high / equal-low pair's newer pivot, kept until a close beyond it retires it, several at once |
 | `LIQUIDITY_POOL_ABOVE_INTACT` / `LIQUIDITY_POOL_BELOW_INTACT` | `poolAboveOk` / `poolBelowOk` | false only on the bar whose close retires that pool |
-| `LIQUIDITY_POOL_ABOVE_TOUCHES` / `LIQUIDITY_POOL_BELOW_TOUCHES` | `poolAboveTouch` / `poolBelowTouch` | the bars since that pool formed whose `levelInteraction` against it is a touch or a reject |
+| `LIQUIDITY_POOL_ABOVE_TOUCHES` / `LIQUIDITY_POOL_BELOW_TOUCHES` | `poolAboveTouch` / `poolBelowTouch` | the bars since that pool formed whose `levelInteraction` against it is a touch or a reject — at exact contact, in practice the wick sweeps it survived |
+| `LIQUIDITY_POOL_ABOVE_AGE` / `LIQUIDITY_POOL_BELOW_AGE` | `poolAboveAge` / `poolBelowAge` | the bars that pool has stood: 0 on the bar that confirms it (`equalBars` bars after the newer pivot), restarting with whichever pool is nearest |
 | `LIQUIDITY_POOL_ABOVE_RETIRED` / `LIQUIDITY_POOL_BELOW_RETIRED` | `poolAboveRetired` / `poolBelowRetired` | the pool the previous bar's close retired, read on the next bar only — a level the level verbs take |
 | `LIQUIDITY_POOL_ABOVE_RECLAIMED` / `LIQUIDITY_POOL_BELOW_RECLAIMED` | `poolAboveRecl` / `poolBelowRecl` | true when this bar's close is back at or inside the pool the previous bar's close retired |
 
@@ -982,8 +989,8 @@ switches Trailing off is refused the same way); a target level that is the direc
 stop's level used as a target. The entry level may also be the stop. A bracket still sent as lists — `tradeLevelMenu`, or
 a direction carrying `stops` or `exitPlans` — is refused as an unrecognised key. A CREATE that stages no bracket opens
 with the seed: per direction, an ATR stop at 1.5× held inside the strategy's own band (its Floor when the Floor is
-above 1.5, its Hard stop when the Hard stop is below it), and one target closing 100% at 3R, the platform's
-risk-reward ceiling, so it meets every minimum. The seed names no level.
+above 1.5, its Hard stop when the Hard stop is below it), and one target closing 100% at 3R, which clears the default
+minimum risk-reward of 1.5; a strategy that requires more stages a plan that pays it. The seed names no level.
 
 ## Position management
 
