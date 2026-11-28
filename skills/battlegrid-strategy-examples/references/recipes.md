@@ -151,6 +151,9 @@ and keep its shape.
 | Sellside pool interaction | `{ "metric": "LIQUIDITY_POOL_BELOW", "transformId": "levelInteraction", "timeframe": { "rel": "anchor" } }` | `poolBelow_lvl` |
 | Closed back under the buyside pool the last bar retired | `{ "metric": "LIQUIDITY_POOL_ABOVE_RECLAIMED", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `poolAboveRecl` |
 | Closed back over the sellside pool the last bar retired | `{ "metric": "LIQUIDITY_POOL_BELOW_RECLAIMED", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `poolBelowRecl` |
+| Bars the sellside pool has been touched or swept | `{ "metric": "LIQUIDITY_POOL_BELOW_TOUCHES", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `poolBelowTouch` |
+| Bars the sellside pool has stood | `{ "metric": "LIQUIDITY_POOL_BELOW_AGE", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `poolBelowAge` |
+| Internal structure break | `{ "metric": "INTERNAL_STRUCTURE_EVENT", "transformId": "value", "timeframe": { "rel": "anchor" } }` | `iStructEvt` |
 
 **Candle at a swing** — LuxAlgo's *Swing Highs/Lows & Candle Patterns* at its length 21: a swing pivot of
 21 bars each side, and the candle pattern of the pivot bar itself, Pine's `[21]`. A pivot is decided on
@@ -222,6 +225,20 @@ the breakout, and `dist_poolAboveRetired` how far the close sits from it.
   "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 1 } } }
 ```
 
+**The first sweep of a pool that has stood N bars.** At exact contact a bar rarely touches a pool without passing it,
+so the touch count is in practice the wick sweeps the pool has survived: on the sweeping bar `poolBelowTouch` reads 1 for
+its first. The pool's age reads how long it stood: 0 on the bar that confirms it, `equalBars` bars after the newer
+pivot, restarting with whichever pool is nearest — so "a pool held 20 bars" is `poolBelowAge gte 20`, never a held
+"age increased". Old, untouched liquidity on its first sweep:
+
+```json
+{ "conditionKey": "SELLSIDE_FIRST_SWEEP_OF_STANDING_POOL", "name": "First sweep of a sellside pool that has stood 20 bars", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "ALL", "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelowTouch" }, "op": "lte", "value": 1, "hold": { "atLeast": 1, "of": 1 } },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelowAge" }, "op": "gte", "value": 20, "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
 The same or next candle, on either side:
 
 ```json
@@ -236,6 +253,31 @@ The same or next candle, on either side:
   "definition": { "kind": "group", "op": "ANY", "hold": { "atLeast": 1, "of": 1 }, "members": [
     { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 1 } },
     { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelowRecl" }, "op": "is", "label": "true", "hold": { "atLeast": 1, "of": 1 } } ] } }
+```
+
+**Held sweeps and the sweep-then-CHoCH entry.** A market-structure column read one or two fixed slots holds inside
+the 200-bar look-back reserve — its `conditionHold.maxWindow` serves 199 closes for a value and 198 for a
+`levelInteraction` at the default knobs (less where a deeper `equalBars` or `swingLength` needs more bars) — so "a sweep
+within the last N closes" is one held clause, never N offset columns. A held sweep reads the one-candle form on each
+counted close:
+
+```json
+{ "conditionKey": "SELLSIDE_POOL_SWEPT_WITHIN_20", "name": "Swept the sellside pool and closed back over it, within the last 20 closes", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 20 } } }
+```
+
+The canonical Smart Money Concepts entry — liquidity taken, then the internal structure changes character — is an In
+order group: the same-or-next-candle sweep on an older close, then `iStructEvt` reading `CHoCH↑` on a later one, both
+inside the last 12 closes. The buyside mirror reads `reject_from_below` over `poolAbove_lvl`, `poolAboveRecl` and
+`CHoCH↓`.
+
+```json
+{ "conditionKey": "SELLSIDE_SWEEP_THEN_CHOCH_UP", "name": "Swept the sellside pool, then the internal structure changed character up, within 12 closes", "verdict": "UP", "required": false, "exitSide": null,
+  "definition": { "kind": "group", "op": "SEQUENCE", "within": 12, "hold": { "atLeast": 1, "of": 1 }, "members": [
+    { "kind": "group", "op": "ANY", "hold": { "atLeast": 1, "of": 1 }, "members": [
+      { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelow_lvl" }, "op": "is", "label": "reject_from_above", "hold": { "atLeast": 1, "of": 1 } },
+      { "kind": "clause", "column": { "sectionKey": null, "header": "poolBelowRecl" }, "op": "is", "label": "true", "hold": { "atLeast": 1, "of": 1 } } ] },
+    { "kind": "clause", "column": { "sectionKey": null, "header": "iStructEvt" }, "op": "is", "label": "CHoCH↑", "hold": { "atLeast": 1, "of": 1 } } ] } }
 ```
 
 ## Board-relative rank recipes
